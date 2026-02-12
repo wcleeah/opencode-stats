@@ -1,24 +1,21 @@
 import 'server-only';
-import { createClient, type InArgs, type Client } from '@libsql/client';
-import { homedir } from 'os';
-import { join } from 'path';
+import { createClient, type InArgs, type Client } from '@libsql/client/web';
 
 let client: Client | null = null;
 
 function getClient(): Client {
   if (!client) {
-    if (process.env.TURSO_DATABASE_URL) {
-      // Remote Turso database
-      client = createClient({
-        url: process.env.TURSO_DATABASE_URL,
-        authToken: process.env.TURSO_AUTH_TOKEN,
-      });
-    } else {
-      // Local file fallback for development
-      const dbPath = process.env.OPENCODE_USAGE_DB
-        ?? join(homedir(), '.local', 'share', 'opencode', 'usage.db');
-      client = createClient({ url: `file:${dbPath}` });
+    const url = process.env.TURSO_DATABASE_URL;
+    if (!url) {
+      throw new Error(
+        'TURSO_DATABASE_URL is required. ' +
+        'See README.md for Turso setup instructions.',
+      );
     }
+    client = createClient({
+      url,
+      authToken: process.env.TURSO_AUTH_TOKEN,
+    });
   }
   return client;
 }

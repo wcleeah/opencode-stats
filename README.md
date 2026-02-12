@@ -6,28 +6,29 @@ A dark-themed dashboard for viewing usage statistics from the [OpenCode](https:/
 
 - **Framework**: Next.js (App Router), React 19
 - **Language**: TypeScript (strict mode)
-- **Database**: SQLite via `@libsql/client` — local file or remote [Turso](https://turso.tech/)
+- **Database**: SQLite via `@libsql/client/web` — remote [Turso](https://turso.tech/)
 - **Styling**: Tailwind CSS v4, dark-only, full monospace (Geist Mono)
 - **Charts**: Recharts
 
 ## Getting Started
 
-```bash
-pnpm install
-pnpm dev
-```
+1. Set up a [Turso](https://turso.tech/) database (see below).
+
+2. Create a `.env.local` with your credentials:
+   ```
+   TURSO_DATABASE_URL=libsql://opencode-usage-<org>.turso.io
+   TURSO_AUTH_TOKEN=<token>
+   ```
+
+3. Start the dev server:
+   ```bash
+   pnpm install
+   pnpm dev
+   ```
 
 Open [http://localhost:3000](http://localhost:3000).
 
-By default the app reads from `~/.local/share/opencode/usage.db`. Override with:
-
-```bash
-OPENCODE_USAGE_DB=/path/to/usage.db pnpm dev
-```
-
-## Deploying with Turso
-
-For remote deployment (e.g., Cloudflare Pages), use a [Turso](https://turso.tech/) hosted database instead of a local file.
+## Turso Setup
 
 1. Create a database:
    ```bash
@@ -45,21 +46,18 @@ For remote deployment (e.g., Cloudflare Pages), use a [Turso](https://turso.tech
    turso db tokens create opencode-usage
    ```
 
-4. Set environment variables:
+4. Set environment variables (in `.env.local` for dev, or in your hosting dashboard for production):
    ```
    TURSO_DATABASE_URL=libsql://opencode-usage-<org>.turso.io
    TURSO_AUTH_TOKEN=<token>
    ```
 
-When `TURSO_DATABASE_URL` is set, the app connects to Turso. Otherwise it falls back to the local SQLite file.
-
 ## Environment Variables
 
-| Variable | Description | Default |
+| Variable | Description | Required |
 |---|---|---|
-| `TURSO_DATABASE_URL` | Turso database URL | — |
-| `TURSO_AUTH_TOKEN` | Turso auth token | — |
-| `OPENCODE_USAGE_DB` | Local SQLite file path | `~/.local/share/opencode/usage.db` |
+| `TURSO_DATABASE_URL` | Turso database URL | Yes |
+| `TURSO_AUTH_TOKEN` | Turso auth token | Yes |
 
 ## Pages
 

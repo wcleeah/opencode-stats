@@ -1,0 +1,30 @@
+{
+    "$schema": "./node_modules/wrangler/config-schema.json",
+    "main": "./.open-next/worker.js",
+    "name": "opencode-stats",
+    "compatibility_date": "2026-01-06",
+    "compatibility_flags": ["nodejs_compat"],
+    "assets": {
+        "directory": ".open-next/assets",
+        "binding": "ASSETS"
+    },
+    "vars": {
+        "NODE_ENV": "production"
+    },
+    "observability": {
+        "enabled": false,
+        "head_sampling_rate": 1,
+        "logs": {
+            "enabled": true,
+            "head_sampling_rate": 1,
+            "persist": true,
+            "invocation_logs": true
+        },
+        "traces": {
+            "enabled": false,
+            "persist": true,
+            "head_sampling_rate": 1
+        }
+    }
+}
+

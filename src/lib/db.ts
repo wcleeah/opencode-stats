@@ -3,19 +3,22 @@ import { createClient, type InArgs, type Client } from '@libsql/client';
 import { homedir } from 'os';
 import { join } from 'path';
 
-function getDbPath(): string {
-  if (process.env.OPENCODE_USAGE_DB) {
-    return process.env.OPENCODE_USAGE_DB;
-  }
-  return join(homedir(), '.local', 'share', 'opencode', 'usage.db');
-}
-
 let client: Client | null = null;
 
 function getClient(): Client {
   if (!client) {
-    const dbPath = getDbPath();
-    client = createClient({ url: `file:${dbPath}` });
+    if (process.env.TURSO_DATABASE_URL) {
+      // Remote Turso database
+      client = createClient({
+        url: process.env.TURSO_DATABASE_URL,
+        authToken: process.env.TURSO_AUTH_TOKEN,
+      });
+    } else {
+      // Local file fallback for development
+      const dbPath = process.env.OPENCODE_USAGE_DB
+        ?? join(homedir(), '.local', 'share', 'opencode', 'usage.db');
+      client = createClient({ url: `file:${dbPath}` });
+    }
   }
   return client;
 }

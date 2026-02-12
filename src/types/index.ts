@@ -164,6 +164,8 @@ export interface ModelUsage {
   total_in: number;
   total_out: number;
   total_reasoning: number;
+  total_cache_read: number;
+  total_cache_write: number;
   total_cost: number;
   avg_in: number;
   avg_out: number;
@@ -208,6 +210,8 @@ export interface GlobalStats {
   total_turns: number;
   total_tokens_in: number;
   total_tokens_out: number;
+  total_tokens_cache_read: number;
+  total_tokens_cache_write: number;
   total_cost: number;
   total_tool_calls: number;
   models_used: number;

@@ -49,6 +49,8 @@ export function getModelUsage(): { data: ModelUsage[] | null; error: string | nu
       SUM(am.tokens_in) AS total_in,
       SUM(am.tokens_out) AS total_out,
       SUM(am.tokens_reasoning) AS total_reasoning,
+      SUM(am.tokens_cache_read) AS total_cache_read,
+      SUM(am.tokens_cache_write) AS total_cache_write,
       SUM(am.cost) AS total_cost,
       ROUND(AVG(am.tokens_in), 0) AS avg_in,
       ROUND(AVG(am.tokens_out), 0) AS avg_out,

@@ -5,6 +5,7 @@ import {
   getCacheEfficiency,
   getDailyErrorRate,
 } from '@/lib/queries/analytics';
+import { estimateCost } from '@/lib/pricing';
 import { formatTokens, formatCost, formatPercent } from '@/lib/format';
 import { Card, StatCard } from '@/components/ui/card';
 import {
@@ -41,13 +42,28 @@ export default async function ModelsPage() {
   const totalIn = data.reduce((sum, m) => sum + m.total_in, 0);
   const totalOut = data.reduce((sum, m) => sum + m.total_out, 0);
   const totalReasoning = data.reduce((sum, m) => sum + m.total_reasoning, 0);
-  const totalCost = data.reduce((sum, m) => sum + m.total_cost, 0);
   const overallCacheHit =
     totalIn > 0
       ? data.reduce((sum, m) => sum + (m.cache_hit_pct / 100) * m.total_in, 0) /
         totalIn *
         100
       : 0;
+
+  // Compute estimated costs per model
+  const modelEstimates = data.map((m) => ({
+    ...m,
+    est: estimateCost({
+      reportedCost: m.total_cost,
+      modelId: m.model_id,
+      tokensIn: m.total_in,
+      tokensOut: m.total_out,
+      tokensCacheRead: m.total_cache_read,
+      tokensCacheWrite: m.total_cache_write,
+    }),
+  }));
+
+  const totalEstCost = modelEstimates.reduce((sum, m) => sum + m.est.cost, 0);
+  const anyEstimated = modelEstimates.some((m) => m.est.estimated);
 
   return (
     <div className="space-y-6">
@@ -70,6 +86,18 @@ export default async function ModelsPage() {
           label="Cache Hit Rate"
           value={formatPercent(overallCacheHit)}
         />
+        <StatCard
+          label="Est. Cost"
+          value={formatCost(totalEstCost, anyEstimated)}
+          subValue={anyEstimated ? 'includes estimates' : undefined}
+        />
+        {totalReasoning > 0 && (
+          <StatCard
+            label="Reasoning Tokens"
+            value={formatTokens(totalReasoning)}
+            subValue={`${formatPercent((totalReasoning / (totalIn + totalOut + totalReasoning)) * 100)} of all tokens`}
+          />
+        )}
       </div>
 
       {/* Model comparison table */}
@@ -90,11 +118,11 @@ export default async function ModelsPage() {
                 <TableCell header align="right">Avg In</TableCell>
                 <TableCell header align="right">Avg Out</TableCell>
                 <TableCell header align="right">Cache Hit</TableCell>
-                <TableCell header align="right">Cost</TableCell>
+                <TableCell header align="right">Est. Cost</TableCell>
               </TableRow>
             </TableHeader>
-            <tbody>
-              {data.map((model) => {
+            <TableBody>
+              {modelEstimates.map((model) => {
                 const pct =
                   totalResponses > 0
                     ? (model.response_count / totalResponses) * 100
@@ -147,12 +175,14 @@ export default async function ModelsPage() {
                       </span>
                     </TableCell>
                     <TableCell align="right">
-                      {formatCost(model.total_cost)}
+                      <span className={model.est.estimated ? 'text-muted' : ''}>
+                        {formatCost(model.est.cost, model.est.estimated)}
+                      </span>
                     </TableCell>
                   </TableRow>
                 );
               })}
-            </tbody>
+            </TableBody>
           </Table>
         </div>
       )}
@@ -175,22 +205,6 @@ export default async function ModelsPage() {
           <ErrorRateChart data={errors.data ?? []} />
         </Card>
       </div>
-
-      {/* Additional stats */}
-      {totalReasoning > 0 && (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <StatCard
-            label="Reasoning Tokens"
-            value={formatTokens(totalReasoning)}
-            subValue={`${formatPercent((totalReasoning / (totalIn + totalOut + totalReasoning)) * 100)} of all tokens`}
-          />
-          <StatCard
-            label="Total Cost"
-            value={formatCost(totalCost)}
-            subValue={totalCost === 0 ? 'estimated N/A' : undefined}
-          />
-        </div>
-      )}
 
       {data.length === 0 && (
         <div className="flex min-h-[40vh] items-center justify-center">

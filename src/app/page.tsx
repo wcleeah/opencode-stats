@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { getGlobalStats } from '@/lib/queries/stats';
 import { getDailyTokenUsage, getModelUsage } from '@/lib/queries/analytics';
+import { estimateCost } from '@/lib/pricing';
 import { formatTokens, formatCost } from '@/lib/format';
 import { StatCard } from '@/components/ui/card';
 import { Card } from '@/components/ui/card';
@@ -45,6 +46,23 @@ export default async function Home() {
 
   const totalTokens = s.total_tokens_in + s.total_tokens_out;
 
+  // Compute estimated total cost from per-model data
+  const modelData = models.data ?? [];
+  let totalEstimatedCost = 0;
+  let anyEstimated = false;
+  for (const m of modelData) {
+    const est = estimateCost({
+      reportedCost: m.total_cost,
+      modelId: m.model_id,
+      tokensIn: m.total_in,
+      tokensOut: m.total_out,
+      tokensCacheRead: m.total_cache_read,
+      tokensCacheWrite: m.total_cache_write,
+    });
+    totalEstimatedCost += est.cost;
+    if (est.estimated) anyEstimated = true;
+  }
+
   return (
     <div className="space-y-6">
       <Breadcrumbs crumbs={[{ label: 'dashboard' }]} />
@@ -79,9 +97,9 @@ export default async function Home() {
           value={s.models_used.toLocaleString()}
         />
         <StatCard
-          label="Cost"
-          value={formatCost(s.total_cost)}
-          subValue={s.total_cost === 0 ? 'estimated N/A' : undefined}
+          label="Est. Cost"
+          value={formatCost(totalEstimatedCost, anyEstimated)}
+          subValue={anyEstimated ? 'includes estimates' : undefined}
         />
       </div>
 
@@ -94,7 +112,7 @@ export default async function Home() {
       </Card>
 
       {/* Model usage table */}
-      {models.data && models.data.length > 0 && (
+      {modelData.length > 0 && (
         <div>
           <div className="mb-2 text-xs text-muted uppercase tracking-wider">
             Model Usage
@@ -108,35 +126,48 @@ export default async function Home() {
                 <TableCell header align="right">Tokens In</TableCell>
                 <TableCell header align="right">Tokens Out</TableCell>
                 <TableCell header align="right">Cache Hit</TableCell>
-                <TableCell header align="right">Cost</TableCell>
+                <TableCell header align="right">Est. Cost</TableCell>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {models.data.map((model) => (
-                <TableRow key={`${model.model_id}-${model.provider_id}`}>
-                  <TableCell className="text-foreground font-medium">
-                    {model.model_id}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="info">{model.provider_id}</Badge>
-                  </TableCell>
-                  <TableCell align="right">
-                    {model.response_count.toLocaleString()}
-                  </TableCell>
-                  <TableCell align="right">
-                    {formatTokens(model.total_in)}
-                  </TableCell>
-                  <TableCell align="right">
-                    {formatTokens(model.total_out)}
-                  </TableCell>
-                  <TableCell align="right">
-                    {model.cache_hit_pct}%
-                  </TableCell>
-                  <TableCell align="right">
-                    {formatCost(model.total_cost)}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {modelData.map((model) => {
+                const est = estimateCost({
+                  reportedCost: model.total_cost,
+                  modelId: model.model_id,
+                  tokensIn: model.total_in,
+                  tokensOut: model.total_out,
+                  tokensCacheRead: model.total_cache_read,
+                  tokensCacheWrite: model.total_cache_write,
+                });
+
+                return (
+                  <TableRow key={`${model.model_id}-${model.provider_id}`}>
+                    <TableCell className="text-foreground font-medium">
+                      {model.model_id}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="info">{model.provider_id}</Badge>
+                    </TableCell>
+                    <TableCell align="right">
+                      {model.response_count.toLocaleString()}
+                    </TableCell>
+                    <TableCell align="right">
+                      {formatTokens(model.total_in)}
+                    </TableCell>
+                    <TableCell align="right">
+                      {formatTokens(model.total_out)}
+                    </TableCell>
+                    <TableCell align="right">
+                      {model.cache_hit_pct}%
+                    </TableCell>
+                    <TableCell align="right">
+                      <span className={est.estimated ? 'text-muted' : ''}>
+                        {formatCost(est.cost, est.estimated)}
+                      </span>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </div>

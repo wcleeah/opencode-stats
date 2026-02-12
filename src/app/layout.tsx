@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import { Geist_Mono } from 'next/font/google';
+
+import { Nav } from '@/components/nav';
 import './globals.css';
 
 const geistMono = Geist_Mono({
@@ -20,7 +22,10 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${geistMono.variable} antialiased`}>
-        {children}
+        <Nav />
+        <main className="mx-auto max-w-7xl px-4 py-6">
+          {children}
+        </main>
       </body>
     </html>
   );

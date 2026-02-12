@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getGlobalStats } from '@/lib/queries/stats';
 import { getDailyTokenUsage, getModelUsage } from '@/lib/queries/analytics';
 import { formatTokens, formatCost } from '@/lib/format';

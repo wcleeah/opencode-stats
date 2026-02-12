@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { getSessionById, getSessionStats, getSubtaskTree } from '@/lib/queries/sessions';
 import { getMessageThread, getToolCallsForSession } from '@/lib/queries/messages';
 import {

@@ -1,4 +1,4 @@
-import { Database, type SQLQueryBindings } from 'bun:sqlite';
+import type { Database as BunDatabase, SQLQueryBindings } from 'bun:sqlite';
 import { homedir } from 'os';
 import { join } from 'path';
 
@@ -11,10 +11,14 @@ function getDbPath(): string {
   return join(homedir(), '.local', 'share', 'opencode', 'usage.db');
 }
 
-let db: Database | null = null;
+let db: BunDatabase | null = null;
 
-function getDb(): Database {
+function getDb(): BunDatabase {
   if (!db) {
+    // bun:sqlite is only available when running under the Bun runtime.
+    // During Next.js build (Node.js workers), this will throw.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { Database } = require('bun:sqlite') as typeof import('bun:sqlite');
     const dbPath = getDbPath();
     db = new Database(dbPath, { readonly: true });
     db.exec('PRAGMA journal_mode = WAL');

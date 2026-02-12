@@ -7,10 +7,10 @@ import type {
   CacheEfficiency,
 } from '@/types';
 
-export function getDailyTokenUsage(
+export async function getDailyTokenUsage(
   startMs?: number,
   endMs?: number,
-): { data: DailyTokenUsage[] | null; error: string | null } {
+): Promise<{ data: DailyTokenUsage[] | null; error: string | null }> {
   const conditions: string[] = [];
   const params: number[] = [];
 
@@ -40,7 +40,10 @@ export function getDailyTokenUsage(
   `, params.length > 0 ? params : undefined);
 }
 
-export function getModelUsage(): { data: ModelUsage[] | null; error: string | null } {
+export async function getModelUsage(): Promise<{
+  data: ModelUsage[] | null;
+  error: string | null;
+}> {
   return queryAll<ModelUsage>(`
     SELECT
       am.model_id,
@@ -65,7 +68,10 @@ export function getModelUsage(): { data: ModelUsage[] | null; error: string | nu
   `);
 }
 
-export function getToolUsage(): { data: ToolUsage[] | null; error: string | null } {
+export async function getToolUsage(): Promise<{
+  data: ToolUsage[] | null;
+  error: string | null;
+}> {
   return queryAll<ToolUsage>(`
     SELECT
       tc.tool,
@@ -89,7 +95,10 @@ export function getToolUsage(): { data: ToolUsage[] | null; error: string | null
   `);
 }
 
-export function getDailyErrorRate(): { data: DailyErrorRate[] | null; error: string | null } {
+export async function getDailyErrorRate(): Promise<{
+  data: DailyErrorRate[] | null;
+  error: string | null;
+}> {
   return queryAll<DailyErrorRate>(`
     SELECT
       DATE(am.created_at / 1000, 'unixepoch', 'localtime') AS day,
@@ -105,10 +114,10 @@ export function getDailyErrorRate(): { data: DailyErrorRate[] | null; error: str
   `);
 }
 
-export function getCacheEfficiency(): {
+export async function getCacheEfficiency(): Promise<{
   data: CacheEfficiency[] | null;
   error: string | null;
-} {
+}> {
   return queryAll<CacheEfficiency>(`
     SELECT
       DATE(am.created_at / 1000, 'unixepoch', 'localtime') AS day,

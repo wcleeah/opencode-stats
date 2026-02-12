@@ -19,7 +19,7 @@ import { Breadcrumbs } from '@/components/breadcrumbs';
 import { ToolChart } from '@/components/tool-chart';
 
 export default async function ToolsPage() {
-  const tools = getToolUsage();
+  const tools = await getToolUsage();
 
   if (tools.error) {
     return (

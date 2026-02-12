@@ -1,14 +1,14 @@
 import { queryAll, queryOne } from '@/lib/db';
 import type { SessionWithStats, PaginatedResult, SubtaskNode, Session } from '@/types';
 
-export function getSessionsByProject(
+export async function getSessionsByProject(
   projectId: string,
   page: number = 1,
   pageSize: number = 20,
-): { data: PaginatedResult<SessionWithStats> | null; error: string | null } {
+): Promise<{ data: PaginatedResult<SessionWithStats> | null; error: string | null }> {
   const offset = (page - 1) * pageSize;
 
-  const countResult = queryOne<{ total: number }>(
+  const countResult = await queryOne<{ total: number }>(
     `SELECT COUNT(*) AS total FROM sessions
      WHERE project_id = ? AND parent_id IS NULL`,
     [projectId],
@@ -21,7 +21,7 @@ export function getSessionsByProject(
   const total = countResult.data.total;
   const totalPages = Math.ceil(total / pageSize);
 
-  const result = queryAll<SessionWithStats>(`
+  const result = await queryAll<SessionWithStats>(`
     SELECT
       s.id,
       s.title,
@@ -64,9 +64,12 @@ export function getSessionsByProject(
   };
 }
 
-export function getSessionById(
+export async function getSessionById(
   sessionId: string,
-): { data: (Session & { project_worktree: string | null }) | null; error: string | null } {
+): Promise<{
+  data: (Session & { project_worktree: string | null }) | null;
+  error: string | null;
+}> {
   return queryOne<Session & { project_worktree: string | null }>(`
     SELECT
       s.*,
@@ -77,9 +80,9 @@ export function getSessionById(
   `, [sessionId]);
 }
 
-export function getSessionStats(
+export async function getSessionStats(
   sessionId: string,
-): { data: SessionWithStats | null; error: string | null } {
+): Promise<{ data: SessionWithStats | null; error: string | null }> {
   return queryOne<SessionWithStats>(`
     SELECT
       s.id,
@@ -105,9 +108,9 @@ export function getSessionStats(
   `, [sessionId]);
 }
 
-export function getSubtaskTree(
+export async function getSubtaskTree(
   rootSessionId: string,
-): { data: SubtaskNode[] | null; error: string | null } {
+): Promise<{ data: SubtaskNode[] | null; error: string | null }> {
   return queryAll<SubtaskNode>(`
     WITH RECURSIVE subtree AS (
       SELECT id, parent_id, title, 0 AS depth

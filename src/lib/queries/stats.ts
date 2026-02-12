@@ -1,7 +1,10 @@
 import { queryOne } from '@/lib/db';
 import type { GlobalStats } from '@/types';
 
-export function getGlobalStats(): { data: GlobalStats | null; error: string | null } {
+export async function getGlobalStats(): Promise<{
+  data: GlobalStats | null;
+  error: string | null;
+}> {
   return queryOne<GlobalStats>(`
     SELECT
       (SELECT COUNT(*) FROM projects WHERE id != '_unknown') AS total_projects,

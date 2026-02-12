@@ -1,9 +1,9 @@
 import { queryAll } from '@/lib/db';
 import type { MessageThread, ToolCall } from '@/types';
 
-export function getMessageThread(
+export async function getMessageThread(
   sessionId: string,
-): { data: MessageThread[] | null; error: string | null } {
+): Promise<{ data: MessageThread[] | null; error: string | null }> {
   return queryAll<MessageThread>(`
     SELECT
       um.id AS user_message_id,
@@ -33,9 +33,9 @@ export function getMessageThread(
   `, [sessionId]);
 }
 
-export function getToolCallsForSession(
+export async function getToolCallsForSession(
   sessionId: string,
-): { data: ToolCall[] | null; error: string | null } {
+): Promise<{ data: ToolCall[] | null; error: string | null }> {
   return queryAll<ToolCall>(`
     SELECT
       tc.id,

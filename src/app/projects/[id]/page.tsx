@@ -36,8 +36,8 @@ export default async function ProjectDetailPage({
   const sp = await searchParams;
   const page = Math.max(1, Number(sp.page) || 1);
 
-  const projectResult = getProjectById(id);
-  const sessionsResult = getSessionsByProject(id, page, 20);
+  const projectResult = await getProjectById(id);
+  const sessionsResult = await getSessionsByProject(id, page, 20);
 
   if (projectResult.error || !projectResult.data) {
     return (

@@ -21,7 +21,7 @@ interface ProjectsPageProps {
 export default async function ProjectsPage({ searchParams }: ProjectsPageProps) {
   const params = await searchParams;
   const page = Math.max(1, Number(params.page) || 1);
-  const result = getProjects(page, 20);
+  const result = await getProjects(page, 20);
 
   if (result.error) {
     return (

@@ -1,8 +1,7 @@
-import type { Database as BunDatabase, SQLQueryBindings } from 'bun:sqlite';
+import 'server-only';
+import { createClient, type InArgs, type Client } from '@libsql/client';
 import { homedir } from 'os';
 import { join } from 'path';
-
-type Params = SQLQueryBindings[];
 
 function getDbPath(): string {
   if (process.env.OPENCODE_USAGE_DB) {
@@ -11,19 +10,14 @@ function getDbPath(): string {
   return join(homedir(), '.local', 'share', 'opencode', 'usage.db');
 }
 
-let db: BunDatabase | null = null;
+let client: Client | null = null;
 
-function getDb(): BunDatabase {
-  if (!db) {
-    // bun:sqlite is only available when running under the Bun runtime.
-    // During Next.js build (Node.js workers), this will throw.
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { Database } = require('bun:sqlite') as typeof import('bun:sqlite');
+function getClient(): Client {
+  if (!client) {
     const dbPath = getDbPath();
-    db = new Database(dbPath, { readonly: true });
-    db.exec('PRAGMA journal_mode = WAL');
+    client = createClient({ url: `file:${dbPath}` });
   }
-  return db;
+  return client;
 }
 
 export interface QueryResult<T> {
@@ -31,12 +25,27 @@ export interface QueryResult<T> {
   error: string | null;
 }
 
-export function queryAll<T>(sql: string, params?: Params): QueryResult<T[]> {
+export type Params = InArgs;
+
+export async function queryAll<T>(
+  sql: string,
+  params?: Params,
+): Promise<QueryResult<T[]>> {
   try {
-    const database = getDb();
-    const stmt = database.prepare(sql);
-    const rows = params ? stmt.all(...params) : stmt.all();
-    return { data: rows as T[], error: null };
+    const db = getClient();
+    const result = await db.execute(
+      params ? { sql, args: params } : sql,
+    );
+    // Row objects have named properties matching column names.
+    // Spread into plain objects so they match our TypeScript interfaces.
+    const rows = result.rows.map((row) => {
+      const obj: Record<string, unknown> = {};
+      for (const col of result.columns) {
+        obj[col] = row[col];
+      }
+      return obj as T;
+    });
+    return { data: rows, error: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[db.queryAll] ${message}`, { sql, params });
@@ -44,12 +53,24 @@ export function queryAll<T>(sql: string, params?: Params): QueryResult<T[]> {
   }
 }
 
-export function queryOne<T>(sql: string, params?: Params): QueryResult<T> {
+export async function queryOne<T>(
+  sql: string,
+  params?: Params,
+): Promise<QueryResult<T>> {
   try {
-    const database = getDb();
-    const stmt = database.prepare(sql);
-    const row = params ? stmt.get(...params) : stmt.get();
-    return { data: (row as T) ?? null, error: null };
+    const db = getClient();
+    const result = await db.execute(
+      params ? { sql, args: params } : sql,
+    );
+    if (result.rows.length === 0) {
+      return { data: null, error: null };
+    }
+    const row = result.rows[0];
+    const obj: Record<string, unknown> = {};
+    for (const col of result.columns) {
+      obj[col] = row[col];
+    }
+    return { data: obj as T, error: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[db.queryOne] ${message}`, { sql, params });

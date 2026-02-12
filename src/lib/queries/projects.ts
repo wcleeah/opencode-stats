@@ -1,13 +1,13 @@
 import { queryAll, queryOne } from '@/lib/db';
 import type { ProjectWithStats, PaginatedResult } from '@/types';
 
-export function getProjects(
+export async function getProjects(
   page: number = 1,
   pageSize: number = 20,
-): { data: PaginatedResult<ProjectWithStats> | null; error: string | null } {
+): Promise<{ data: PaginatedResult<ProjectWithStats> | null; error: string | null }> {
   const offset = (page - 1) * pageSize;
 
-  const countResult = queryOne<{ total: number }>(
+  const countResult = await queryOne<{ total: number }>(
     `SELECT COUNT(*) AS total FROM projects WHERE id != '_unknown'`
   );
 
@@ -18,7 +18,7 @@ export function getProjects(
   const total = countResult.data.total;
   const totalPages = Math.ceil(total / pageSize);
 
-  const result = queryAll<ProjectWithStats>(`
+  const result = await queryAll<ProjectWithStats>(`
     SELECT
       p.id,
       p.worktree,
@@ -53,9 +53,9 @@ export function getProjects(
   };
 }
 
-export function getProjectById(
+export async function getProjectById(
   projectId: string,
-): { data: ProjectWithStats | null; error: string | null } {
+): Promise<{ data: ProjectWithStats | null; error: string | null }> {
   return queryOne<ProjectWithStats>(`
     SELECT
       p.id,

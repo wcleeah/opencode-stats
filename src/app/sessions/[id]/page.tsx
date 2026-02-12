@@ -44,11 +44,11 @@ export default async function SessionDetailPage({
 }: SessionDetailPageProps) {
   const { id } = await params;
 
-  const sessionResult = getSessionById(id);
-  const statsResult = getSessionStats(id);
-  const threadResult = getMessageThread(id);
-  const toolCallsResult = getToolCallsForSession(id);
-  const subtasksResult = getSubtaskTree(id);
+  const sessionResult = await getSessionById(id);
+  const statsResult = await getSessionStats(id);
+  const threadResult = await getMessageThread(id);
+  const toolCallsResult = await getToolCallsForSession(id);
+  const subtasksResult = await getSubtaskTree(id);
 
   if (sessionResult.error || !sessionResult.data) {
     return (

@@ -18,9 +18,9 @@ import { TokenChart } from '@/components/token-chart';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 
 export default async function Home() {
-  const stats = getGlobalStats();
-  const dailyTokens = getDailyTokenUsage();
-  const models = getModelUsage();
+  const stats = await getGlobalStats();
+  const dailyTokens = await getDailyTokenUsage();
+  const models = await getModelUsage();
 
   if (stats.error) {
     return (

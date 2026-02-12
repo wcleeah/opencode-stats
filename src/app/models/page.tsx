@@ -21,9 +21,9 @@ import { CacheChart } from '@/components/cache-chart';
 import { ErrorRateChart } from '@/components/error-rate-chart';
 
 export default async function ModelsPage() {
-  const models = getModelUsage();
-  const cache = getCacheEfficiency();
-  const errors = getDailyErrorRate();
+  const models = await getModelUsage();
+  const cache = await getCacheEfficiency();
+  const errors = await getDailyErrorRate();
 
   if (models.error) {
     return (

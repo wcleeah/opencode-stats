@@ -1,7 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { getSessionById, getSessionStats, getSubtaskTree } from '@/lib/queries/sessions';
-import { getMessageThread, getToolCallsForSession } from '@/lib/queries/messages';
+import { getMessageThread, getToolCallDetailsBySession } from '@/lib/queries/messages';
 import {
   formatTokens,
   formatCost,
@@ -14,6 +14,7 @@ import {
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { StatCard, Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import type { ToolCallDetail } from '@/types';
 
 interface SessionDetailPageProps {
   params: Promise<{ id: string }>;
@@ -39,6 +40,174 @@ function finishBadgeVariant(
   }
 }
 
+/**
+ * Parse tool call input JSON and return readable key-value lines.
+ * Each tool has different input fields — extract the meaningful ones.
+ */
+function formatToolInput(tool: string, raw: string | null): string | null {
+  if (!raw) return null;
+
+  try {
+    const parsed: Record<string, unknown> = JSON.parse(raw);
+
+    switch (tool) {
+      case 'bash': {
+        const parts: string[] = [];
+        if (parsed.command) parts.push(`$ ${parsed.command}`);
+        if (parsed.workdir) parts.push(`cwd: ${parsed.workdir}`);
+        if (parsed.description) parts.push(`# ${parsed.description}`);
+        return parts.length > 0 ? parts.join('\n') : raw;
+      }
+
+      case 'read': {
+        const parts: string[] = [];
+        if (parsed.filePath) parts.push(`${parsed.filePath}`);
+        if (parsed.offset != null || parsed.limit != null) {
+          const range: string[] = [];
+          if (parsed.offset != null) range.push(`offset: ${parsed.offset}`);
+          if (parsed.limit != null) range.push(`limit: ${parsed.limit}`);
+          parts.push(range.join(', '));
+        }
+        return parts.length > 0 ? parts.join('\n') : raw;
+      }
+
+      case 'edit': {
+        const parts: string[] = [];
+        if (parsed.filePath) parts.push(`${parsed.filePath}`);
+        if (parsed.oldString != null) {
+          parts.push(`--- old`);
+          parts.push(String(parsed.oldString));
+          parts.push(`+++ new`);
+          parts.push(String(parsed.newString ?? ''));
+        }
+        if (parsed.replaceAll) parts.push(`(replace all)`);
+        return parts.length > 0 ? parts.join('\n') : raw;
+      }
+
+      case 'write': {
+        const parts: string[] = [];
+        if (parsed.filePath) parts.push(`${parsed.filePath}`);
+        if (parsed.content != null) parts.push(String(parsed.content));
+        return parts.length > 0 ? parts.join('\n') : raw;
+      }
+
+      case 'glob': {
+        const parts: string[] = [];
+        if (parsed.pattern) parts.push(`pattern: ${parsed.pattern}`);
+        if (parsed.path) parts.push(`path: ${parsed.path}`);
+        return parts.length > 0 ? parts.join('\n') : raw;
+      }
+
+      case 'grep': {
+        const parts: string[] = [];
+        if (parsed.pattern) parts.push(`pattern: ${parsed.pattern}`);
+        if (parsed.include) parts.push(`include: ${parsed.include}`);
+        if (parsed.path) parts.push(`path: ${parsed.path}`);
+        return parts.length > 0 ? parts.join('\n') : raw;
+      }
+
+      case 'task': {
+        const parts: string[] = [];
+        if (parsed.description) parts.push(`# ${parsed.description}`);
+        if (parsed.prompt) parts.push(String(parsed.prompt));
+        return parts.length > 0 ? parts.join('\n') : raw;
+      }
+
+      case 'webfetch': {
+        const parts: string[] = [];
+        if (parsed.url) parts.push(`${parsed.url}`);
+        if (parsed.format) parts.push(`format: ${parsed.format}`);
+        return parts.length > 0 ? parts.join('\n') : raw;
+      }
+
+      case 'todowrite': {
+        if (Array.isArray(parsed.todos)) {
+          return (parsed.todos as Array<Record<string, unknown>>)
+            .map((t) => {
+              const status = t.status === 'completed' ? '[x]'
+                : t.status === 'in_progress' ? '[~]'
+                : '[ ]';
+              return `${status} ${t.content ?? t.id}`;
+            })
+            .join('\n');
+        }
+        return raw;
+      }
+
+      default: {
+        // Generic: show all key-value pairs
+        const entries = Object.entries(parsed);
+        if (entries.length === 0) return null;
+        return entries
+          .map(([k, v]) => {
+            const val = typeof v === 'string' ? v : JSON.stringify(v);
+            return `${k}: ${val}`;
+          })
+          .join('\n');
+      }
+    }
+  } catch {
+    // Not JSON or parse failed — return raw content
+    return raw;
+  }
+}
+
+function ToolCallBlock({ tc }: { tc: ToolCallDetail }) {
+  const formattedInput = formatToolInput(tc.tool, tc.input_content);
+
+  return (
+    <div className="border border-border/50 rounded-sm overflow-hidden">
+      {/* Tool call header */}
+      <div className="flex items-center gap-2 px-2 py-1.5 bg-grep-1 border-b border-border/50">
+        <Badge variant={tc.status === 'error' ? 'error' : 'success'}>
+          {tc.tool}
+        </Badge>
+        {tc.title && (
+          <span className="text-xs text-grep-9 truncate flex-1">
+            {tc.title}
+          </span>
+        )}
+        {tc.duration_ms != null && (
+          <span className="text-xs text-grep-7 tabular-nums shrink-0">
+            {formatDuration(tc.duration_ms)}
+          </span>
+        )}
+      </div>
+
+      {/* Error */}
+      {tc.error && (
+        <div className="px-2 py-1.5 text-xs text-error bg-error/5 border-b border-border/50">
+          {tc.error}
+        </div>
+      )}
+
+      {/* Input content */}
+      {formattedInput && (
+        <div className="border-b border-border/50">
+          <div className="px-2 py-1 text-[10px] text-grep-5 uppercase tracking-wider">
+            input
+          </div>
+          <div className="px-2 pb-2 text-xs whitespace-pre-wrap text-grep-9 max-h-64 overflow-y-auto">
+            {formattedInput}
+          </div>
+        </div>
+      )}
+
+      {/* Output content */}
+      {tc.output_content && (
+        <div>
+          <div className="px-2 py-1 text-[10px] text-grep-5 uppercase tracking-wider">
+            output
+          </div>
+          <div className="px-2 pb-2 text-xs whitespace-pre-wrap text-grep-9 max-h-64 overflow-y-auto">
+            {tc.output_content}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default async function SessionDetailPage({
   params,
 }: SessionDetailPageProps) {
@@ -47,7 +216,7 @@ export default async function SessionDetailPage({
   const sessionResult = await getSessionById(id);
   const statsResult = await getSessionStats(id);
   const threadResult = await getMessageThread(id);
-  const toolCallsResult = await getToolCallsForSession(id);
+  const toolCallDetailsResult = await getToolCallDetailsBySession(id);
   const subtasksResult = await getSubtaskTree(id);
 
   if (sessionResult.error || !sessionResult.data) {
@@ -64,8 +233,16 @@ export default async function SessionDetailPage({
   const session = sessionResult.data;
   const stats = statsResult.data;
   const thread = threadResult.data ?? [];
-  const toolCalls = toolCallsResult.data ?? [];
   const subtasks = subtasksResult.data ?? [];
+
+  // Build map: assistant_message_id -> tool calls with full details
+  const toolCallsByMessage = new Map<string, ToolCallDetail[]>();
+  for (const tc of toolCallDetailsResult.data ?? []) {
+    if (!toolCallsByMessage.has(tc.assistant_message_id)) {
+      toolCallsByMessage.set(tc.assistant_message_id, []);
+    }
+    toolCallsByMessage.get(tc.assistant_message_id)!.push(tc);
+  }
 
   const worktree = session.project_worktree;
   const pName = worktree ? projectName(worktree) : 'unknown';
@@ -189,10 +366,6 @@ export default async function SessionDetailPage({
             const assistantMsgs = messages.filter(
               (m) => m.assistant_message_id !== null,
             );
-            // The final response is the last non-tool-calls one
-            const finalResponse = assistantMsgs.find(
-              (m) => m.finish !== 'tool-calls',
-            ) ?? assistantMsgs[assistantMsgs.length - 1];
 
             return (
               <div key={umId} className="border border-border rounded-sm">
@@ -219,6 +392,9 @@ export default async function SessionDetailPage({
                 {assistantMsgs.map((am) => {
                   if (!am.assistant_message_id) return null;
 
+                  const msgToolCalls =
+                    toolCallsByMessage.get(am.assistant_message_id) ?? [];
+
                   return (
                     <div
                       key={am.assistant_message_id}
@@ -238,12 +414,15 @@ export default async function SessionDetailPage({
                         )}
                         {am.tokens_in != null && (
                           <span className="text-xs text-grep-7">
-                            {formatTokens(am.tokens_in)} in / {formatTokens(am.tokens_out ?? 0)} out
+                            {formatTokens(am.tokens_in)} in /{' '}
+                            {formatTokens(am.tokens_out ?? 0)} out
                           </span>
                         )}
                         {am.completed_at && am.assistant_created_at && (
                           <span className="text-xs text-grep-7">
-                            {formatDuration(am.completed_at - am.assistant_created_at)}
+                            {formatDuration(
+                              am.completed_at - am.assistant_created_at,
+                            )}
                           </span>
                         )}
                       </div>
@@ -252,16 +431,18 @@ export default async function SessionDetailPage({
                           {am.error_type}: {am.error_message}
                         </div>
                       )}
-                      {am.assistant_text ? (
+                      {am.assistant_text && (
                         <div className="text-sm whitespace-pre-wrap text-grep-11 max-h-96 overflow-y-auto">
                           {am.assistant_text}
                         </div>
-                      ) : (
-                        am.finish === 'tool-calls' && (
-                          <span className="text-xs text-grep-5 italic">
-                            [tool calls...]
-                          </span>
-                        )
+                      )}
+                      {/* Inline tool calls */}
+                      {msgToolCalls.length > 0 && (
+                        <div className="mt-2 space-y-2">
+                          {msgToolCalls.map((tc) => (
+                            <ToolCallBlock key={tc.id} tc={tc} />
+                          ))}
+                        </div>
                       )}
                     </div>
                   );
@@ -271,42 +452,6 @@ export default async function SessionDetailPage({
           })}
         </div>
       </div>
-
-      {/* Tool calls timeline */}
-      {toolCalls.length > 0 && (
-        <div>
-          <div className="text-xs text-muted uppercase tracking-wider mb-3">
-            Tool Calls ({toolCalls.length})
-          </div>
-          <div className="space-y-1">
-            {toolCalls.map((tc) => (
-              <div
-                key={tc.id}
-                className="flex items-center gap-3 text-xs py-1 border-b border-border/50 last:border-b-0"
-              >
-                <Badge
-                  variant={tc.status === 'error' ? 'error' : 'success'}
-                >
-                  {tc.tool}
-                </Badge>
-                <span className="text-grep-11 truncate flex-1">
-                  {tc.title ?? truncateId(tc.id)}
-                </span>
-                {tc.duration_ms != null && (
-                  <span className="text-grep-7 tabular-nums">
-                    {formatDuration(tc.duration_ms)}
-                  </span>
-                )}
-                {tc.error && (
-                  <span className="text-error truncate max-w-xs">
-                    {tc.error}
-                  </span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

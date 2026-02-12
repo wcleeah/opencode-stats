@@ -1,5 +1,5 @@
 import { queryAll } from '@/lib/db';
-import type { MessageThread, ToolCall } from '@/types';
+import type { MessageThread, ToolCall, ToolCallDetail } from '@/types';
 
 export async function getMessageThread(
   sessionId: string,
@@ -51,6 +51,31 @@ export async function getToolCallsForSession(
       tc.completed_at,
       tc.duration_ms
     FROM tool_calls tc
+    WHERE tc.session_id = ?
+    ORDER BY tc.started_at
+  `, [sessionId]);
+}
+
+export async function getToolCallDetailsBySession(
+  sessionId: string,
+): Promise<{ data: ToolCallDetail[] | null; error: string | null }> {
+  return queryAll<ToolCallDetail>(`
+    SELECT
+      tc.id,
+      st.assistant_message_id,
+      tc.tool,
+      tc.title,
+      tc.status,
+      tc.error,
+      tc.duration_ms,
+      tcb_in.content AS input_content,
+      tcb_out.content AS output_content
+    FROM tool_calls tc
+    JOIN steps st ON st.id = tc.step_id
+    LEFT JOIN tool_call_blobs tcb_in
+      ON tcb_in.tool_call_id = tc.id AND tcb_in.blob_type = 'tool_input'
+    LEFT JOIN tool_call_blobs tcb_out
+      ON tcb_out.tool_call_id = tc.id AND tcb_out.blob_type = 'tool_output'
     WHERE tc.session_id = ?
     ORDER BY tc.started_at
   `, [sessionId]);

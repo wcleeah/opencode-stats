@@ -98,6 +98,18 @@ export interface ToolCallBlob {
   size_bytes: number;
 }
 
+export interface ToolCallDetail {
+  id: string;
+  assistant_message_id: string;
+  tool: string;
+  title: string | null;
+  status: string;
+  error: string | null;
+  duration_ms: number | null;
+  input_content: string | null;
+  output_content: string | null;
+}
+
 // --- Composite view types (for query results) ---
 
 export interface SessionWithStats {

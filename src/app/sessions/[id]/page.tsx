@@ -1,16 +1,23 @@
 export const dynamic = 'force-dynamic';
 
-import { getSessionById, getSessionStats, getSubtaskTree } from '@/lib/queries/sessions';
+import {
+  getSessionById,
+  getSessionStats,
+  getSubtaskTree,
+  getSessionCostBreakdown,
+} from '@/lib/queries/sessions';
 import { getMessageThread, getToolCallDetailsBySession } from '@/lib/queries/messages';
 import {
   formatTokens,
   formatCost,
+  formatCostBreakdown,
   formatDuration,
   formatRelativeTime,
   formatDateTime,
   truncateId,
   projectName,
 } from '@/lib/format';
+import { aggregateCostBreakdown } from '@/lib/pricing';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { StatCard, Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -218,6 +225,7 @@ export default async function SessionDetailPage({
   const threadResult = await getMessageThread(id);
   const toolCallDetailsResult = await getToolCallDetailsBySession(id);
   const subtasksResult = await getSubtaskTree(id);
+  const costBreakdownResult = await getSessionCostBreakdown(id);
 
   if (sessionResult.error || !sessionResult.data) {
     return (
@@ -234,6 +242,16 @@ export default async function SessionDetailPage({
   const stats = statsResult.data;
   const thread = threadResult.data ?? [];
   const subtasks = subtasksResult.data ?? [];
+  const costBreakdown = aggregateCostBreakdown(
+    (costBreakdownResult.data ?? []).map((row) => ({
+      reportedCost: row.reported_cost,
+      modelId: row.model_id,
+      tokensIn: row.total_in,
+      tokensOut: row.total_out,
+      tokensCacheRead: row.total_cache_read,
+      tokensCacheWrite: row.total_cache_write,
+    })),
+  );
 
   // Build map: assistant_message_id -> tool calls with full details
   const toolCallsByMessage = new Map<string, ToolCallDetail[]>();
@@ -295,8 +313,9 @@ export default async function SessionDetailPage({
             accent
           />
           <StatCard
-            label="Cost"
-            value={formatCost(stats.total_cost)}
+            label="Total Cost"
+            value={formatCost(costBreakdown.total, costBreakdown.hasEstimated)}
+            subValue={formatCostBreakdown(costBreakdown.reported, costBreakdown.estimated)}
           />
           <StatCard
             label="Changes"

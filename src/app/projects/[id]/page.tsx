@@ -2,15 +2,18 @@ export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
 
-import { getProjectById } from '@/lib/queries/projects';
-import { getSessionsByProject } from '@/lib/queries/sessions';
+import { getProjectById, getProjectCostBreakdowns } from '@/lib/queries/projects';
+import { getSessionsByProject, getSessionCostBreakdown } from '@/lib/queries/sessions';
 import {
   formatTokens,
   formatRelativeTime,
   formatDiff,
   projectName,
   truncateId,
+  formatCost,
+  formatCostBreakdown,
 } from '@/lib/format';
+import { aggregateCostBreakdown } from '@/lib/pricing';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { StatCard } from '@/components/ui/card';
 import {
@@ -38,6 +41,17 @@ export default async function ProjectDetailPage({
 
   const projectResult = await getProjectById(id);
   const sessionsResult = await getSessionsByProject(id, page, 20);
+  const projectCostResult = await getProjectCostBreakdowns([id]);
+  const projectCostRows = projectCostResult.data ?? [];
+
+  const sessionCostResults = sessionsResult.data
+    ? await Promise.all(
+      sessionsResult.data.data.map(async (session) => ({
+        sessionId: session.id,
+        result: await getSessionCostBreakdown(session.id),
+      })),
+    )
+    : [];
 
   if (projectResult.error || !projectResult.data) {
     return (
@@ -56,6 +70,32 @@ export default async function ProjectDetailPage({
   const project = projectResult.data;
   const sessions = sessionsResult.data;
   const name = projectName(project.worktree);
+  const projectCost = aggregateCostBreakdown(
+    projectCostRows.map((row) => ({
+      reportedCost: row.reported_cost,
+      modelId: row.model_id,
+      tokensIn: row.total_in,
+      tokensOut: row.total_out,
+      tokensCacheRead: row.total_cache_read,
+      tokensCacheWrite: row.total_cache_write,
+    })),
+  );
+
+  const sessionCostMap = new Map<string, ReturnType<typeof aggregateCostBreakdown>>();
+  for (const entry of sessionCostResults) {
+    const rows = entry.result.data ?? [];
+    const breakdown = aggregateCostBreakdown(
+      rows.map((row) => ({
+        reportedCost: row.reported_cost,
+        modelId: row.model_id,
+        tokensIn: row.total_in,
+        tokensOut: row.total_out,
+        tokensCacheRead: row.total_cache_read,
+        tokensCacheWrite: row.total_cache_write,
+      })),
+    );
+    sessionCostMap.set(entry.sessionId, breakdown);
+  }
 
   return (
     <div className="space-y-6">
@@ -76,6 +116,11 @@ export default async function ProjectDetailPage({
           value={formatTokens(project.total_tokens_in + project.total_tokens_out)}
           subValue={`${formatTokens(project.total_tokens_in)} in / ${formatTokens(project.total_tokens_out)} out`}
           accent
+        />
+        <StatCard
+          label="Total Cost"
+          value={formatCost(projectCost.total, projectCost.hasEstimated)}
+          subValue={formatCostBreakdown(projectCost.reported, projectCost.estimated)}
         />
         <StatCard
           label="Last Active"
@@ -101,6 +146,7 @@ export default async function ProjectDetailPage({
                 <TableCell header align="right">Turns</TableCell>
                 <TableCell header align="right">Tokens</TableCell>
                 <TableCell header align="right">Changes</TableCell>
+                <TableCell header align="right">Total Cost (est)</TableCell>
                 <TableCell header align="right">Updated</TableCell>
               </TableRow>
             </TableHeader>
@@ -145,6 +191,14 @@ export default async function ProjectDetailPage({
                     ) : (
                       <span className="text-grep-5">--</span>
                     )}
+                  </TableCell>
+                  <TableCell align="right">
+                    <span className="text-muted">
+                      {formatCost(
+                        sessionCostMap.get(session.id)?.total ?? 0,
+                        sessionCostMap.get(session.id)?.hasEstimated ?? false,
+                      )}
+                    </span>
                   </TableCell>
                   <TableCell align="right" className="text-muted">
                     {formatRelativeTime(session.updated_at)}

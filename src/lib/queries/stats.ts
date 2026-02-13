@@ -15,7 +15,7 @@ export async function getGlobalStats(): Promise<{
       (SELECT COALESCE(SUM(tokens_out), 0) FROM assistant_messages) AS total_tokens_out,
       (SELECT COALESCE(SUM(tokens_cache_read), 0) FROM assistant_messages) AS total_tokens_cache_read,
       (SELECT COALESCE(SUM(tokens_cache_write), 0) FROM assistant_messages) AS total_tokens_cache_write,
-      (SELECT COALESCE(SUM(cost), 0) FROM assistant_messages) AS total_cost,
+      (SELECT COALESCE(SUM(cost), 0) FROM assistant_messages) AS reported_cost,
       (SELECT COUNT(*) FROM tool_calls) AS total_tool_calls,
       (SELECT COUNT(DISTINCT model_id) FROM assistant_messages
         WHERE model_id IS NOT NULL) AS models_used

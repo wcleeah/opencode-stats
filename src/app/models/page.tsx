@@ -5,8 +5,8 @@ import {
   getCacheEfficiency,
   getDailyErrorRate,
 } from '@/lib/queries/analytics';
-import { estimateCost } from '@/lib/pricing';
-import { formatTokens, formatCost, formatPercent } from '@/lib/format';
+import { estimateCost, aggregateCostBreakdown } from '@/lib/pricing';
+import { formatTokens, formatCost, formatPercent, formatCostBreakdown } from '@/lib/format';
 import { Card, StatCard } from '@/components/ui/card';
 import {
   Table,
@@ -62,8 +62,16 @@ export default async function ModelsPage() {
     }),
   }));
 
-  const totalEstCost = modelEstimates.reduce((sum, m) => sum + m.est.cost, 0);
-  const anyEstimated = modelEstimates.some((m) => m.est.estimated);
+  const totalCost = aggregateCostBreakdown(
+    data.map((m) => ({
+      reportedCost: m.total_cost,
+      modelId: m.model_id,
+      tokensIn: m.total_in,
+      tokensOut: m.total_out,
+      tokensCacheRead: m.total_cache_read,
+      tokensCacheWrite: m.total_cache_write,
+    })),
+  );
 
   return (
     <div className="space-y-6">
@@ -87,9 +95,9 @@ export default async function ModelsPage() {
           value={formatPercent(overallCacheHit)}
         />
         <StatCard
-          label="Est. Cost"
-          value={formatCost(totalEstCost, anyEstimated)}
-          subValue={anyEstimated ? 'includes estimates' : undefined}
+          label="Total Cost"
+          value={formatCost(totalCost.total, totalCost.hasEstimated)}
+          subValue={formatCostBreakdown(totalCost.reported, totalCost.estimated)}
         />
         {totalReasoning > 0 && (
           <StatCard
@@ -115,10 +123,9 @@ export default async function ModelsPage() {
                 <TableCell header align="right">Tokens In</TableCell>
                 <TableCell header align="right">Tokens Out</TableCell>
                 <TableCell header align="right">Reasoning</TableCell>
-                <TableCell header align="right">Avg In</TableCell>
-                <TableCell header align="right">Avg Out</TableCell>
                 <TableCell header align="right">Cache Hit</TableCell>
-                <TableCell header align="right">Est. Cost</TableCell>
+                <TableCell header align="right">Reported Cost</TableCell>
+                <TableCell header align="right">Total Cost</TableCell>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -156,12 +163,6 @@ export default async function ModelsPage() {
                         : <span className="text-muted">--</span>}
                     </TableCell>
                     <TableCell align="right">
-                      {formatTokens(model.avg_in)}
-                    </TableCell>
-                    <TableCell align="right">
-                      {formatTokens(model.avg_out)}
-                    </TableCell>
-                    <TableCell align="right">
                       <span
                         className={
                           model.cache_hit_pct >= 50
@@ -173,6 +174,9 @@ export default async function ModelsPage() {
                       >
                         {formatPercent(model.cache_hit_pct)}
                       </span>
+                    </TableCell>
+                    <TableCell align="right">
+                      {formatCost(model.total_cost)}
                     </TableCell>
                     <TableCell align="right">
                       <span className={model.est.estimated ? 'text-muted' : ''}>

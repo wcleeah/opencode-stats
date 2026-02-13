@@ -1,5 +1,11 @@
 import { queryAll, queryOne } from '@/lib/db';
-import type { SessionWithStats, PaginatedResult, SubtaskNode, Session } from '@/types';
+import type {
+  SessionWithStats,
+  PaginatedResult,
+  SubtaskNode,
+  Session,
+  SessionCostAggregate,
+} from '@/types';
 
 export async function getSessionsByProject(
   projectId: string,
@@ -45,7 +51,7 @@ export async function getSessionsByProject(
       COALESCE(um.turn_count, 0) AS turn_count,
       COALESCE(am.total_tokens_in, 0) AS total_tokens_in,
       COALESCE(am.total_tokens_out, 0) AS total_tokens_out,
-      COALESCE(am.total_cost, 0) AS total_cost,
+      COALESCE(am.total_cost, 0) AS reported_cost,
       COALESCE(am.models_used, 0) AS models_used
     FROM sessions s
     LEFT JOIN (
@@ -130,7 +136,7 @@ export async function getSessionStats(
       COALESCE(um.turn_count, 0) AS turn_count,
       COALESCE(am.total_tokens_in, 0) AS total_tokens_in,
       COALESCE(am.total_tokens_out, 0) AS total_tokens_out,
-      COALESCE(am.total_cost, 0) AS total_cost,
+      COALESCE(am.total_cost, 0) AS reported_cost,
       COALESCE(am.models_used, 0) AS models_used
     FROM sessions s
     LEFT JOIN (
@@ -170,5 +176,33 @@ export async function getSubtaskTree(
       JOIN subtree st ON s.parent_id = st.id
     )
     SELECT * FROM subtree ORDER BY depth, id
+  `, [rootSessionId]);
+}
+
+export async function getSessionCostBreakdown(
+  rootSessionId: string,
+): Promise<{ data: SessionCostAggregate[] | null; error: string | null }> {
+  return queryAll<SessionCostAggregate>(`
+    WITH RECURSIVE subtree AS (
+      SELECT id
+      FROM sessions
+      WHERE id = ?
+
+      UNION ALL
+
+      SELECT s.id
+      FROM sessions s
+      JOIN subtree st ON s.parent_id = st.id
+    )
+    SELECT
+      COALESCE(am.model_id, '_unknown') AS model_id,
+      SUM(am.tokens_in) AS total_in,
+      SUM(am.tokens_out) AS total_out,
+      SUM(am.tokens_cache_read) AS total_cache_read,
+      SUM(am.tokens_cache_write) AS total_cache_write,
+      SUM(am.cost) AS reported_cost
+    FROM assistant_messages am
+    JOIN subtree st ON st.id = am.session_id
+    GROUP BY am.model_id
   `, [rootSessionId]);
 }

@@ -172,6 +172,22 @@ export interface CostEstimate {
   estimated: boolean;
 }
 
+export interface CostBreakdown {
+  total: number;
+  reported: number;
+  estimated: number;
+  hasEstimated: boolean;
+}
+
+export interface CostBreakdownInput {
+  reportedCost: number;
+  modelId: string;
+  tokensIn: number;
+  tokensOut: number;
+  tokensCacheRead: number;
+  tokensCacheWrite: number;
+}
+
 /**
  * Estimate or return the cost for a response.
  *
@@ -203,6 +219,36 @@ export function estimateCost(params: {
     params.tokensOut * pricing.output;
 
   return { cost, estimated: true };
+}
+
+export function aggregateCostBreakdown(rows: CostBreakdownInput[]): CostBreakdown {
+  let reported = 0;
+  let estimated = 0;
+
+  for (const row of rows) {
+    const est = estimateCost({
+      reportedCost: row.reportedCost,
+      modelId: row.modelId,
+      tokensIn: row.tokensIn,
+      tokensOut: row.tokensOut,
+      tokensCacheRead: row.tokensCacheRead,
+      tokensCacheWrite: row.tokensCacheWrite,
+    });
+
+    if (est.estimated) {
+      estimated += est.cost;
+    } else {
+      reported += est.cost;
+    }
+  }
+
+  const total = reported + estimated;
+  return {
+    total,
+    reported,
+    estimated,
+    hasEstimated: estimated > 0,
+  };
 }
 
 /**

@@ -1,5 +1,5 @@
 import { queryAll, queryOne } from '@/lib/db';
-import type { ProjectWithStats, PaginatedResult } from '@/types';
+import type { ProjectWithStats, PaginatedResult, ProjectCostAggregate } from '@/types';
 
 export async function getProjects(
   page: number = 1,
@@ -26,7 +26,7 @@ export async function getProjects(
       COALESCE(sc.session_count, 0) AS session_count,
       COALESCE(am.total_tokens_in, 0) AS total_tokens_in,
       COALESCE(am.total_tokens_out, 0) AS total_tokens_out,
-      COALESCE(am.total_cost, 0) AS total_cost,
+      COALESCE(am.total_cost, 0) AS reported_cost,
       COALESCE(sc.last_activity, p.created_at) AS last_activity
     FROM projects p
     LEFT JOIN (
@@ -79,7 +79,7 @@ export async function getProjectById(
       COALESCE(sc.session_count, 0) AS session_count,
       COALESCE(am.total_tokens_in, 0) AS total_tokens_in,
       COALESCE(am.total_tokens_out, 0) AS total_tokens_out,
-      COALESCE(am.total_cost, 0) AS total_cost,
+      COALESCE(am.total_cost, 0) AS reported_cost,
       COALESCE(sc.last_activity, p.created_at) AS last_activity
     FROM projects p
     LEFT JOIN (
@@ -102,4 +102,29 @@ export async function getProjectById(
     ) am ON am.project_id = p.id
     WHERE p.id = ?
   `, [projectId]);
+}
+
+export async function getProjectCostBreakdowns(
+  projectIds: string[],
+): Promise<{ data: ProjectCostAggregate[] | null; error: string | null }> {
+  if (projectIds.length === 0) {
+    return { data: [], error: null };
+  }
+
+  const placeholders = projectIds.map(() => '?').join(', ');
+
+  return queryAll<ProjectCostAggregate>(`
+    SELECT
+      s.project_id,
+      COALESCE(am.model_id, '_unknown') AS model_id,
+      SUM(am.tokens_in) AS total_in,
+      SUM(am.tokens_out) AS total_out,
+      SUM(am.tokens_cache_read) AS total_cache_read,
+      SUM(am.tokens_cache_write) AS total_cache_write,
+      SUM(am.cost) AS reported_cost
+    FROM sessions s
+    JOIN assistant_messages am ON am.session_id = s.id
+    WHERE s.project_id IN (${placeholders})
+    GROUP BY s.project_id, am.model_id
+  `, projectIds);
 }

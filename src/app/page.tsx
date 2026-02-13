@@ -2,8 +2,8 @@ export const dynamic = 'force-dynamic';
 
 import { getGlobalStats } from '@/lib/queries/stats';
 import { getDailyTokenUsage, getModelUsage } from '@/lib/queries/analytics';
-import { estimateCost } from '@/lib/pricing';
-import { formatTokens, formatCost } from '@/lib/format';
+import { estimateCost, aggregateCostBreakdown } from '@/lib/pricing';
+import { formatTokens, formatCost, formatCostBreakdown } from '@/lib/format';
 import { StatCard } from '@/components/ui/card';
 import { Card } from '@/components/ui/card';
 import {
@@ -48,20 +48,16 @@ export default async function Home() {
 
   // Compute estimated total cost from per-model data
   const modelData = models.data ?? [];
-  let totalEstimatedCost = 0;
-  let anyEstimated = false;
-  for (const m of modelData) {
-    const est = estimateCost({
+  const totalCost = aggregateCostBreakdown(
+    modelData.map((m) => ({
       reportedCost: m.total_cost,
       modelId: m.model_id,
       tokensIn: m.total_in,
       tokensOut: m.total_out,
       tokensCacheRead: m.total_cache_read,
       tokensCacheWrite: m.total_cache_write,
-    });
-    totalEstimatedCost += est.cost;
-    if (est.estimated) anyEstimated = true;
-  }
+    })),
+  );
 
   return (
     <div className="space-y-6">
@@ -97,9 +93,9 @@ export default async function Home() {
           value={s.models_used.toLocaleString()}
         />
         <StatCard
-          label="Est. Cost"
-          value={formatCost(totalEstimatedCost, anyEstimated)}
-          subValue={anyEstimated ? 'includes estimates' : undefined}
+          label="Total Cost"
+          value={formatCost(totalCost.total, totalCost.hasEstimated)}
+          subValue={formatCostBreakdown(totalCost.reported, totalCost.estimated)}
         />
       </div>
 
@@ -126,7 +122,8 @@ export default async function Home() {
                 <TableCell header align="right">Tokens In</TableCell>
                 <TableCell header align="right">Tokens Out</TableCell>
                 <TableCell header align="right">Cache Hit</TableCell>
-                <TableCell header align="right">Est. Cost</TableCell>
+                <TableCell header align="right">Reported Cost</TableCell>
+                <TableCell header align="right">Total Cost</TableCell>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -159,6 +156,9 @@ export default async function Home() {
                     </TableCell>
                     <TableCell align="right">
                       {model.cache_hit_pct}%
+                    </TableCell>
+                    <TableCell align="right">
+                      {formatCost(model.total_cost)}
                     </TableCell>
                     <TableCell align="right">
                       <span className={est.estimated ? 'text-muted' : ''}>

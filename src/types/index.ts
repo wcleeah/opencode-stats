@@ -124,7 +124,6 @@ export interface SessionWithStats {
   turn_count: number;
   total_tokens_in: number;
   total_tokens_out: number;
-  total_cost: number;
   models_used: number;
 }
 
@@ -135,7 +134,6 @@ export interface ProjectWithStats {
   session_count: number;
   total_tokens_in: number;
   total_tokens_out: number;
-  total_cost: number;
   last_activity: number;
 }
 
@@ -165,7 +163,7 @@ export interface DailyTokenUsage {
   total_in: number;
   total_out: number;
   total_reasoning: number;
-  total_cost: number;
+  reported_cost: number;
   response_count: number;
 }
 
@@ -179,8 +177,6 @@ export interface ModelUsage {
   total_cache_read: number;
   total_cache_write: number;
   total_cost: number;
-  avg_in: number;
-  avg_out: number;
   cache_hit_pct: number;
 }
 
@@ -216,6 +212,25 @@ export interface CacheEfficiency {
   cache_hit_pct: number;
 }
 
+export interface ProjectCostAggregate {
+  project_id: string;
+  model_id: string;
+  total_in: number;
+  total_out: number;
+  total_cache_read: number;
+  total_cache_write: number;
+  reported_cost: number;
+}
+
+export interface SessionCostAggregate {
+  model_id: string;
+  total_in: number;
+  total_out: number;
+  total_cache_read: number;
+  total_cache_write: number;
+  reported_cost: number;
+}
+
 export interface GlobalStats {
   total_projects: number;
   total_sessions: number;
@@ -224,7 +239,7 @@ export interface GlobalStats {
   total_tokens_out: number;
   total_tokens_cache_read: number;
   total_tokens_cache_write: number;
-  total_cost: number;
+  reported_cost: number;
   total_tool_calls: number;
   models_used: number;
 }

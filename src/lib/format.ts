@@ -30,6 +30,10 @@ export function formatCost(cost: number, estimated: boolean = false): string {
   return `${prefix}$${cost.toFixed(2)}`;
 }
 
+export function formatCostBreakdown(reported: number, estimated: number): string {
+  return `${formatCost(reported)} reported / ${formatCost(estimated, true)} est`;
+}
+
 /**
  * Format duration in ms to human-readable: 1234 -> "1.2s", 65000 -> "1m 5s"
  */

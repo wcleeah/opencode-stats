@@ -2,8 +2,9 @@ export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
 
-import { getProjects } from '@/lib/queries/projects';
-import { formatTokens, formatRelativeTime, projectName } from '@/lib/format';
+import { getProjects, getProjectCostBreakdowns } from '@/lib/queries/projects';
+import { formatTokens, formatRelativeTime, projectName, formatCost } from '@/lib/format';
+import { aggregateCostBreakdown } from '@/lib/pricing';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import {
   Table,
@@ -42,6 +43,38 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
     );
   }
 
+  const costBreakdownsResult = await getProjectCostBreakdowns(
+    projects.data.map((project) => project.id),
+  );
+
+  const costBreakdowns = new Map<string, ReturnType<typeof aggregateCostBreakdown>>();
+  const grouped: Record<string, Array<{
+    reportedCost: number;
+    modelId: string;
+    tokensIn: number;
+    tokensOut: number;
+    tokensCacheRead: number;
+    tokensCacheWrite: number;
+  }>> = {};
+
+  for (const row of costBreakdownsResult.data ?? []) {
+    if (!grouped[row.project_id]) grouped[row.project_id] = [];
+    grouped[row.project_id].push({
+      reportedCost: row.reported_cost,
+      modelId: row.model_id,
+      tokensIn: row.total_in,
+      tokensOut: row.total_out,
+      tokensCacheRead: row.total_cache_read,
+      tokensCacheWrite: row.total_cache_write,
+    });
+  }
+
+  for (const project of projects.data) {
+    const rows = grouped[project.id] ?? [];
+    const breakdown = aggregateCostBreakdown(rows);
+    costBreakdowns.set(project.id, breakdown);
+  }
+
   return (
     <div className="space-y-6">
       <Breadcrumbs crumbs={[{ label: 'projects' }]} />
@@ -59,6 +92,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
               <TableCell header>Project</TableCell>
               <TableCell header align="right">Sessions</TableCell>
               <TableCell header align="right">Tokens</TableCell>
+              <TableCell header align="right">Total Cost (est)</TableCell>
               <TableCell header align="right">Last Active</TableCell>
             </TableRow>
         </TableHeader>
@@ -81,6 +115,14 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
               </TableCell>
               <TableCell align="right">
                 {formatTokens(project.total_tokens_in + project.total_tokens_out)}
+              </TableCell>
+              <TableCell align="right">
+                <span className="text-muted">
+                  {formatCost(
+                    costBreakdowns.get(project.id)?.total ?? 0,
+                    costBreakdowns.get(project.id)?.hasEstimated ?? false,
+                  )}
+                </span>
               </TableCell>
               <TableCell align="right" className="text-muted">
                 {formatRelativeTime(project.last_activity)}

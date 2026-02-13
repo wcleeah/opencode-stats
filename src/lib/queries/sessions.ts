@@ -22,6 +22,17 @@ export async function getSessionsByProject(
   const totalPages = Math.ceil(total / pageSize);
 
   const result = await queryAll<SessionWithStats>(`
+    WITH RECURSIVE subtree AS (
+      SELECT id, parent_id, id AS root_id
+      FROM sessions
+      WHERE project_id = ? AND parent_id IS NULL
+
+      UNION ALL
+
+      SELECT s.id, s.parent_id, st.root_id
+      FROM sessions s
+      JOIN subtree st ON s.parent_id = st.id
+    )
     SELECT
       s.id,
       s.title,
@@ -31,22 +42,34 @@ export async function getSessionsByProject(
       s.deletions,
       s.files_changed,
       s.archived_at,
-      COUNT(DISTINCT um.id) FILTER (
-        WHERE um.synthetic = 0 AND um.undone_at IS NULL
-      ) AS turn_count,
-      COALESCE(SUM(am.tokens_in), 0) AS total_tokens_in,
-      COALESCE(SUM(am.tokens_out), 0) AS total_tokens_out,
-      COALESCE(SUM(am.cost), 0) AS total_cost,
-      COUNT(DISTINCT am.model_id) AS models_used
+      COALESCE(um.turn_count, 0) AS turn_count,
+      COALESCE(am.total_tokens_in, 0) AS total_tokens_in,
+      COALESCE(am.total_tokens_out, 0) AS total_tokens_out,
+      COALESCE(am.total_cost, 0) AS total_cost,
+      COALESCE(am.models_used, 0) AS models_used
     FROM sessions s
-    LEFT JOIN user_messages um ON um.session_id = s.id
-    LEFT JOIN assistant_messages am ON am.session_id = s.id
+    LEFT JOIN (
+      SELECT session_id, COUNT(*) AS turn_count
+      FROM user_messages
+      WHERE synthetic = 0 AND compaction = 0 AND undone_at IS NULL
+      GROUP BY session_id
+    ) um ON um.session_id = s.id
+    LEFT JOIN (
+      SELECT
+        st.root_id,
+        SUM(am.tokens_in) AS total_tokens_in,
+        SUM(am.tokens_out) AS total_tokens_out,
+        SUM(am.cost) AS total_cost,
+        COUNT(DISTINCT am.model_id) AS models_used
+      FROM subtree st
+      JOIN assistant_messages am ON am.session_id = st.id
+      GROUP BY st.root_id
+    ) am ON am.root_id = s.id
     WHERE s.project_id = ?
       AND s.parent_id IS NULL
-    GROUP BY s.id
     ORDER BY s.updated_at DESC
     LIMIT ? OFFSET ?
-  `, [projectId, pageSize, offset]);
+  `, [projectId, projectId, pageSize, offset]);
 
   if (result.error || !result.data) {
     return { data: null, error: result.error ?? 'Failed to fetch sessions' };
@@ -84,6 +107,17 @@ export async function getSessionStats(
   sessionId: string,
 ): Promise<{ data: SessionWithStats | null; error: string | null }> {
   return queryOne<SessionWithStats>(`
+    WITH RECURSIVE subtree AS (
+      SELECT id, parent_id, id AS root_id
+      FROM sessions
+      WHERE id = ?
+
+      UNION ALL
+
+      SELECT s.id, s.parent_id, st.root_id
+      FROM sessions s
+      JOIN subtree st ON s.parent_id = st.id
+    )
     SELECT
       s.id,
       s.title,
@@ -93,19 +127,31 @@ export async function getSessionStats(
       s.deletions,
       s.files_changed,
       s.archived_at,
-      COUNT(DISTINCT um.id) FILTER (
-        WHERE um.synthetic = 0 AND um.undone_at IS NULL
-      ) AS turn_count,
-      COALESCE(SUM(am.tokens_in), 0) AS total_tokens_in,
-      COALESCE(SUM(am.tokens_out), 0) AS total_tokens_out,
-      COALESCE(SUM(am.cost), 0) AS total_cost,
-      COUNT(DISTINCT am.model_id) AS models_used
+      COALESCE(um.turn_count, 0) AS turn_count,
+      COALESCE(am.total_tokens_in, 0) AS total_tokens_in,
+      COALESCE(am.total_tokens_out, 0) AS total_tokens_out,
+      COALESCE(am.total_cost, 0) AS total_cost,
+      COALESCE(am.models_used, 0) AS models_used
     FROM sessions s
-    LEFT JOIN user_messages um ON um.session_id = s.id
-    LEFT JOIN assistant_messages am ON am.session_id = s.id
+    LEFT JOIN (
+      SELECT session_id, COUNT(*) AS turn_count
+      FROM user_messages
+      WHERE synthetic = 0 AND compaction = 0 AND undone_at IS NULL
+      GROUP BY session_id
+    ) um ON um.session_id = s.id
+    LEFT JOIN (
+      SELECT
+        st.root_id,
+        SUM(am.tokens_in) AS total_tokens_in,
+        SUM(am.tokens_out) AS total_tokens_out,
+        SUM(am.cost) AS total_cost,
+        COUNT(DISTINCT am.model_id) AS models_used
+      FROM subtree st
+      JOIN assistant_messages am ON am.session_id = st.id
+      GROUP BY st.root_id
+    ) am ON am.root_id = s.id
     WHERE s.id = ?
-    GROUP BY s.id
-  `, [sessionId]);
+  `, [sessionId, sessionId]);
 }
 
 export async function getSubtaskTree(

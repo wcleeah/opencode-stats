@@ -37,6 +37,17 @@ export async function getToolCallsForSession(
   sessionId: string,
 ): Promise<{ data: ToolCall[] | null; error: string | null }> {
   return queryAll<ToolCall>(`
+    WITH RECURSIVE subtree AS (
+      SELECT id
+      FROM sessions
+      WHERE id = ?
+
+      UNION ALL
+
+      SELECT s.id
+      FROM sessions s
+      JOIN subtree st ON s.parent_id = st.id
+    )
     SELECT
       tc.id,
       tc.step_id,
@@ -51,7 +62,7 @@ export async function getToolCallsForSession(
       tc.completed_at,
       tc.duration_ms
     FROM tool_calls tc
-    WHERE tc.session_id = ?
+    JOIN subtree st ON st.id = tc.session_id
     ORDER BY tc.started_at
   `, [sessionId]);
 }
@@ -60,6 +71,17 @@ export async function getToolCallDetailsBySession(
   sessionId: string,
 ): Promise<{ data: ToolCallDetail[] | null; error: string | null }> {
   return queryAll<ToolCallDetail>(`
+    WITH RECURSIVE subtree AS (
+      SELECT id
+      FROM sessions
+      WHERE id = ?
+
+      UNION ALL
+
+      SELECT s.id
+      FROM sessions s
+      JOIN subtree st ON s.parent_id = st.id
+    )
     SELECT
       tc.id,
       st.assistant_message_id,
@@ -76,7 +98,7 @@ export async function getToolCallDetailsBySession(
       ON tcb_in.tool_call_id = tc.id AND tcb_in.blob_type = 'tool_input'
     LEFT JOIN tool_call_blobs tcb_out
       ON tcb_out.tool_call_id = tc.id AND tcb_out.blob_type = 'tool_output'
-    WHERE tc.session_id = ?
+    JOIN subtree sub ON sub.id = tc.session_id
     ORDER BY tc.started_at
   `, [sessionId]);
 }

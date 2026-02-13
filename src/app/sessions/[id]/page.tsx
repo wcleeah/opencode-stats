@@ -350,7 +350,7 @@ export default async function SessionDetailPage({
       {/* Conversation thread */}
       <div>
         <div className="text-xs text-muted uppercase tracking-wider mb-3">
-          Conversation ({userTurns.length} turns)
+          Conversation ({stats?.turn_count ?? userTurns.length} turns)
         </div>
         <div className="space-y-4">
           {Array.from(grouped.entries()).map(([umId, messages]) => {

@@ -10,7 +10,7 @@ export async function getGlobalStats(): Promise<{
       (SELECT COUNT(*) FROM projects WHERE id != '_unknown') AS total_projects,
       (SELECT COUNT(*) FROM sessions WHERE parent_id IS NULL) AS total_sessions,
       (SELECT COUNT(*) FROM user_messages
-        WHERE synthetic = 0 AND undone_at IS NULL) AS total_turns,
+        WHERE synthetic = 0 AND compaction = 0 AND undone_at IS NULL) AS total_turns,
       (SELECT COALESCE(SUM(tokens_in), 0) FROM assistant_messages) AS total_tokens_in,
       (SELECT COALESCE(SUM(tokens_out), 0) FROM assistant_messages) AS total_tokens_out,
       (SELECT COALESCE(SUM(tokens_cache_read), 0) FROM assistant_messages) AS total_tokens_cache_read,

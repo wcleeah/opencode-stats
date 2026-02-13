@@ -23,16 +23,31 @@ export async function getProjects(
       p.id,
       p.worktree,
       p.created_at,
-      COUNT(DISTINCT s.id) FILTER (WHERE s.parent_id IS NULL) AS session_count,
-      COALESCE(SUM(am.tokens_in), 0) AS total_tokens_in,
-      COALESCE(SUM(am.tokens_out), 0) AS total_tokens_out,
-      COALESCE(SUM(am.cost), 0) AS total_cost,
-      COALESCE(MAX(s.updated_at), p.created_at) AS last_activity
+      COALESCE(sc.session_count, 0) AS session_count,
+      COALESCE(am.total_tokens_in, 0) AS total_tokens_in,
+      COALESCE(am.total_tokens_out, 0) AS total_tokens_out,
+      COALESCE(am.total_cost, 0) AS total_cost,
+      COALESCE(sc.last_activity, p.created_at) AS last_activity
     FROM projects p
-    LEFT JOIN sessions s ON s.project_id = p.id
-    LEFT JOIN assistant_messages am ON am.session_id = s.id
+    LEFT JOIN (
+      SELECT
+        project_id,
+        COUNT(*) FILTER (WHERE parent_id IS NULL) AS session_count,
+        MAX(updated_at) AS last_activity
+      FROM sessions
+      GROUP BY project_id
+    ) sc ON sc.project_id = p.id
+    LEFT JOIN (
+      SELECT
+        s.project_id,
+        SUM(am.tokens_in) AS total_tokens_in,
+        SUM(am.tokens_out) AS total_tokens_out,
+        SUM(am.cost) AS total_cost
+      FROM sessions s
+      LEFT JOIN assistant_messages am ON am.session_id = s.id
+      GROUP BY s.project_id
+    ) am ON am.project_id = p.id
     WHERE p.id != '_unknown'
-    GROUP BY p.id
     ORDER BY last_activity DESC
     LIMIT ? OFFSET ?
   `, [pageSize, offset]);
@@ -61,15 +76,30 @@ export async function getProjectById(
       p.id,
       p.worktree,
       p.created_at,
-      COUNT(DISTINCT s.id) FILTER (WHERE s.parent_id IS NULL) AS session_count,
-      COALESCE(SUM(am.tokens_in), 0) AS total_tokens_in,
-      COALESCE(SUM(am.tokens_out), 0) AS total_tokens_out,
-      COALESCE(SUM(am.cost), 0) AS total_cost,
-      COALESCE(MAX(s.updated_at), p.created_at) AS last_activity
+      COALESCE(sc.session_count, 0) AS session_count,
+      COALESCE(am.total_tokens_in, 0) AS total_tokens_in,
+      COALESCE(am.total_tokens_out, 0) AS total_tokens_out,
+      COALESCE(am.total_cost, 0) AS total_cost,
+      COALESCE(sc.last_activity, p.created_at) AS last_activity
     FROM projects p
-    LEFT JOIN sessions s ON s.project_id = p.id
-    LEFT JOIN assistant_messages am ON am.session_id = s.id
+    LEFT JOIN (
+      SELECT
+        project_id,
+        COUNT(*) FILTER (WHERE parent_id IS NULL) AS session_count,
+        MAX(updated_at) AS last_activity
+      FROM sessions
+      GROUP BY project_id
+    ) sc ON sc.project_id = p.id
+    LEFT JOIN (
+      SELECT
+        s.project_id,
+        SUM(am.tokens_in) AS total_tokens_in,
+        SUM(am.tokens_out) AS total_tokens_out,
+        SUM(am.cost) AS total_cost
+      FROM sessions s
+      LEFT JOIN assistant_messages am ON am.session_id = s.id
+      GROUP BY s.project_id
+    ) am ON am.project_id = p.id
     WHERE p.id = ?
-    GROUP BY p.id
   `, [projectId]);
 }

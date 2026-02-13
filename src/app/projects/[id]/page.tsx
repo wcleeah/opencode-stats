@@ -111,7 +111,7 @@ export default async function ProjectDetailPage({
         <div className="text-xs text-muted mt-1">{project.worktree}</div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
         <StatCard label="Sessions" value={project.session_count.toLocaleString()} />
         <StatCard
           label="Total Tokens"
@@ -136,6 +136,13 @@ export default async function ProjectDetailPage({
           label="Total Cost"
           value={formatCost(projectCost.total, projectCost.hasEstimated)}
           subValue={formatCostBreakdown(projectCost.reported, projectCost.estimated)}
+        />
+        <StatCard
+          label="Active Time"
+          value={formatDuration(project.total_active_time_ms)}
+          subValue={project.session_count > 0
+            ? `~${formatDuration(Math.round(project.total_active_time_ms / project.session_count))} avg/session`
+            : undefined}
         />
         <StatCard
           label="Last Active"

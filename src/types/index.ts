@@ -138,6 +138,7 @@ export interface ProjectWithStats {
   total_tokens_in: number;
   total_tokens_out: number;
   total_tokens_cache_read: number;
+  total_active_time_ms: number;
   last_activity: number;
 }
 

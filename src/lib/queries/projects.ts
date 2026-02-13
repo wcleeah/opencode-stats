@@ -28,6 +28,7 @@ export async function getProjects(
       COALESCE(am.total_tokens_out, 0) AS total_tokens_out,
       COALESCE(am.total_tokens_cache_read, 0) AS total_tokens_cache_read,
       COALESCE(am.total_cost, 0) AS reported_cost,
+      COALESCE(dur.total_active_time_ms, 0) AS total_active_time_ms,
       COALESCE(sc.last_activity, p.created_at) AS last_activity
     FROM projects p
     LEFT JOIN (
@@ -49,6 +50,19 @@ export async function getProjects(
       LEFT JOIN assistant_messages am ON am.session_id = s.id
       GROUP BY s.project_id
     ) am ON am.project_id = p.id
+    LEFT JOIN (
+      SELECT
+        s.project_id,
+        SUM(um.turn_duration_ms) AS total_active_time_ms
+      FROM sessions s
+      JOIN user_messages um ON um.session_id = s.id
+      WHERE um.turn_duration_ms IS NOT NULL
+        AND um.turn_duration_ms > 0
+        AND um.synthetic = 0
+        AND um.compaction = 0
+        AND um.undone_at IS NULL
+      GROUP BY s.project_id
+    ) dur ON dur.project_id = p.id
     WHERE p.id != '_unknown'
     ORDER BY last_activity DESC
     LIMIT ? OFFSET ?
@@ -83,6 +97,7 @@ export async function getProjectById(
       COALESCE(am.total_tokens_out, 0) AS total_tokens_out,
       COALESCE(am.total_tokens_cache_read, 0) AS total_tokens_cache_read,
       COALESCE(am.total_cost, 0) AS reported_cost,
+      COALESCE(dur.total_active_time_ms, 0) AS total_active_time_ms,
       COALESCE(sc.last_activity, p.created_at) AS last_activity
     FROM projects p
     LEFT JOIN (
@@ -104,6 +119,19 @@ export async function getProjectById(
       LEFT JOIN assistant_messages am ON am.session_id = s.id
       GROUP BY s.project_id
     ) am ON am.project_id = p.id
+    LEFT JOIN (
+      SELECT
+        s.project_id,
+        SUM(um.turn_duration_ms) AS total_active_time_ms
+      FROM sessions s
+      JOIN user_messages um ON um.session_id = s.id
+      WHERE um.turn_duration_ms IS NOT NULL
+        AND um.turn_duration_ms > 0
+        AND um.synthetic = 0
+        AND um.compaction = 0
+        AND um.undone_at IS NULL
+      GROUP BY s.project_id
+    ) dur ON dur.project_id = p.id
     WHERE p.id = ?
   `, [projectId]);
 }

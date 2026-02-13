@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import Link from 'next/link';
 
 import { getProjects, getProjectCostBreakdowns } from '@/lib/queries/projects';
-import { formatTokens, formatRelativeTime, projectName, formatCost } from '@/lib/format';
+import { formatTokens, formatRelativeTime, formatDuration, projectName, formatCost } from '@/lib/format';
 import { aggregateCostBreakdown } from '@/lib/pricing';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import {
@@ -93,6 +93,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
             <TableRow>
               <TableCell header>Project</TableCell>
               <TableCell header align="right">Sessions</TableCell>
+              <TableCell header align="right">Active Time</TableCell>
               <TableCell header align="right">Tokens</TableCell>
               <TableCell header align="right">Total Cost (est)</TableCell>
               <TableCell header align="right">Last Active</TableCell>
@@ -114,6 +115,15 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
               </TableCell>
               <TableCell align="right">
                 {project.session_count}
+              </TableCell>
+              <TableCell align="right">
+                {project.total_active_time_ms > 0 ? (
+                  <span className="tabular-nums text-muted">
+                    {formatDuration(project.total_active_time_ms)}
+                  </span>
+                ) : (
+                  <span className="text-grep-5">--</span>
+                )}
               </TableCell>
               <TableCell align="right">
                 <Tooltip

@@ -20,19 +20,19 @@ and recommended SQL query patterns.
 ## Build / Dev / Test Commands
 
 ```bash
-bun install              # install dependencies
-bun dev                  # start dev server (Next.js)
-bun run build            # production build
-bun run lint             # run ESLint
-bun run typecheck        # run tsc --noEmit (if configured in scripts)
+pnpm install              # install dependencies
+pnpm dev                  # start dev server (Next.js)
+pnpm run build            # production build
+pnpm run lint             # run ESLint
+pnpm run typecheck        # run tsc --noEmit (if configured in scripts)
 ```
 
 ### Testing
 
 ```bash
-bun test                 # run all tests
-bun test path/to/file    # run a single test file
-bun test --grep "name"   # run tests matching a pattern
+pnpm test                 # run all tests
+pnpm test path/to/file    # run a single test file
+pnpm test --grep "name"   # run tests matching a pattern
 ```
 
 Test files live alongside source code with the `.test.ts` / `.test.tsx` suffix.

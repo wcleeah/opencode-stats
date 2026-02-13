@@ -394,10 +394,7 @@ export default async function SessionDetailPage({
             const first = messages[0];
             if (!first) return null;
 
-            // Skip synthetic/compacted/undone messages
-            if (first.synthetic || first.compaction || first.undone_at) {
-              return null;
-            }
+            const isUndone = first.undone_at !== null;
 
             // Get all assistant responses for this user message
             const assistantMsgs = messages.filter(
@@ -420,8 +417,17 @@ export default async function SessionDetailPage({
                         {formatDuration(first.turn_duration_ms)}
                       </span>
                     )}
+                    {!!first.synthetic && (
+                      <Badge variant="warning">synthetic</Badge>
+                    )}
+                    {!!first.compaction && (
+                      <Badge variant="info">compaction</Badge>
+                    )}
+                    {isUndone && (
+                      <Badge variant="error">undone</Badge>
+                    )}
                   </div>
-                  <div className="text-sm whitespace-pre-wrap">
+                  <div className={`text-sm whitespace-pre-wrap${isUndone ? ' line-through text-grep-7' : ''}`}>
                     {first.user_content ?? (
                       <span className="text-grep-5 italic">
                         [no content]
@@ -474,7 +480,7 @@ export default async function SessionDetailPage({
                         </div>
                       )}
                       {am.assistant_text && (
-                        <div className="text-sm whitespace-pre-wrap text-grep-11 max-h-96 overflow-y-auto">
+                        <div className={`text-sm whitespace-pre-wrap text-grep-11 max-h-96 overflow-y-auto${isUndone ? ' line-through text-grep-7' : ''}`}>
                           {am.assistant_text}
                         </div>
                       )}

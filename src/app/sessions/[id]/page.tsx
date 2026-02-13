@@ -289,12 +289,9 @@ export default async function SessionDetailPage({
             value={stats.turn_count.toLocaleString()}
           />
           <StatCard
-            label="Tokens In"
-            value={formatTokens(stats.total_tokens_in)}
-          />
-          <StatCard
-            label="Tokens Out"
-            value={formatTokens(stats.total_tokens_out)}
+            label="Total Tokens"
+            value={formatTokens(stats.total_tokens_in + stats.total_tokens_out)}
+            subValue={`${formatTokens(stats.total_tokens_in)} in / ${formatTokens(stats.total_tokens_out)} out`}
             accent
           />
           <StatCard

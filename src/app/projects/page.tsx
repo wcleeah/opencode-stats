@@ -55,13 +55,12 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
 
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableCell header>Project</TableCell>
-            <TableCell header align="right">Sessions</TableCell>
-            <TableCell header align="right">Tokens In</TableCell>
-            <TableCell header align="right">Tokens Out</TableCell>
-            <TableCell header align="right">Last Active</TableCell>
-          </TableRow>
+            <TableRow>
+              <TableCell header>Project</TableCell>
+              <TableCell header align="right">Sessions</TableCell>
+              <TableCell header align="right">Tokens</TableCell>
+              <TableCell header align="right">Last Active</TableCell>
+            </TableRow>
         </TableHeader>
         <TableBody>
           {projects.data.map((project) => (
@@ -81,10 +80,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                 {project.session_count}
               </TableCell>
               <TableCell align="right">
-                {formatTokens(project.total_tokens_in)}
-              </TableCell>
-              <TableCell align="right">
-                {formatTokens(project.total_tokens_out)}
+                {formatTokens(project.total_tokens_in + project.total_tokens_out)}
               </TableCell>
               <TableCell align="right" className="text-muted">
                 {formatRelativeTime(project.last_activity)}

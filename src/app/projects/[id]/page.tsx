@@ -72,12 +72,9 @@ export default async function ProjectDetailPage({
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Sessions" value={project.session_count.toLocaleString()} />
         <StatCard
-          label="Tokens In"
-          value={formatTokens(project.total_tokens_in)}
-        />
-        <StatCard
-          label="Tokens Out"
-          value={formatTokens(project.total_tokens_out)}
+          label="Total Tokens"
+          value={formatTokens(project.total_tokens_in + project.total_tokens_out)}
+          subValue={`${formatTokens(project.total_tokens_in)} in / ${formatTokens(project.total_tokens_out)} out`}
           accent
         />
         <StatCard

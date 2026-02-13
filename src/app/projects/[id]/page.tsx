@@ -8,6 +8,7 @@ import {
   formatTokens,
   formatRelativeTime,
   formatDiff,
+  formatDuration,
   projectName,
   truncateId,
   formatCost,
@@ -158,6 +159,7 @@ export default async function ProjectDetailPage({
               <TableRow>
                 <TableCell header>Session</TableCell>
                 <TableCell header align="right">Turns</TableCell>
+                <TableCell header align="right">Active Time</TableCell>
                 <TableCell header align="right">Tokens</TableCell>
                 <TableCell header align="right">Changes</TableCell>
                 <TableCell header align="right">Total Cost (est)</TableCell>
@@ -182,6 +184,15 @@ export default async function ProjectDetailPage({
                   </TableCell>
                   <TableCell align="right">
                     {session.turn_count}
+                  </TableCell>
+                  <TableCell align="right">
+                    {session.total_active_time_ms > 0 ? (
+                      <span className="tabular-nums text-muted">
+                        {formatDuration(session.total_active_time_ms)}
+                      </span>
+                    ) : (
+                      <span className="text-grep-5">--</span>
+                    )}
                   </TableCell>
                   <TableCell align="right">
                     <Tooltip

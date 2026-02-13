@@ -308,6 +308,13 @@ export default async function SessionDetailPage({
             value={stats.turn_count.toLocaleString()}
           />
           <StatCard
+            label="Active Time"
+            value={formatDuration(stats.total_active_time_ms)}
+            subValue={stats.turn_count > 0
+              ? `~${formatDuration(Math.round(stats.total_active_time_ms / stats.turn_count))} avg/turn`
+              : undefined}
+          />
+          <StatCard
             label="Total Tokens"
             value={formatTokens(stats.total_tokens_in + stats.total_tokens_out)}
             subValue={
@@ -408,6 +415,11 @@ export default async function SessionDetailPage({
                     <span className="text-xs text-grep-7">
                       {formatRelativeTime(first.user_created_at)}
                     </span>
+                    {first.turn_duration_ms != null && first.turn_duration_ms > 0 && (
+                      <span className="text-xs text-grep-5 tabular-nums">
+                        {formatDuration(first.turn_duration_ms)}
+                      </span>
+                    )}
                   </div>
                   <div className="text-sm whitespace-pre-wrap">
                     {first.user_content ?? (

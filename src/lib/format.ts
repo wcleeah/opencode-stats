@@ -35,7 +35,9 @@ export function formatCostBreakdown(reported: number, estimated: number): string
 }
 
 /**
- * Format duration in ms to human-readable: 1234 -> "1.2s", 65000 -> "1m 5s"
+ * Format duration in ms to human-readable:
+ * 500 -> "500ms", 1234 -> "1.2s", 65000 -> "1m 5s",
+ * 3700000 -> "1h 1m", 90000000 -> "1d 1h"
  */
 export function formatDuration(ms: number): string {
   if (ms < 1000) {
@@ -44,12 +46,28 @@ export function formatDuration(ms: number): string {
   if (ms < 60_000) {
     return `${(ms / 1000).toFixed(1)}s`;
   }
-  const minutes = Math.floor(ms / 60_000);
-  const seconds = Math.round((ms % 60_000) / 1000);
-  if (seconds === 0) {
-    return `${minutes}m`;
+  if (ms < 3_600_000) {
+    const minutes = Math.floor(ms / 60_000);
+    const seconds = Math.round((ms % 60_000) / 1000);
+    if (seconds === 0) {
+      return `${minutes}m`;
+    }
+    return `${minutes}m ${seconds}s`;
   }
-  return `${minutes}m ${seconds}s`;
+  if (ms < 86_400_000) {
+    const hours = Math.floor(ms / 3_600_000);
+    const minutes = Math.round((ms % 3_600_000) / 60_000);
+    if (minutes === 0) {
+      return `${hours}h`;
+    }
+    return `${hours}h ${minutes}m`;
+  }
+  const days = Math.floor(ms / 86_400_000);
+  const hours = Math.round((ms % 86_400_000) / 3_600_000);
+  if (hours === 0) {
+    return `${days}d`;
+  }
+  return `${days}d ${hours}h`;
 }
 
 /**

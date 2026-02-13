@@ -12,6 +12,7 @@ export async function getMessageThread(
       um.compaction,
       um.undone_at,
       um.created_at AS user_created_at,
+      um.turn_duration_ms,
       am.id AS assistant_message_id,
       am.model_id,
       am.tokens_in,

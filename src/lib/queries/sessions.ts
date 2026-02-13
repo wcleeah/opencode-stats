@@ -53,6 +53,7 @@ export async function getSessionsByProject(
       COALESCE(am.total_tokens_out, 0) AS total_tokens_out,
       COALESCE(am.total_tokens_cache_read, 0) AS total_tokens_cache_read,
       COALESCE(am.total_cost, 0) AS reported_cost,
+      COALESCE(dur.total_active_time_ms, 0) AS total_active_time_ms,
       COALESCE(am.models_used, 0) AS models_used
     FROM sessions s
     LEFT JOIN (
@@ -73,6 +74,16 @@ export async function getSessionsByProject(
       JOIN assistant_messages am ON am.session_id = st.id
       GROUP BY st.root_id
     ) am ON am.root_id = s.id
+    LEFT JOIN (
+      SELECT
+        st.root_id,
+        SUM(um.turn_duration_ms) AS total_active_time_ms
+      FROM subtree st
+      JOIN user_messages um ON um.session_id = st.id
+      WHERE um.synthetic = 0 AND um.compaction = 0 AND um.undone_at IS NULL
+        AND um.turn_duration_ms IS NOT NULL AND um.turn_duration_ms > 0
+      GROUP BY st.root_id
+    ) dur ON dur.root_id = s.id
     WHERE s.project_id = ?
       AND s.parent_id IS NULL
     ORDER BY s.updated_at DESC
@@ -140,6 +151,7 @@ export async function getSessionStats(
       COALESCE(am.total_tokens_out, 0) AS total_tokens_out,
       COALESCE(am.total_tokens_cache_read, 0) AS total_tokens_cache_read,
       COALESCE(am.total_cost, 0) AS reported_cost,
+      COALESCE(dur.total_active_time_ms, 0) AS total_active_time_ms,
       COALESCE(am.models_used, 0) AS models_used
     FROM sessions s
     LEFT JOIN (
@@ -160,6 +172,16 @@ export async function getSessionStats(
       JOIN assistant_messages am ON am.session_id = st.id
       GROUP BY st.root_id
     ) am ON am.root_id = s.id
+    LEFT JOIN (
+      SELECT
+        st.root_id,
+        SUM(um.turn_duration_ms) AS total_active_time_ms
+      FROM subtree st
+      JOIN user_messages um ON um.session_id = st.id
+      WHERE um.synthetic = 0 AND um.compaction = 0 AND um.undone_at IS NULL
+        AND um.turn_duration_ms IS NOT NULL AND um.turn_duration_ms > 0
+      GROUP BY st.root_id
+    ) dur ON dur.root_id = s.id
     WHERE s.id = ?
   `, [sessionId, sessionId]);
 }

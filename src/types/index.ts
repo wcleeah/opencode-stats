@@ -30,6 +30,7 @@ export interface UserMessage {
   compaction: number;
   undone_at: number | null;
   created_at: number;
+  turn_duration_ms: number | null;
 }
 
 export interface AssistantMessage {
@@ -125,6 +126,7 @@ export interface SessionWithStats {
   total_tokens_in: number;
   total_tokens_out: number;
   total_tokens_cache_read: number;
+  total_active_time_ms: number;
   models_used: number;
 }
 
@@ -146,6 +148,7 @@ export interface MessageThread {
   compaction: number;
   undone_at: number | null;
   user_created_at: number;
+  turn_duration_ms: number | null;
   assistant_message_id: string | null;
   model_id: string | null;
   tokens_in: number | null;
@@ -243,6 +246,7 @@ export interface GlobalStats {
   total_tokens_cache_write: number;
   reported_cost: number;
   total_tool_calls: number;
+  total_active_time_ms: number;
   models_used: number;
 }
 

@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { getGlobalStats } from '@/lib/queries/stats';
 import { getDailyTokenUsage, getModelUsage } from '@/lib/queries/analytics';
 import { estimateCost, aggregateCostBreakdown } from '@/lib/pricing';
-import { formatTokens, formatCost, formatCostBreakdown, formatPercent } from '@/lib/format';
+import { formatTokens, formatCost, formatCostBreakdown, formatPercent, formatDuration } from '@/lib/format';
 import { parseDateRange } from '@/lib/date-range';
 
 import { Card, StatCard } from '@/components/ui/card';
@@ -122,6 +122,13 @@ export default async function Home({ searchParams }: HomePageProps) {
           label="Total Cost"
           value={formatCost(totalCost.total, totalCost.hasEstimated)}
           subValue={formatCostBreakdown(totalCost.reported, totalCost.estimated)}
+        />
+        <StatCard
+          label="Active Time"
+          value={formatDuration(s.total_active_time_ms)}
+          subValue={s.total_turns > 0
+            ? `~${formatDuration(Math.round(s.total_active_time_ms / s.total_turns))} avg/turn`
+            : undefined}
         />
       </div>
 

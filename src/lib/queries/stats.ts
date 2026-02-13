@@ -45,6 +45,7 @@ export async function getGlobalStats(
     ...amParams,
     ...amParams,
     ...tcParams,
+    ...umParams,
     ...amParams,
   ];
 
@@ -65,6 +66,10 @@ export async function getGlobalStats(
         AS total_tokens_cache_write,
       (SELECT COALESCE(SUM(cost), 0) FROM assistant_messages ${amWhere}) AS reported_cost,
       (SELECT COUNT(*) FROM tool_calls ${tcWhere}) AS total_tool_calls,
+      (SELECT COALESCE(SUM(turn_duration_ms), 0) FROM user_messages
+        WHERE synthetic = 0 AND compaction = 0 AND undone_at IS NULL
+        AND turn_duration_ms IS NOT NULL AND turn_duration_ms > 0
+        ${umWhere}) AS total_active_time_ms,
       (SELECT COUNT(DISTINCT model_id) FROM assistant_messages
         WHERE model_id IS NOT NULL ${amAnd}) AS models_used
   `, totalParams.length > 0 ? totalParams : undefined);

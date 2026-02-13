@@ -258,3 +258,30 @@ export interface PaginatedResult<T> {
   pageSize: number;
   totalPages: number;
 }
+
+export interface DailyTimeUsage {
+  day: string;
+  total_active_time_ms: number;
+  total_response_time_ms: number;
+  turn_count: number;
+  response_count: number;
+}
+
+export interface TimeStats {
+  total_active_time_ms: number;
+  total_turns: number;
+  avg_turn_duration_ms: number;
+  max_turn_duration_ms: number;
+  avg_response_time_ms: number;
+  total_responses: number;
+}
+
+export interface ProjectTimeBreakdown {
+  project_id: string;
+  worktree: string;
+  total_active_time_ms: number;
+  turn_count: number;
+  avg_turn_duration_ms: number;
+  avg_response_time_ms: number;
+  last_activity: number;
+}

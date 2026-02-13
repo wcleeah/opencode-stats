@@ -3,6 +3,7 @@ import Link from 'next/link';
 const NAV_ITEMS = [
   { href: '/', label: 'dashboard' },
   { href: '/projects', label: 'projects' },
+  { href: '/time', label: 'time' },
   { href: '/tools', label: 'tools' },
   { href: '/models', label: 'models' },
 ] as const;

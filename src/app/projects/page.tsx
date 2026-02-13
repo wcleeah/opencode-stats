@@ -14,6 +14,7 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import { Pagination } from '@/components/ui/pagination';
+import { Tooltip } from '@/components/ui/tooltip';
 
 interface ProjectsPageProps {
   searchParams: Promise<{ page?: string }>;
@@ -59,10 +60,11 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
 
   for (const row of costBreakdownsResult.data ?? []) {
     if (!grouped[row.project_id]) grouped[row.project_id] = [];
+    const uncachedIn = Math.max(0, row.total_in - row.total_cache_read);
     grouped[row.project_id].push({
       reportedCost: row.reported_cost,
       modelId: row.model_id,
-      tokensIn: row.total_in,
+      tokensIn: uncachedIn,
       tokensOut: row.total_out,
       tokensCacheRead: row.total_cache_read,
       tokensCacheWrite: row.total_cache_write,
@@ -114,7 +116,18 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                 {project.session_count}
               </TableCell>
               <TableCell align="right">
-                {formatTokens(project.total_tokens_in + project.total_tokens_out)}
+                <Tooltip
+                  content={
+                    <span className="text-muted">
+                      Input {formatTokens(project.total_tokens_in)} · Output{' '}
+                      {formatTokens(project.total_tokens_out)}
+                    </span>
+                  }
+                >
+                  <span className="tabular-nums">
+                    {formatTokens(project.total_tokens_in + project.total_tokens_out)}
+                  </span>
+                </Tooltip>
               </TableCell>
               <TableCell align="right">
                 <span className="text-muted">

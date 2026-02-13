@@ -7,7 +7,10 @@ import {
 } from '@/lib/queries/analytics';
 import { estimateCost, aggregateCostBreakdown } from '@/lib/pricing';
 import { formatTokens, formatCost, formatPercent, formatCostBreakdown } from '@/lib/format';
+import { parseDateRange } from '@/lib/date-range';
+
 import { Card, StatCard } from '@/components/ui/card';
+import { Tooltip } from '@/components/ui/tooltip';
 import {
   Table,
   TableHeader,
@@ -19,11 +22,18 @@ import { Badge } from '@/components/ui/badge';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { CacheChart } from '@/components/cache-chart';
 import { ErrorRateChart } from '@/components/error-rate-chart';
+import { DateRangeControls } from '@/components/date-range-controls';
 
-export default async function ModelsPage() {
-  const models = await getModelUsage();
-  const cache = await getCacheEfficiency();
-  const errors = await getDailyErrorRate();
+interface ModelsPageProps {
+  searchParams: Promise<{ from?: string; to?: string }>;
+}
+
+export default async function ModelsPage({ searchParams }: ModelsPageProps) {
+  const params = await searchParams;
+  const range = parseDateRange({ from: params.from, to: params.to });
+  const models = await getModelUsage(range.startMs, range.endMs);
+  const cache = await getCacheEfficiency(range.startMs, range.endMs);
+  const errors = await getDailyErrorRate(range.startMs, range.endMs);
 
   if (models.error) {
     return (
@@ -39,14 +49,14 @@ export default async function ModelsPage() {
   const data = models.data ?? [];
 
   const totalResponses = data.reduce((sum, m) => sum + m.response_count, 0);
+  const totalCachedIn = data.reduce((sum, m) => sum + m.total_cache_read, 0);
   const totalIn = data.reduce((sum, m) => sum + m.total_in, 0);
+  const totalUncachedIn = Math.max(0, totalIn - totalCachedIn);
   const totalOut = data.reduce((sum, m) => sum + m.total_out, 0);
   const totalReasoning = data.reduce((sum, m) => sum + m.total_reasoning, 0);
   const overallCacheHit =
     totalIn > 0
-      ? data.reduce((sum, m) => sum + (m.cache_hit_pct / 100) * m.total_in, 0) /
-        totalIn *
-        100
+      ? totalCachedIn / totalIn * 100
       : 0;
 
   // Compute estimated costs per model
@@ -55,7 +65,7 @@ export default async function ModelsPage() {
     est: estimateCost({
       reportedCost: m.total_cost,
       modelId: m.model_id,
-      tokensIn: m.total_in,
+      tokensIn: Math.max(0, m.total_in - m.total_cache_read),
       tokensOut: m.total_out,
       tokensCacheRead: m.total_cache_read,
       tokensCacheWrite: m.total_cache_write,
@@ -66,7 +76,7 @@ export default async function ModelsPage() {
     data.map((m) => ({
       reportedCost: m.total_cost,
       modelId: m.model_id,
-      tokensIn: m.total_in,
+      tokensIn: Math.max(0, m.total_in - m.total_cache_read),
       tokensOut: m.total_out,
       tokensCacheRead: m.total_cache_read,
       tokensCacheWrite: m.total_cache_write,
@@ -75,7 +85,10 @@ export default async function ModelsPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs crumbs={[{ label: 'models' }]} />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <Breadcrumbs crumbs={[{ label: 'models' }]} />
+        <DateRangeControls from={range.from} to={range.to} />
+      </div>
 
       {/* Summary stats */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -87,7 +100,20 @@ export default async function ModelsPage() {
         <StatCard
           label="Total Tokens"
           value={formatTokens(totalIn + totalOut)}
-          subValue={`${formatTokens(totalIn)} in / ${formatTokens(totalOut)} out`}
+          subValue={
+            <Tooltip
+              content={
+                <span className="text-muted">
+                  Uncached {formatTokens(totalUncachedIn)} · Cached{' '}
+                  {formatTokens(totalCachedIn)}
+                </span>
+              }
+            >
+              <span>
+                {formatTokens(totalIn)} in / {formatTokens(totalOut)} out
+              </span>
+            </Tooltip>
+          }
           accent
         />
         <StatCard
@@ -152,7 +178,18 @@ export default async function ModelsPage() {
                       </span>
                     </TableCell>
                     <TableCell align="right">
-                      {formatTokens(model.total_in)}
+                      <Tooltip
+                        content={
+                          <span className="text-muted">
+                            Uncached {formatTokens(Math.max(0, model.total_in - model.total_cache_read))}
+                            {' '}· Cached {formatTokens(model.total_cache_read)}
+                          </span>
+                        }
+                      >
+                        <span className="tabular-nums">
+                          {formatTokens(model.total_in)}
+                        </span>
+                      </Tooltip>
                     </TableCell>
                     <TableCell align="right">
                       {formatTokens(model.total_out)}

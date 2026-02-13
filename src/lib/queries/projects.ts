@@ -26,6 +26,7 @@ export async function getProjects(
       COALESCE(sc.session_count, 0) AS session_count,
       COALESCE(am.total_tokens_in, 0) AS total_tokens_in,
       COALESCE(am.total_tokens_out, 0) AS total_tokens_out,
+      COALESCE(am.total_tokens_cache_read, 0) AS total_tokens_cache_read,
       COALESCE(am.total_cost, 0) AS reported_cost,
       COALESCE(sc.last_activity, p.created_at) AS last_activity
     FROM projects p
@@ -40,8 +41,9 @@ export async function getProjects(
     LEFT JOIN (
       SELECT
         s.project_id,
-        SUM(am.tokens_in) AS total_tokens_in,
+        SUM(am.tokens_in + am.tokens_cache_read) AS total_tokens_in,
         SUM(am.tokens_out) AS total_tokens_out,
+        SUM(am.tokens_cache_read) AS total_tokens_cache_read,
         SUM(am.cost) AS total_cost
       FROM sessions s
       LEFT JOIN assistant_messages am ON am.session_id = s.id
@@ -79,6 +81,7 @@ export async function getProjectById(
       COALESCE(sc.session_count, 0) AS session_count,
       COALESCE(am.total_tokens_in, 0) AS total_tokens_in,
       COALESCE(am.total_tokens_out, 0) AS total_tokens_out,
+      COALESCE(am.total_tokens_cache_read, 0) AS total_tokens_cache_read,
       COALESCE(am.total_cost, 0) AS reported_cost,
       COALESCE(sc.last_activity, p.created_at) AS last_activity
     FROM projects p
@@ -93,8 +96,9 @@ export async function getProjectById(
     LEFT JOIN (
       SELECT
         s.project_id,
-        SUM(am.tokens_in) AS total_tokens_in,
+        SUM(am.tokens_in + am.tokens_cache_read) AS total_tokens_in,
         SUM(am.tokens_out) AS total_tokens_out,
+        SUM(am.tokens_cache_read) AS total_tokens_cache_read,
         SUM(am.cost) AS total_cost
       FROM sessions s
       LEFT JOIN assistant_messages am ON am.session_id = s.id
@@ -117,7 +121,7 @@ export async function getProjectCostBreakdowns(
     SELECT
       s.project_id,
       COALESCE(am.model_id, '_unknown') AS model_id,
-      SUM(am.tokens_in) AS total_in,
+      SUM(am.tokens_in + am.tokens_cache_read) AS total_in,
       SUM(am.tokens_out) AS total_out,
       SUM(am.tokens_cache_read) AS total_cache_read,
       SUM(am.tokens_cache_write) AS total_cache_write,

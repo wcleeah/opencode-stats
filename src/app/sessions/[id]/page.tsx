@@ -20,6 +20,7 @@ import {
 import { aggregateCostBreakdown } from '@/lib/pricing';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { StatCard, Card } from '@/components/ui/card';
+import { Tooltip } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
 import type { ToolCallDetail } from '@/types';
 
@@ -246,7 +247,7 @@ export default async function SessionDetailPage({
     (costBreakdownResult.data ?? []).map((row) => ({
       reportedCost: row.reported_cost,
       modelId: row.model_id,
-      tokensIn: row.total_in,
+      tokensIn: Math.max(0, row.total_in - row.total_cache_read),
       tokensOut: row.total_out,
       tokensCacheRead: row.total_cache_read,
       tokensCacheWrite: row.total_cache_write,
@@ -309,7 +310,20 @@ export default async function SessionDetailPage({
           <StatCard
             label="Total Tokens"
             value={formatTokens(stats.total_tokens_in + stats.total_tokens_out)}
-            subValue={`${formatTokens(stats.total_tokens_in)} in / ${formatTokens(stats.total_tokens_out)} out`}
+            subValue={
+              <Tooltip
+                content={
+                  <span className="text-muted">
+                    Input {formatTokens(stats.total_tokens_in)} · Output{' '}
+                    {formatTokens(stats.total_tokens_out)}
+                  </span>
+                }
+              >
+                <span>
+                  {formatTokens(stats.total_tokens_in)} in / {formatTokens(stats.total_tokens_out)} out
+                </span>
+              </Tooltip>
+            }
             accent
           />
           <StatCard

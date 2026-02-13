@@ -20,8 +20,8 @@ export function Card({ children, className }: CardProps) {
 
 interface StatCardProps {
   label: string;
-  value: string;
-  subValue?: string;
+  value: React.ReactNode;
+  subValue?: React.ReactNode;
   accent?: boolean;
 }
 

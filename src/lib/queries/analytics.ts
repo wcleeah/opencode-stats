@@ -28,7 +28,7 @@ export async function getDailyTokenUsage(
   return queryAll<DailyTokenUsage>(`
     SELECT
       DATE(am.created_at / 1000, 'unixepoch', 'localtime') AS day,
-      SUM(am.tokens_in) AS total_in,
+      SUM(am.tokens_in + am.tokens_cache_read) AS total_in,
       SUM(am.tokens_out) AS total_out,
       SUM(am.tokens_reasoning) AS total_reasoning,
       SUM(am.cost) AS reported_cost,
@@ -40,30 +40,51 @@ export async function getDailyTokenUsage(
   `, params.length > 0 ? params : undefined);
 }
 
-export async function getModelUsage(): Promise<{
+export async function getModelUsage(
+  startMs?: number,
+  endMs?: number,
+): Promise<{
   data: ModelUsage[] | null;
   error: string | null;
 }> {
+  const conditions: string[] = ['am.model_id IS NOT NULL'];
+  const params: number[] = [];
+
+  if (startMs !== undefined) {
+    conditions.push('am.created_at >= ?');
+    params.push(startMs);
+  }
+  if (endMs !== undefined) {
+    conditions.push('am.created_at <= ?');
+    params.push(endMs);
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
   return queryAll<ModelUsage>(`
     SELECT
       am.model_id,
       am.provider_id,
       COUNT(*) AS response_count,
-      SUM(am.tokens_in) AS total_in,
+      SUM(am.tokens_in + am.tokens_cache_read) AS total_in,
       SUM(am.tokens_out) AS total_out,
       SUM(am.tokens_reasoning) AS total_reasoning,
       SUM(am.tokens_cache_read) AS total_cache_read,
       SUM(am.tokens_cache_write) AS total_cache_write,
       SUM(am.cost) AS total_cost,
-      CASE WHEN SUM(am.tokens_in) > 0
-        THEN ROUND(100.0 * SUM(am.tokens_cache_read) / SUM(am.tokens_in), 1)
+      CASE WHEN SUM(am.tokens_in) + SUM(am.tokens_cache_read) > 0
+        THEN ROUND(
+          100.0 * SUM(am.tokens_cache_read)
+          / (SUM(am.tokens_in) + SUM(am.tokens_cache_read)),
+          1
+        )
         ELSE 0
       END AS cache_hit_pct
     FROM assistant_messages am
-    WHERE am.model_id IS NOT NULL
+    ${where}
     GROUP BY am.model_id, am.provider_id
     ORDER BY total_out DESC
-  `);
+  `, params.length > 0 ? params : undefined);
 }
 
 export async function getToolUsage(): Promise<{
@@ -93,10 +114,27 @@ export async function getToolUsage(): Promise<{
   `);
 }
 
-export async function getDailyErrorRate(): Promise<{
+export async function getDailyErrorRate(
+  startMs?: number,
+  endMs?: number,
+): Promise<{
   data: DailyErrorRate[] | null;
   error: string | null;
 }> {
+  const conditions: string[] = [];
+  const params: number[] = [];
+
+  if (startMs !== undefined) {
+    conditions.push('am.created_at >= ?');
+    params.push(startMs);
+  }
+  if (endMs !== undefined) {
+    conditions.push('am.created_at <= ?');
+    params.push(endMs);
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
   return queryAll<DailyErrorRate>(`
     SELECT
       DATE(am.created_at / 1000, 'unixepoch', 'localtime') AS day,
@@ -107,26 +145,49 @@ export async function getDailyErrorRate(): Promise<{
         1
       ) AS error_rate
     FROM assistant_messages am
+    ${where}
     GROUP BY day
     ORDER BY day
-  `);
+  `, params.length > 0 ? params : undefined);
 }
 
-export async function getCacheEfficiency(): Promise<{
+export async function getCacheEfficiency(
+  startMs?: number,
+  endMs?: number,
+): Promise<{
   data: CacheEfficiency[] | null;
   error: string | null;
 }> {
+  const conditions: string[] = [];
+  const params: number[] = [];
+
+  if (startMs !== undefined) {
+    conditions.push('am.created_at >= ?');
+    params.push(startMs);
+  }
+  if (endMs !== undefined) {
+    conditions.push('am.created_at <= ?');
+    params.push(endMs);
+  }
+
+  const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
   return queryAll<CacheEfficiency>(`
     SELECT
       DATE(am.created_at / 1000, 'unixepoch', 'localtime') AS day,
       SUM(am.tokens_cache_read) AS cached_tokens,
-      SUM(am.tokens_in) AS total_input_tokens,
-      CASE WHEN SUM(am.tokens_in) > 0
-        THEN ROUND(100.0 * SUM(am.tokens_cache_read) / SUM(am.tokens_in), 1)
+      SUM(am.tokens_in + am.tokens_cache_read) AS total_input_tokens,
+      CASE WHEN SUM(am.tokens_in) + SUM(am.tokens_cache_read) > 0
+        THEN ROUND(
+          100.0 * SUM(am.tokens_cache_read)
+          / (SUM(am.tokens_in) + SUM(am.tokens_cache_read)),
+          1
+        )
         ELSE 0
       END AS cache_hit_pct
     FROM assistant_messages am
+    ${where}
     GROUP BY day
     ORDER BY day
-  `);
+  `, params.length > 0 ? params : undefined);
 }

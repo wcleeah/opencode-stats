@@ -124,6 +124,7 @@ export interface SessionWithStats {
   turn_count: number;
   total_tokens_in: number;
   total_tokens_out: number;
+  total_tokens_cache_read: number;
   models_used: number;
 }
 
@@ -134,6 +135,7 @@ export interface ProjectWithStats {
   session_count: number;
   total_tokens_in: number;
   total_tokens_out: number;
+  total_tokens_cache_read: number;
   last_activity: number;
 }
 

@@ -16,6 +16,7 @@ import {
 import { aggregateCostBreakdown } from '@/lib/pricing';
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import { StatCard } from '@/components/ui/card';
+import { Tooltip } from '@/components/ui/tooltip';
 import {
   Table,
   TableHeader,
@@ -74,7 +75,7 @@ export default async function ProjectDetailPage({
     projectCostRows.map((row) => ({
       reportedCost: row.reported_cost,
       modelId: row.model_id,
-      tokensIn: row.total_in,
+      tokensIn: Math.max(0, row.total_in - row.total_cache_read),
       tokensOut: row.total_out,
       tokensCacheRead: row.total_cache_read,
       tokensCacheWrite: row.total_cache_write,
@@ -88,7 +89,7 @@ export default async function ProjectDetailPage({
       rows.map((row) => ({
         reportedCost: row.reported_cost,
         modelId: row.model_id,
-        tokensIn: row.total_in,
+        tokensIn: Math.max(0, row.total_in - row.total_cache_read),
         tokensOut: row.total_out,
         tokensCacheRead: row.total_cache_read,
         tokensCacheWrite: row.total_cache_write,
@@ -114,7 +115,20 @@ export default async function ProjectDetailPage({
         <StatCard
           label="Total Tokens"
           value={formatTokens(project.total_tokens_in + project.total_tokens_out)}
-          subValue={`${formatTokens(project.total_tokens_in)} in / ${formatTokens(project.total_tokens_out)} out`}
+          subValue={
+            <Tooltip
+              content={
+                <span className="text-muted">
+                  Input {formatTokens(project.total_tokens_in)} · Output{' '}
+                  {formatTokens(project.total_tokens_out)}
+                </span>
+              }
+            >
+              <span>
+                {formatTokens(project.total_tokens_in)} in / {formatTokens(project.total_tokens_out)} out
+              </span>
+            </Tooltip>
+          }
           accent
         />
         <StatCard
@@ -170,9 +184,18 @@ export default async function ProjectDetailPage({
                     {session.turn_count}
                   </TableCell>
                   <TableCell align="right">
-                    <span className="text-muted">
-                      {formatTokens(session.total_tokens_in + session.total_tokens_out)}
-                    </span>
+                    <Tooltip
+                      content={
+                        <span className="text-muted">
+                          Input {formatTokens(session.total_tokens_in)} · Output{' '}
+                          {formatTokens(session.total_tokens_out)}
+                        </span>
+                      }
+                    >
+                      <span className="tabular-nums text-muted">
+                        {formatTokens(session.total_tokens_in + session.total_tokens_out)}
+                      </span>
+                    </Tooltip>
                   </TableCell>
                   <TableCell align="right">
                     {session.files_changed > 0 ? (

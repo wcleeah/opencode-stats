@@ -103,8 +103,9 @@ export interface SessionRollup {
   total_tokens_cache_read: number;
   total_tokens_cache_write: number;
   reported_cost: number;
-  total_active_time_ms: number;
-  total_response_time_ms: number;
+  total_turn_wall_time_ms: number;
+  total_assistant_time_ms: number;
+  total_tool_time_ms: number;
   total_tool_calls: number;
   models_used: number;
   last_activity: number | null;
@@ -135,8 +136,9 @@ export interface ProjectRollup {
   total_tokens_cache_read: number;
   total_tokens_cache_write: number;
   reported_cost: number;
-  total_active_time_ms: number;
-  total_response_time_ms: number;
+  total_turn_wall_time_ms: number;
+  total_assistant_time_ms: number;
+  total_tool_time_ms: number;
   total_tool_calls: number;
   models_used: number;
   last_activity: number | null;
@@ -160,6 +162,7 @@ export interface ToolRollup {
   tool: string;
   call_count: number;
   error_count: number;
+  total_duration_ms: number;
   avg_duration_ms: number;
   max_duration_ms: number;
   total_input_bytes: number;
@@ -180,10 +183,12 @@ export interface DailyGlobalRollup {
   total_tokens_cache_read: number;
   total_tokens_cache_write: number;
   reported_cost: number;
-  total_active_time_ms: number;
-  total_response_time_ms: number;
-  max_turn_duration_ms: number;
-  max_response_time_ms: number;
+  total_turn_wall_time_ms: number;
+  total_assistant_time_ms: number;
+  total_tool_time_ms: number;
+  max_turn_wall_time_ms: number;
+  max_assistant_time_ms: number;
+  max_tool_duration_ms: number;
   updated_at: number;
 }
 
@@ -207,6 +212,7 @@ export interface DailyToolRollup {
   tool: string;
   call_count: number;
   error_count: number;
+  total_duration_ms: number;
   avg_duration_ms: number;
   max_duration_ms: number;
   total_input_bytes: number;
@@ -226,10 +232,12 @@ export interface DailyProjectRollup {
   total_tokens_cache_read: number;
   total_tokens_cache_write: number;
   reported_cost: number;
-  total_active_time_ms: number;
-  total_response_time_ms: number;
-  max_turn_duration_ms: number;
-  max_response_time_ms: number;
+  total_turn_wall_time_ms: number;
+  total_assistant_time_ms: number;
+  total_tool_time_ms: number;
+  max_turn_wall_time_ms: number;
+  max_assistant_time_ms: number;
+  max_tool_duration_ms: number;
   updated_at: number;
 }
 
@@ -249,8 +257,9 @@ export interface SessionWithStats {
   total_tokens_reasoning: number;
   total_tokens_cache_read: number;
   total_tokens_cache_write: number;
-  total_active_time_ms: number;
-  total_response_time_ms: number;
+  total_turn_wall_time_ms: number;
+  total_assistant_time_ms: number;
+  total_tool_time_ms: number;
   total_tool_calls: number;
   models_used: number;
   reported_cost: number;
@@ -269,8 +278,9 @@ export interface ProjectWithStats {
   total_tokens_reasoning: number;
   total_tokens_cache_read: number;
   total_tokens_cache_write: number;
-  total_active_time_ms: number;
-  total_response_time_ms: number;
+  total_turn_wall_time_ms: number;
+  total_assistant_time_ms: number;
+  total_tool_time_ms: number;
   total_tool_calls: number;
   models_used: number;
   reported_cost: number;
@@ -288,8 +298,9 @@ export interface GlobalStats {
   total_tokens_cache_write: number;
   reported_cost: number;
   total_tool_calls: number;
-  total_active_time_ms: number;
-  total_response_time_ms: number;
+  total_turn_wall_time_ms: number;
+  total_assistant_time_ms: number;
+  total_tool_time_ms: number;
   models_used: number;
 }
 
@@ -404,27 +415,36 @@ export interface SubtaskNode {
 
 export interface DailyTimeUsage {
   day: string;
-  total_active_time_ms: number;
-  total_response_time_ms: number;
+  total_turn_wall_time_ms: number;
+  total_assistant_time_ms: number;
+  total_tool_time_ms: number;
   turn_count: number;
   response_count: number;
 }
 
 export interface TimeStats {
-  total_active_time_ms: number;
+  total_turn_wall_time_ms: number;
+  total_assistant_time_ms: number;
+  total_tool_time_ms: number;
   total_turns: number;
-  avg_turn_duration_ms: number;
-  max_turn_duration_ms: number;
-  avg_response_time_ms: number;
+  avg_turn_wall_time_ms: number;
+  max_turn_wall_time_ms: number;
+  avg_assistant_time_ms: number;
+  max_assistant_time_ms: number;
+  avg_tool_duration_ms: number;
+  max_tool_duration_ms: number;
   total_responses: number;
 }
 
 export interface ProjectTimeBreakdown {
   project_id: string;
   worktree: string;
-  total_active_time_ms: number;
+  total_turn_wall_time_ms: number;
+  total_assistant_time_ms: number;
+  total_tool_time_ms: number;
   turn_count: number;
-  avg_turn_duration_ms: number;
-  avg_response_time_ms: number;
+  avg_turn_wall_time_ms: number;
+  avg_assistant_time_ms: number;
+  avg_tool_duration_ms: number;
   last_activity: number | null;
 }

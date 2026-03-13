@@ -38,8 +38,9 @@ export async function getGlobalStats(
         COALESCE(SUM(total_tokens_cache_write), 0) AS total_tokens_cache_write,
         COALESCE(SUM(reported_cost), 0) AS reported_cost,
         COALESCE(SUM(tool_call_count), 0) AS total_tool_calls,
-        COALESCE(SUM(total_active_time_ms), 0) AS total_active_time_ms,
-        COALESCE(SUM(total_response_time_ms), 0) AS total_response_time_ms,
+        COALESCE(SUM(total_turn_wall_time_ms), 0) AS total_turn_wall_time_ms,
+        COALESCE(SUM(total_assistant_time_ms), 0) AS total_assistant_time_ms,
+        COALESCE(SUM(total_tool_time_ms), 0) AS total_tool_time_ms,
         (SELECT COUNT(DISTINCT model_id) FROM responses WHERE model_id IS NOT NULL) AS models_used
       FROM daily_global_rollups
     `);
@@ -62,8 +63,9 @@ export async function getGlobalStats(
       COALESCE(SUM(total_tokens_cache_write), 0) AS total_tokens_cache_write,
       COALESCE(SUM(reported_cost), 0) AS reported_cost,
       COALESCE(SUM(tool_call_count), 0) AS total_tool_calls,
-      COALESCE(SUM(total_active_time_ms), 0) AS total_active_time_ms,
-      COALESCE(SUM(total_response_time_ms), 0) AS total_response_time_ms,
+      COALESCE(SUM(total_turn_wall_time_ms), 0) AS total_turn_wall_time_ms,
+      COALESCE(SUM(total_assistant_time_ms), 0) AS total_assistant_time_ms,
+      COALESCE(SUM(total_tool_time_ms), 0) AS total_tool_time_ms,
       (
         SELECT COUNT(DISTINCT model_id)
         FROM responses

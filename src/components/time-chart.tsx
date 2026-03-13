@@ -99,8 +99,8 @@ export function TimeChart({ data }: TimeChartProps) {
         />
         <Area
           type="monotone"
-          dataKey="total_active_time_ms"
-          name="Active Time"
+          dataKey="total_turn_wall_time_ms"
+          name="Turn Wall Time"
           stroke="#52a9ff"
           fill="#52a9ff"
           fillOpacity={0.1}
@@ -108,11 +108,20 @@ export function TimeChart({ data }: TimeChartProps) {
         />
         <Area
           type="monotone"
-          dataKey="total_response_time_ms"
-          name="Response Time"
+          dataKey="total_assistant_time_ms"
+          name="Assistant Time"
           stroke="#03B000"
           fill="#03B000"
           fillOpacity={0.1}
+          strokeWidth={1.5}
+        />
+        <Area
+          type="monotone"
+          dataKey="total_tool_time_ms"
+          name="Tool Time"
+          stroke="#ff9f43"
+          fill="#ff9f43"
+          fillOpacity={0.08}
           strokeWidth={1.5}
         />
       </AreaChart>

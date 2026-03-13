@@ -40,8 +40,9 @@ export async function getSessionsByProject(
       COALESCE(sr.total_tokens_reasoning, 0) AS total_tokens_reasoning,
       COALESCE(sr.total_tokens_cache_read, 0) AS total_tokens_cache_read,
       COALESCE(sr.total_tokens_cache_write, 0) AS total_tokens_cache_write,
-      COALESCE(sr.total_active_time_ms, 0) AS total_active_time_ms,
-      COALESCE(sr.total_response_time_ms, 0) AS total_response_time_ms,
+      COALESCE(sr.total_turn_wall_time_ms, 0) AS total_turn_wall_time_ms,
+      COALESCE(sr.total_assistant_time_ms, 0) AS total_assistant_time_ms,
+      COALESCE(sr.total_tool_time_ms, 0) AS total_tool_time_ms,
       COALESCE(sr.total_tool_calls, 0) AS total_tool_calls,
       COALESCE(sr.models_used, 0) AS models_used,
       COALESCE(sr.reported_cost, 0) AS reported_cost
@@ -105,8 +106,9 @@ export async function getSessionStats(
       COALESCE(sr.total_tokens_reasoning, 0) AS total_tokens_reasoning,
       COALESCE(sr.total_tokens_cache_read, 0) AS total_tokens_cache_read,
       COALESCE(sr.total_tokens_cache_write, 0) AS total_tokens_cache_write,
-      COALESCE(sr.total_active_time_ms, 0) AS total_active_time_ms,
-      COALESCE(sr.total_response_time_ms, 0) AS total_response_time_ms,
+      COALESCE(sr.total_turn_wall_time_ms, 0) AS total_turn_wall_time_ms,
+      COALESCE(sr.total_assistant_time_ms, 0) AS total_assistant_time_ms,
+      COALESCE(sr.total_tool_time_ms, 0) AS total_tool_time_ms,
       COALESCE(sr.total_tool_calls, 0) AS total_tool_calls,
       COALESCE(sr.models_used, 0) AS models_used,
       COALESCE(sr.reported_cost, 0) AS reported_cost

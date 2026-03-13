@@ -124,10 +124,10 @@ export default async function Home({ searchParams }: HomePageProps) {
           subValue={formatCostBreakdown(totalCost.reported, totalCost.estimated)}
         />
         <StatCard
-          label="Active Time"
-          value={formatDuration(s.total_active_time_ms)}
+          label="Turn Wall Time"
+          value={formatDuration(s.total_turn_wall_time_ms)}
           subValue={s.total_turns > 0
-            ? `~${formatDuration(Math.round(s.total_active_time_ms / s.total_turns))} avg/turn`
+            ? `~${formatDuration(Math.round(s.total_turn_wall_time_ms / s.total_turns))} avg/turn`
             : undefined}
         />
       </div>

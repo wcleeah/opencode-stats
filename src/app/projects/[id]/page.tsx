@@ -137,10 +137,10 @@ export default async function ProjectDetailPage({
           subValue={formatCostBreakdown(projectCost.reported, projectCost.estimated)}
         />
         <StatCard
-          label="Active Time"
-          value={formatDuration(project.total_active_time_ms)}
+          label="Turn Wall Time"
+          value={formatDuration(project.total_turn_wall_time_ms)}
           subValue={project.session_count > 0
-            ? `~${formatDuration(Math.round(project.total_active_time_ms / project.session_count))} avg/session`
+            ? `~${formatDuration(Math.round(project.total_turn_wall_time_ms / project.session_count))} avg/session`
             : undefined}
         />
         <StatCard
@@ -165,7 +165,7 @@ export default async function ProjectDetailPage({
               <TableRow>
                 <TableCell header>Session</TableCell>
                 <TableCell header align="right">Turns</TableCell>
-                <TableCell header align="right">Active Time</TableCell>
+                <TableCell header align="right">Turn Wall Time</TableCell>
                 <TableCell header align="right">Tokens</TableCell>
                 <TableCell header align="right">Changes</TableCell>
                 <TableCell header align="right">Total Cost (est)</TableCell>
@@ -192,9 +192,9 @@ export default async function ProjectDetailPage({
                     {session.turn_count}
                   </TableCell>
                   <TableCell align="right">
-                    {session.total_active_time_ms > 0 ? (
+                    {session.total_turn_wall_time_ms > 0 ? (
                       <span className="tabular-nums text-muted">
-                        {formatDuration(session.total_active_time_ms)}
+                        {formatDuration(session.total_turn_wall_time_ms)}
                       </span>
                     ) : (
                       <span className="text-grep-5">--</span>

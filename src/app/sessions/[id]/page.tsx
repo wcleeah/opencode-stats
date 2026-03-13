@@ -308,10 +308,10 @@ export default async function SessionDetailPage({
             value={stats.turn_count.toLocaleString()}
           />
           <StatCard
-            label="Active Time"
-            value={formatDuration(stats.total_active_time_ms)}
+            label="Turn Wall Time"
+            value={formatDuration(stats.total_turn_wall_time_ms)}
             subValue={stats.turn_count > 0
-              ? `~${formatDuration(Math.round(stats.total_active_time_ms / stats.turn_count))} avg/turn`
+              ? `~${formatDuration(Math.round(stats.total_turn_wall_time_ms / stats.turn_count))} avg/turn`
               : undefined}
           />
           <StatCard

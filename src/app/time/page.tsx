@@ -158,7 +158,7 @@ export default async function TimePage({ searchParams }: TimePageProps) {
                     </span>
                   </TableCell>
                   <TableCell align="right" className="text-muted">
-                    {formatRelativeTime(project.last_activity)}
+                    {project.last_activity ? formatRelativeTime(project.last_activity) : '--'}
                   </TableCell>
                 </TableRow>
               ))}

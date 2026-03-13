@@ -1,5 +1,5 @@
 import { queryAll, queryOne } from '@/lib/db';
-import type { ProjectWithStats, PaginatedResult, ProjectCostAggregate } from '@/types';
+import type { PaginatedResult, ProjectCostAggregate, ProjectWithStats } from '@/types';
 
 export async function getProjects(
   page: number = 1,
@@ -7,78 +7,48 @@ export async function getProjects(
 ): Promise<{ data: PaginatedResult<ProjectWithStats> | null; error: string | null }> {
   const offset = (page - 1) * pageSize;
 
-  const countResult = await queryOne<{ total: number }>(
-    `SELECT COUNT(*) AS total FROM projects WHERE id != '_unknown'`
-  );
-
+  const countResult = await queryOne<{ total: number }>('SELECT COUNT(*) AS total FROM projects');
   if (countResult.error || !countResult.data) {
     return { data: null, error: countResult.error ?? 'Failed to count projects' };
   }
 
-  const total = countResult.data.total;
-  const totalPages = Math.ceil(total / pageSize);
-
-  const result = await queryAll<ProjectWithStats>(`
+  const rows = await queryAll<ProjectWithStats>(`
     SELECT
       p.id,
       p.worktree,
-      p.created_at,
-      COALESCE(sc.session_count, 0) AS session_count,
-      COALESCE(am.total_tokens_in, 0) AS total_tokens_in,
-      COALESCE(am.total_tokens_out, 0) AS total_tokens_out,
-      COALESCE(am.total_tokens_cache_read, 0) AS total_tokens_cache_read,
-      COALESCE(am.total_cost, 0) AS reported_cost,
-      COALESCE(dur.total_active_time_ms, 0) AS total_active_time_ms,
-      COALESCE(sc.last_activity, p.created_at) AS last_activity
+      p.name,
+      p.time_created AS created_at,
+      p.time_updated AS updated_at,
+      COALESCE(pr.session_count, 0) AS session_count,
+      COALESCE(pr.turn_count, 0) AS turn_count,
+      COALESCE(pr.total_tokens_in, 0) AS total_tokens_in,
+      COALESCE(pr.total_tokens_out, 0) AS total_tokens_out,
+      COALESCE(pr.total_tokens_reasoning, 0) AS total_tokens_reasoning,
+      COALESCE(pr.total_tokens_cache_read, 0) AS total_tokens_cache_read,
+      COALESCE(pr.total_tokens_cache_write, 0) AS total_tokens_cache_write,
+      COALESCE(pr.total_active_time_ms, 0) AS total_active_time_ms,
+      COALESCE(pr.total_response_time_ms, 0) AS total_response_time_ms,
+      COALESCE(pr.total_tool_calls, 0) AS total_tool_calls,
+      COALESCE(pr.models_used, 0) AS models_used,
+      COALESCE(pr.reported_cost, 0) AS reported_cost,
+      pr.last_activity
     FROM projects p
-    LEFT JOIN (
-      SELECT
-        project_id,
-        COUNT(*) FILTER (WHERE parent_id IS NULL) AS session_count,
-        MAX(updated_at) AS last_activity
-      FROM sessions
-      GROUP BY project_id
-    ) sc ON sc.project_id = p.id
-    LEFT JOIN (
-      SELECT
-        s.project_id,
-        SUM(am.tokens_in + am.tokens_cache_read) AS total_tokens_in,
-        SUM(am.tokens_out) AS total_tokens_out,
-        SUM(am.tokens_cache_read) AS total_tokens_cache_read,
-        SUM(am.cost) AS total_cost
-      FROM sessions s
-      LEFT JOIN assistant_messages am ON am.session_id = s.id
-      GROUP BY s.project_id
-    ) am ON am.project_id = p.id
-    LEFT JOIN (
-      SELECT
-        s.project_id,
-        SUM(um.turn_duration_ms) AS total_active_time_ms
-      FROM sessions s
-      JOIN user_messages um ON um.session_id = s.id
-      WHERE um.turn_duration_ms IS NOT NULL
-        AND um.turn_duration_ms > 0
-        AND um.synthetic = 0
-        AND um.compaction = 0
-        AND um.undone_at IS NULL
-      GROUP BY s.project_id
-    ) dur ON dur.project_id = p.id
-    WHERE p.id != '_unknown'
-    ORDER BY last_activity DESC
+    LEFT JOIN project_rollups pr ON pr.project_id = p.id
+    ORDER BY COALESCE(pr.last_activity, p.time_updated) DESC, p.worktree ASC
     LIMIT ? OFFSET ?
   `, [pageSize, offset]);
 
-  if (result.error || !result.data) {
-    return { data: null, error: result.error ?? 'Failed to fetch projects' };
+  if (rows.error || !rows.data) {
+    return { data: null, error: rows.error ?? 'Failed to fetch projects' };
   }
 
   return {
     data: {
-      data: result.data,
-      total,
+      data: rows.data,
+      total: countResult.data.total,
       page,
       pageSize,
-      totalPages,
+      totalPages: Math.max(1, Math.ceil(countResult.data.total / pageSize)),
     },
     error: null,
   };
@@ -91,47 +61,24 @@ export async function getProjectById(
     SELECT
       p.id,
       p.worktree,
-      p.created_at,
-      COALESCE(sc.session_count, 0) AS session_count,
-      COALESCE(am.total_tokens_in, 0) AS total_tokens_in,
-      COALESCE(am.total_tokens_out, 0) AS total_tokens_out,
-      COALESCE(am.total_tokens_cache_read, 0) AS total_tokens_cache_read,
-      COALESCE(am.total_cost, 0) AS reported_cost,
-      COALESCE(dur.total_active_time_ms, 0) AS total_active_time_ms,
-      COALESCE(sc.last_activity, p.created_at) AS last_activity
+      p.name,
+      p.time_created AS created_at,
+      p.time_updated AS updated_at,
+      COALESCE(pr.session_count, 0) AS session_count,
+      COALESCE(pr.turn_count, 0) AS turn_count,
+      COALESCE(pr.total_tokens_in, 0) AS total_tokens_in,
+      COALESCE(pr.total_tokens_out, 0) AS total_tokens_out,
+      COALESCE(pr.total_tokens_reasoning, 0) AS total_tokens_reasoning,
+      COALESCE(pr.total_tokens_cache_read, 0) AS total_tokens_cache_read,
+      COALESCE(pr.total_tokens_cache_write, 0) AS total_tokens_cache_write,
+      COALESCE(pr.total_active_time_ms, 0) AS total_active_time_ms,
+      COALESCE(pr.total_response_time_ms, 0) AS total_response_time_ms,
+      COALESCE(pr.total_tool_calls, 0) AS total_tool_calls,
+      COALESCE(pr.models_used, 0) AS models_used,
+      COALESCE(pr.reported_cost, 0) AS reported_cost,
+      pr.last_activity
     FROM projects p
-    LEFT JOIN (
-      SELECT
-        project_id,
-        COUNT(*) FILTER (WHERE parent_id IS NULL) AS session_count,
-        MAX(updated_at) AS last_activity
-      FROM sessions
-      GROUP BY project_id
-    ) sc ON sc.project_id = p.id
-    LEFT JOIN (
-      SELECT
-        s.project_id,
-        SUM(am.tokens_in + am.tokens_cache_read) AS total_tokens_in,
-        SUM(am.tokens_out) AS total_tokens_out,
-        SUM(am.tokens_cache_read) AS total_tokens_cache_read,
-        SUM(am.cost) AS total_cost
-      FROM sessions s
-      LEFT JOIN assistant_messages am ON am.session_id = s.id
-      GROUP BY s.project_id
-    ) am ON am.project_id = p.id
-    LEFT JOIN (
-      SELECT
-        s.project_id,
-        SUM(um.turn_duration_ms) AS total_active_time_ms
-      FROM sessions s
-      JOIN user_messages um ON um.session_id = s.id
-      WHERE um.turn_duration_ms IS NOT NULL
-        AND um.turn_duration_ms > 0
-        AND um.synthetic = 0
-        AND um.compaction = 0
-        AND um.undone_at IS NULL
-      GROUP BY s.project_id
-    ) dur ON dur.project_id = p.id
+    LEFT JOIN project_rollups pr ON pr.project_id = p.id
     WHERE p.id = ?
   `, [projectId]);
 }
@@ -144,19 +91,17 @@ export async function getProjectCostBreakdowns(
   }
 
   const placeholders = projectIds.map(() => '?').join(', ');
-
   return queryAll<ProjectCostAggregate>(`
     SELECT
-      s.project_id,
-      COALESCE(am.model_id, '_unknown') AS model_id,
-      SUM(am.tokens_in + am.tokens_cache_read) AS total_in,
-      SUM(am.tokens_out) AS total_out,
-      SUM(am.tokens_cache_read) AS total_cache_read,
-      SUM(am.tokens_cache_write) AS total_cache_write,
-      SUM(am.cost) AS reported_cost
-    FROM sessions s
-    JOIN assistant_messages am ON am.session_id = s.id
-    WHERE s.project_id IN (${placeholders})
-    GROUP BY s.project_id, am.model_id
+      project_id,
+      model_id,
+      total_tokens_in AS total_in,
+      total_tokens_out AS total_out,
+      total_tokens_cache_read AS total_cache_read,
+      total_tokens_cache_write AS total_cache_write,
+      reported_cost
+    FROM project_model_rollups
+    WHERE project_id IN (${placeholders})
+    ORDER BY project_id, total_out DESC, model_id ASC
   `, projectIds);
 }

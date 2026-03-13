@@ -22,7 +22,7 @@ import { Breadcrumbs } from '@/components/breadcrumbs';
 import { StatCard, Card } from '@/components/ui/card';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
-import type { ToolCallDetail } from '@/types';
+import type { SessionDetailToolCall } from '@/types';
 
 interface SessionDetailPageProps {
   params: Promise<{ id: string }>;
@@ -160,7 +160,7 @@ function formatToolInput(tool: string, raw: string | null): string | null {
   }
 }
 
-function ToolCallBlock({ tc }: { tc: ToolCallDetail }) {
+function ToolCallBlock({ tc }: { tc: SessionDetailToolCall }) {
   const formattedInput = formatToolInput(tc.tool, tc.input_content);
 
   return (
@@ -254,13 +254,13 @@ export default async function SessionDetailPage({
     })),
   );
 
-  // Build map: assistant_message_id -> tool calls with full details
-  const toolCallsByMessage = new Map<string, ToolCallDetail[]>();
+  // Build map: response_id -> tool calls with full details
+  const toolCallsByMessage = new Map<string, SessionDetailToolCall[]>();
   for (const tc of toolCallDetailsResult.data ?? []) {
-    if (!toolCallsByMessage.has(tc.assistant_message_id)) {
-      toolCallsByMessage.set(tc.assistant_message_id, []);
+    if (!toolCallsByMessage.has(tc.response_id)) {
+      toolCallsByMessage.set(tc.response_id, []);
     }
-    toolCallsByMessage.get(tc.assistant_message_id)!.push(tc);
+    toolCallsByMessage.get(tc.response_id)!.push(tc);
   }
 
   const worktree = session.project_worktree;
@@ -271,10 +271,10 @@ export default async function SessionDetailPage({
     (m) => m.synthetic === 0 && m.compaction === 0 && m.undone_at === null,
   );
 
-  // Group by user_message_id to combine multiple assistant messages per user turn
+  // Group by turn_id to combine multiple assistant messages per user turn
   const grouped = new Map<string, typeof thread>();
   for (const msg of thread) {
-    const key = msg.user_message_id;
+    const key = msg.turn_id;
     if (!grouped.has(key)) {
       grouped.set(key, []);
     }
@@ -397,9 +397,7 @@ export default async function SessionDetailPage({
             const isUndone = first.undone_at !== null;
 
             // Get all assistant responses for this user message
-            const assistantMsgs = messages.filter(
-              (m) => m.assistant_message_id !== null,
-            );
+            const assistantMsgs = messages.filter((m) => m.response_id !== null);
 
             return (
               <div key={umId} className="border border-border rounded-sm">
@@ -438,14 +436,14 @@ export default async function SessionDetailPage({
 
                 {/* Assistant response(s) */}
                 {assistantMsgs.map((am) => {
-                  if (!am.assistant_message_id) return null;
+                  if (!am.response_id) return null;
 
                   const msgToolCalls =
-                    toolCallsByMessage.get(am.assistant_message_id) ?? [];
+                    toolCallsByMessage.get(am.response_id) ?? [];
 
                   return (
                     <div
-                      key={am.assistant_message_id}
+                      key={am.response_id}
                       className="p-3 border-b border-border last:border-b-0"
                     >
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -466,10 +464,10 @@ export default async function SessionDetailPage({
                             {formatTokens(am.tokens_out ?? 0)} out
                           </span>
                         )}
-                        {am.completed_at && am.assistant_created_at && (
+                        {am.time_completed && am.response_created_at && (
                           <span className="text-xs text-grep-7">
                             {formatDuration(
-                              am.completed_at - am.assistant_created_at,
+                              am.time_completed - am.response_created_at,
                             )}
                           </span>
                         )}
@@ -479,9 +477,9 @@ export default async function SessionDetailPage({
                           {am.error_type}: {am.error_message}
                         </div>
                       )}
-                      {am.assistant_text && (
+                      {am.response_text && (
                         <div className={`text-sm whitespace-pre-wrap text-grep-11 max-h-96 overflow-y-auto${isUndone ? ' line-through text-grep-7' : ''}`}>
-                          {am.assistant_text}
+                          {am.response_text}
                         </div>
                       )}
                       {/* Inline tool calls */}
@@ -492,9 +490,9 @@ export default async function SessionDetailPage({
                           ))}
                         </div>
                       )}
-                    </div>
-                  );
-                })}
+                     </div>
+                   );
+                 })}
               </div>
             );
           })}

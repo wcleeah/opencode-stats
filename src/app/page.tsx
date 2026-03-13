@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { getGlobalStats } from '@/lib/queries/stats';
 import { getDailyTokenUsage, getModelUsage } from '@/lib/queries/analytics';
 import { estimateCost, aggregateCostBreakdown } from '@/lib/pricing';
-import { formatTokens, formatCost, formatCostBreakdown, formatPercent, formatDuration } from '@/lib/format';
+import { formatTokens, formatCost, formatCostBreakdown, formatDuration } from '@/lib/format';
 import { parseDateRange } from '@/lib/date-range';
 
 import { Card, StatCard } from '@/components/ui/card';
@@ -154,7 +154,7 @@ export default async function Home({ searchParams }: HomePageProps) {
                 <TableCell header align="right">Responses</TableCell>
                 <TableCell header align="right">Tokens In</TableCell>
                 <TableCell header align="right">Tokens Out</TableCell>
-                <TableCell header align="right">Cache Hit</TableCell>
+                <TableCell header align="right">Reasoning</TableCell>
                 <TableCell header align="right">Reported Cost</TableCell>
                 <TableCell header align="right">Total Cost</TableCell>
               </TableRow>
@@ -199,7 +199,7 @@ export default async function Home({ searchParams }: HomePageProps) {
                       {formatTokens(model.total_out)}
                     </TableCell>
                     <TableCell align="right">
-                      {formatPercent(model.cache_hit_pct)}
+                      {model.total_reasoning > 0 ? formatTokens(model.total_reasoning) : '--'}
                     </TableCell>
                     <TableCell align="right">
                       {formatCost(model.total_cost)}

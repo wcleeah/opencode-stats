@@ -134,10 +134,10 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                     </span>
                   }
                 >
-                  <span className="tabular-nums">
+                <span className="tabular-nums">
                     {formatTokens(project.total_tokens_in + project.total_tokens_out)}
-                  </span>
-                </Tooltip>
+                </span>
+              </Tooltip>
               </TableCell>
               <TableCell align="right">
                 <span className="text-muted">
@@ -148,7 +148,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                 </span>
               </TableCell>
               <TableCell align="right" className="text-muted">
-                {formatRelativeTime(project.last_activity)}
+                {project.last_activity ? formatRelativeTime(project.last_activity) : '--'}
               </TableCell>
             </TableRow>
           ))}

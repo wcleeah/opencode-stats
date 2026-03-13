@@ -7,7 +7,6 @@ import { getSessionsByProject, getSessionCostBreakdown } from '@/lib/queries/ses
 import {
   formatTokens,
   formatRelativeTime,
-  formatDiff,
   formatDuration,
   projectName,
   truncateId,
@@ -120,15 +119,15 @@ export default async function ProjectDetailPage({
             <Tooltip
               content={
                 <span className="text-muted">
-                  Input {formatTokens(project.total_tokens_in)} · Output{' '}
-                  {formatTokens(project.total_tokens_out)}
-                </span>
-              }
+                      Input {formatTokens(project.total_tokens_in)} · Output{' '}
+                      {formatTokens(project.total_tokens_out)}
+                    </span>
+                  }
             >
               <span>
-                {formatTokens(project.total_tokens_in)} in / {formatTokens(project.total_tokens_out)} out
-              </span>
-            </Tooltip>
+                  {formatTokens(project.total_tokens_in)} in / {formatTokens(project.total_tokens_out)} out
+                </span>
+              </Tooltip>
           }
           accent
         />
@@ -146,7 +145,7 @@ export default async function ProjectDetailPage({
         />
         <StatCard
           label="Last Active"
-          value={formatRelativeTime(project.last_activity)}
+          value={project.last_activity ? formatRelativeTime(project.last_activity) : '--'}
         />
       </div>
 
@@ -205,10 +204,10 @@ export default async function ProjectDetailPage({
                     <Tooltip
                       content={
                         <span className="text-muted">
-                          Input {formatTokens(session.total_tokens_in)} · Output{' '}
-                          {formatTokens(session.total_tokens_out)}
-                        </span>
-                      }
+                           Input {formatTokens(session.total_tokens_in)} · Output{' '}
+                           {formatTokens(session.total_tokens_out)}
+                         </span>
+                       }
                     >
                       <span className="tabular-nums text-muted">
                         {formatTokens(session.total_tokens_in + session.total_tokens_out)}

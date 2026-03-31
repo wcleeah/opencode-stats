@@ -118,6 +118,11 @@ export function formatPercent(value: number): string {
   return `${value.toFixed(1)}%`;
 }
 
+export function formatRatio(numerator: number, denominator: number): string {
+  if (denominator <= 0) return '0.0%';
+  return formatPercent((numerator / denominator) * 100);
+}
+
 /**
  * Truncate a session ID for display: "abc123def456..." -> "abc123d..."
  */

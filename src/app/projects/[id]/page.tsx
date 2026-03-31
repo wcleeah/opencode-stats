@@ -7,7 +7,6 @@ import { getSessionsByProject, getSessionCostBreakdown } from '@/lib/queries/ses
 import {
   formatTokens,
   formatRelativeTime,
-  formatDiff,
   formatDuration,
   projectName,
   truncateId,
@@ -120,15 +119,15 @@ export default async function ProjectDetailPage({
             <Tooltip
               content={
                 <span className="text-muted">
-                  Input {formatTokens(project.total_tokens_in)} · Output{' '}
-                  {formatTokens(project.total_tokens_out)}
-                </span>
-              }
+                      Input {formatTokens(project.total_tokens_in)} · Output{' '}
+                      {formatTokens(project.total_tokens_out)}
+                    </span>
+                  }
             >
               <span>
-                {formatTokens(project.total_tokens_in)} in / {formatTokens(project.total_tokens_out)} out
-              </span>
-            </Tooltip>
+                  {formatTokens(project.total_tokens_in)} in / {formatTokens(project.total_tokens_out)} out
+                </span>
+              </Tooltip>
           }
           accent
         />
@@ -138,15 +137,15 @@ export default async function ProjectDetailPage({
           subValue={formatCostBreakdown(projectCost.reported, projectCost.estimated)}
         />
         <StatCard
-          label="Active Time"
-          value={formatDuration(project.total_active_time_ms)}
+          label="Turn Wall Time"
+          value={formatDuration(project.total_turn_wall_time_ms)}
           subValue={project.session_count > 0
-            ? `~${formatDuration(Math.round(project.total_active_time_ms / project.session_count))} avg/session`
+            ? `~${formatDuration(Math.round(project.total_turn_wall_time_ms / project.session_count))} avg/session`
             : undefined}
         />
         <StatCard
           label="Last Active"
-          value={formatRelativeTime(project.last_activity)}
+          value={project.last_activity ? formatRelativeTime(project.last_activity) : '--'}
         />
       </div>
 
@@ -166,7 +165,7 @@ export default async function ProjectDetailPage({
               <TableRow>
                 <TableCell header>Session</TableCell>
                 <TableCell header align="right">Turns</TableCell>
-                <TableCell header align="right">Active Time</TableCell>
+                <TableCell header align="right">Turn Wall Time</TableCell>
                 <TableCell header align="right">Tokens</TableCell>
                 <TableCell header align="right">Changes</TableCell>
                 <TableCell header align="right">Total Cost (est)</TableCell>
@@ -193,9 +192,9 @@ export default async function ProjectDetailPage({
                     {session.turn_count}
                   </TableCell>
                   <TableCell align="right">
-                    {session.total_active_time_ms > 0 ? (
+                    {session.total_turn_wall_time_ms > 0 ? (
                       <span className="tabular-nums text-muted">
-                        {formatDuration(session.total_active_time_ms)}
+                        {formatDuration(session.total_turn_wall_time_ms)}
                       </span>
                     ) : (
                       <span className="text-grep-5">--</span>
@@ -205,10 +204,10 @@ export default async function ProjectDetailPage({
                     <Tooltip
                       content={
                         <span className="text-muted">
-                          Input {formatTokens(session.total_tokens_in)} · Output{' '}
-                          {formatTokens(session.total_tokens_out)}
-                        </span>
-                      }
+                           Input {formatTokens(session.total_tokens_in)} · Output{' '}
+                           {formatTokens(session.total_tokens_out)}
+                         </span>
+                       }
                     >
                       <span className="tabular-nums text-muted">
                         {formatTokens(session.total_tokens_in + session.total_tokens_out)}

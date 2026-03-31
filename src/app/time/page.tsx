@@ -65,10 +65,10 @@ export default async function TimePage({ searchParams }: TimePageProps) {
       {/* Summary stats */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
         <StatCard
-          label="Total Active Time"
-          value={formatDuration(s.total_active_time_ms)}
+          label="Turn Wall Time"
+          value={formatDuration(s.total_turn_wall_time_ms)}
           subValue={s.total_turns > 0
-            ? `~${formatDuration(Math.round(s.total_active_time_ms / s.total_turns))} avg/turn`
+            ? `~${formatDuration(Math.round(s.total_turn_wall_time_ms / s.total_turns))} avg/turn`
             : undefined}
           accent
         />
@@ -78,16 +78,21 @@ export default async function TimePage({ searchParams }: TimePageProps) {
           subValue="user messages"
         />
         <StatCard
-          label="Avg Turn Duration"
-          value={formatDuration(s.avg_turn_duration_ms)}
+          label="Avg Turn Wall Time"
+          value={formatDuration(s.avg_turn_wall_time_ms)}
         />
         <StatCard
-          label="Longest Turn"
-          value={formatDuration(s.max_turn_duration_ms)}
+          label="Longest Turn Wall Time"
+          value={formatDuration(s.max_turn_wall_time_ms)}
         />
         <StatCard
-          label="Avg Response Time"
-          value={formatDuration(s.avg_response_time_ms)}
+          label="Avg Assistant Time"
+          value={formatDuration(s.avg_assistant_time_ms)}
+          subValue="per assistant message"
+        />
+        <StatCard
+          label="Avg Tool Time"
+          value={formatDuration(s.avg_tool_duration_ms)}
           subValue="per assistant message"
         />
         <StatCard
@@ -114,10 +119,13 @@ export default async function TimePage({ searchParams }: TimePageProps) {
             <TableHeader>
               <TableRow>
                 <TableCell header>Project</TableCell>
-                <TableCell header align="right">Active Time</TableCell>
+                <TableCell header align="right">Turn Wall Time</TableCell>
+                <TableCell header align="right">Assistant Time</TableCell>
+                <TableCell header align="right">Tool Time</TableCell>
                 <TableCell header align="right">Turns</TableCell>
                 <TableCell header align="right">Avg/Turn</TableCell>
-                <TableCell header align="right">Avg Response</TableCell>
+                <TableCell header align="right">Avg Assistant</TableCell>
+                <TableCell header align="right">Avg Tool</TableCell>
                 <TableCell header align="right">Last Active</TableCell>
               </TableRow>
             </TableHeader>
@@ -137,7 +145,17 @@ export default async function TimePage({ searchParams }: TimePageProps) {
                   </TableCell>
                   <TableCell align="right">
                     <span className="tabular-nums font-medium text-accent">
-                      {formatDuration(project.total_active_time_ms)}
+                      {formatDuration(project.total_turn_wall_time_ms)}
+                    </span>
+                  </TableCell>
+                  <TableCell align="right">
+                    <span className="tabular-nums text-muted">
+                      {formatDuration(project.total_assistant_time_ms)}
+                    </span>
+                  </TableCell>
+                  <TableCell align="right">
+                    <span className="tabular-nums text-muted">
+                      {formatDuration(project.total_tool_time_ms)}
                     </span>
                   </TableCell>
                   <TableCell align="right">
@@ -145,20 +163,27 @@ export default async function TimePage({ searchParams }: TimePageProps) {
                   </TableCell>
                   <TableCell align="right">
                     <span className="tabular-nums text-muted">
-                      {project.avg_turn_duration_ms > 0
-                        ? formatDuration(project.avg_turn_duration_ms)
+                      {project.avg_turn_wall_time_ms > 0
+                        ? formatDuration(project.avg_turn_wall_time_ms)
                         : '--'}
                     </span>
                   </TableCell>
                   <TableCell align="right">
                     <span className="tabular-nums text-muted">
-                      {project.avg_response_time_ms > 0
-                        ? formatDuration(project.avg_response_time_ms)
+                      {project.avg_assistant_time_ms > 0
+                        ? formatDuration(project.avg_assistant_time_ms)
+                        : '--'}
+                    </span>
+                  </TableCell>
+                  <TableCell align="right">
+                    <span className="tabular-nums text-muted">
+                      {project.avg_tool_duration_ms > 0
+                        ? formatDuration(project.avg_tool_duration_ms)
                         : '--'}
                     </span>
                   </TableCell>
                   <TableCell align="right" className="text-muted">
-                    {formatRelativeTime(project.last_activity)}
+                    {project.last_activity ? formatRelativeTime(project.last_activity) : '--'}
                   </TableCell>
                 </TableRow>
               ))}

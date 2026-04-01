@@ -47,7 +47,7 @@ export function ToolCallBlock({
           </span>
         )}
         {durationMs != null && (
-          <span className="text-xs text-grep-8 tabular-nums shrink-0">
+          <span className="text-xs text-muted tabular-nums shrink-0">
             {formatDuration(durationMs)}
           </span>
         )}
@@ -65,10 +65,10 @@ export function ToolCallBlock({
           {/* Input content */}
           {formattedInput && (
             <div className="border-b border-border/50">
-              <div className="px-2 py-1 text-[10px] text-grep-8 uppercase tracking-wider">
+              <div className="px-2 py-1 text-[10px] text-muted uppercase tracking-wider">
                 input
               </div>
-              <div className="px-2 pb-2 text-xs whitespace-pre-wrap text-foreground/70 max-h-64 overflow-y-auto">
+              <div className="px-2 pb-2 text-xs whitespace-pre-wrap text-foreground/80 max-h-64 overflow-y-auto">
                 {formattedInput}
               </div>
             </div>
@@ -77,10 +77,10 @@ export function ToolCallBlock({
           {/* Output content */}
           {outputContent && (
             <div>
-              <div className="px-2 py-1 text-[10px] text-grep-8 uppercase tracking-wider">
+              <div className="px-2 py-1 text-[10px] text-muted uppercase tracking-wider">
                 output
               </div>
-              <div className="px-2 pb-2 text-xs whitespace-pre-wrap text-foreground/70 max-h-64 overflow-y-auto">
+              <div className="px-2 pb-2 text-xs whitespace-pre-wrap text-foreground/80 max-h-64 overflow-y-auto">
                 {outputContent}
               </div>
             </div>

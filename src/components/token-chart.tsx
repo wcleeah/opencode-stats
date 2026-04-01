@@ -43,7 +43,7 @@ function CustomTooltip({
             className="inline-block h-2 w-2 rounded-full"
             style={{ backgroundColor: entry.color }}
           />
-          <span className="text-grep-11">{entry.name}:</span>
+          <span className="text-muted">{entry.name}:</span>
           <span className="font-medium tabular-nums text-foreground">
             {formatTick(entry.value)}
           </span>

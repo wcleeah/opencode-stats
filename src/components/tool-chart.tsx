@@ -36,7 +36,7 @@ function CustomTooltip({
   return (
     <div className="rounded-sm border border-border bg-grep-1 px-3 py-2 text-xs">
       <div className="mb-1 font-medium text-foreground">{tool.tool}</div>
-      <div className="space-y-0.5 text-grep-11">
+      <div className="space-y-0.5 text-muted">
         <div>
           Calls:{' '}
           <span className="text-foreground tabular-nums">

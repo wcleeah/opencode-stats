@@ -197,7 +197,7 @@ export default async function ProjectDetailPage({
                         {formatDuration(session.total_turn_wall_time_ms)}
                       </span>
                     ) : (
-                      <span className="text-grep-5">--</span>
+                      <span className="text-grep-8">--</span>
                     )}
                   </TableCell>
                   <TableCell align="right">
@@ -229,7 +229,7 @@ export default async function ProjectDetailPage({
                         </span>
                       </span>
                     ) : (
-                      <span className="text-grep-5">--</span>
+                      <span className="text-grep-8">--</span>
                     )}
                   </TableCell>
                   <TableCell align="right">

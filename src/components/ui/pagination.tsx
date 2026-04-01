@@ -35,7 +35,7 @@ export function Pagination({ page, totalPages, baseUrl, className }: PaginationP
           &lt; prev
         </Link>
       ) : (
-        <span className="px-2 py-1 text-grep-5">&lt; prev</span>
+        <span className="px-2 py-1 text-grep-8">&lt; prev</span>
       )}
 
       {start > 1 && (
@@ -46,7 +46,7 @@ export function Pagination({ page, totalPages, baseUrl, className }: PaginationP
           >
             1
           </Link>
-          {start > 2 && <span className="px-1 text-grep-5">...</span>}
+          {start > 2 && <span className="px-1 text-grep-8">...</span>}
         </>
       )}
 
@@ -67,7 +67,7 @@ export function Pagination({ page, totalPages, baseUrl, className }: PaginationP
 
       {end < totalPages && (
         <>
-          {end < totalPages - 1 && <span className="px-1 text-grep-5">...</span>}
+          {end < totalPages - 1 && <span className="px-1 text-grep-8">...</span>}
           <Link
             href={pageUrl(totalPages)}
             className="px-2 py-1 text-muted hover:text-foreground transition-colors"
@@ -85,7 +85,7 @@ export function Pagination({ page, totalPages, baseUrl, className }: PaginationP
           next &gt;
         </Link>
       ) : (
-        <span className="px-2 py-1 text-grep-5">next &gt;</span>
+        <span className="px-2 py-1 text-grep-8">next &gt;</span>
       )}
     </nav>
   );

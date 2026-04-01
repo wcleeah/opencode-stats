@@ -122,7 +122,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                     {formatDuration(project.total_turn_wall_time_ms)}
                   </span>
                 ) : (
-                  <span className="text-grep-5">--</span>
+                  <span className="text-grep-8">--</span>
                 )}
               </TableCell>
               <TableCell align="right">

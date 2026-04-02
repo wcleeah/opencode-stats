@@ -13,7 +13,7 @@ const NAV_ITEMS = [
 export function Nav() {
   return (
     <header className="border-b border-border bg-background">
-      <div className="mx-auto flex max-w-7xl items-center gap-6 px-4 py-3">
+      <div className="mx-auto flex max-w-[120rem] items-center gap-6 px-4 py-3">
         <Link
           href="/"
           className="text-sm font-semibold text-foreground hover:text-muted transition-colors"

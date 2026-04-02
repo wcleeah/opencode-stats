@@ -1,5 +1,9 @@
 import { queryAll } from '@/lib/db';
-import type { MessageThread, SessionDetailToolCall } from '@/types';
+import type {
+  MessageThread,
+  ResponsePart,
+  SessionDetailToolCall,
+} from '@/types';
 
 export async function getMessageThread(
   sessionId: string,
@@ -24,20 +28,29 @@ export async function getMessageThread(
       r.error_type,
       r.error_message,
       r.time_created AS response_created_at,
-      r.time_completed,
-      (
-        SELECT group_concat(content, '\n\n')
-        FROM (
-          SELECT content
-          FROM response_parts rp
-          WHERE rp.response_id = r.id AND rp.part_type = 'text'
-          ORDER BY rp.sort_key
-        )
-      ) AS response_text
+      r.time_completed
     FROM turns t
     LEFT JOIN responses r ON r.turn_id = t.id
     WHERE t.session_id = ?
     ORDER BY t.time_created, r.time_created
+  `, [sessionId]);
+}
+
+export async function getResponsePartsBySession(
+  sessionId: string,
+): Promise<{ data: ResponsePart[] | null; error: string | null }> {
+  return queryAll<ResponsePart>(`
+    SELECT
+      rp.response_id,
+      rp.part_id,
+      rp.part_type,
+      rp.sort_key,
+      rp.content,
+      rp.size_bytes
+    FROM response_parts rp
+    JOIN responses r ON r.id = rp.response_id
+    WHERE r.session_id = ?
+    ORDER BY r.time_created, r.id, rp.sort_key
   `, [sessionId]);
 }
 

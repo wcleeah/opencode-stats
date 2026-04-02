@@ -6,7 +6,11 @@ import {
   getSubtaskTree,
   getSessionCostBreakdown,
 } from '@/lib/queries/sessions';
-import { getMessageThread, getToolCallDetailsBySession } from '@/lib/queries/messages';
+import {
+  getMessageThread,
+  getResponsePartsBySession,
+  getToolCallDetailsBySession,
+} from '@/lib/queries/messages';
 import {
   formatTokens,
   formatCost,
@@ -25,10 +29,16 @@ import { Badge } from '@/components/ui/badge';
 import { ToolCallBlock } from '@/components/tool-call-block';
 import { MarkdownContent } from '@/components/markdown-content';
 import { CollapsibleContent } from '@/components/collapsible-content';
-import type { SessionDetailToolCall } from '@/types';
+import type { ResponsePart, SessionDetailToolCall } from '@/types';
 
 interface SessionDetailPageProps {
   params: Promise<{ id: string }>;
+}
+
+interface RenderableResponsePart {
+  part_id: string;
+  part_type: 'text' | 'reasoning';
+  content: string;
 }
 
 function finishBadgeVariant(
@@ -74,6 +84,33 @@ function parseFileAttachment(
   return { path: match[1], fileContent: match[2] };
 }
 
+function getRenderableResponseParts(parts: ResponsePart[]): RenderableResponsePart[] {
+  const renderable: RenderableResponsePart[] = [];
+
+  for (const part of parts) {
+    const content = part.content.trim();
+    if (!content) continue;
+
+    if (part.part_type !== 'text' && part.part_type !== 'reasoning') {
+      continue;
+    }
+
+    const previous = renderable[renderable.length - 1];
+    if (previous && previous.part_type === part.part_type) {
+      previous.content = `${previous.content}\n\n${content}`;
+      continue;
+    }
+
+    renderable.push({
+      part_id: part.part_id,
+      part_type: part.part_type,
+      content,
+    });
+  }
+
+  return renderable;
+}
+
 export default async function SessionDetailPage({
   params,
 }: SessionDetailPageProps) {
@@ -82,6 +119,7 @@ export default async function SessionDetailPage({
   const sessionResult = await getSessionById(id);
   const statsResult = await getSessionStats(id);
   const threadResult = await getMessageThread(id);
+  const responsePartsResult = await getResponsePartsBySession(id);
   const toolCallDetailsResult = await getToolCallDetailsBySession(id);
   const subtasksResult = await getSubtaskTree(id);
   const costBreakdownResult = await getSessionCostBreakdown(id);
@@ -119,6 +157,14 @@ export default async function SessionDetailPage({
       toolCallsByMessage.set(tc.response_id, []);
     }
     toolCallsByMessage.get(tc.response_id)!.push(tc);
+  }
+
+  const responsePartsByMessage = new Map<string, ResponsePart[]>();
+  for (const part of responsePartsResult.data ?? []) {
+    if (!responsePartsByMessage.has(part.response_id)) {
+      responsePartsByMessage.set(part.response_id, []);
+    }
+    responsePartsByMessage.get(part.response_id)!.push(part);
   }
 
   const worktree = session.project_worktree;
@@ -347,6 +393,9 @@ export default async function SessionDetailPage({
 
                   const msgToolCalls =
                     toolCallsByMessage.get(am.response_id) ?? [];
+                  const responseParts = getRenderableResponseParts(
+                    responsePartsByMessage.get(am.response_id) ?? [],
+                  );
 
                   // Is this the final response (stop/end-turn) vs intermediate
                   const isFinal =
@@ -394,13 +443,44 @@ export default async function SessionDetailPage({
                           {am.error_type}: {am.error_message}
                         </div>
                       )}
-                      {am.response_text && (
-                        <MarkdownContent
-                          content={am.response_text}
-                          className={`text-sm text-foreground/90 max-h-96 overflow-y-auto${
-                            isUndone ? ' line-through text-muted' : ''
-                          }`}
-                        />
+                      {responseParts.length > 0 && (
+                        <div className="space-y-2">
+                          {responseParts.map((part) => {
+                            if (part.part_type === 'text') {
+                              return (
+                                <MarkdownContent
+                                  key={part.part_id}
+                                  content={part.content}
+                                  className={`text-sm text-foreground/90 max-h-96 overflow-y-auto${
+                                    isUndone ? ' line-through text-muted' : ''
+                                  }`}
+                                />
+                              );
+                            }
+
+                            return (
+                              <details
+                                key={part.part_id}
+                                open
+                                className={`rounded-sm border border-border bg-surface-alt${
+                                  isUndone ? ' text-muted' : ''
+                                }`}
+                              >
+                                <summary className="flex cursor-pointer items-center gap-2 px-3 py-2 text-xs text-muted">
+                                  <Badge variant="warning">reasoning</Badge>
+                                </summary>
+                                <div className="border-t border-border px-3 py-2">
+                                  <MarkdownContent
+                                    content={part.content}
+                                    className={`text-xs text-foreground/80 max-h-96 overflow-y-auto${
+                                      isUndone ? ' line-through text-muted' : ''
+                                    }`}
+                                  />
+                                </div>
+                              </details>
+                            );
+                          })}
+                        </div>
                       )}
                       {/* Inline tool calls */}
                       {msgToolCalls.length > 0 && (

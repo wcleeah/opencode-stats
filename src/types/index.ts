@@ -399,7 +399,6 @@ export interface MessageThread {
   error_message: string | null;
   response_created_at: number | null;
   time_completed: number | null;
-  response_text: string | null;
 }
 
 export interface SessionDetailToolCall extends ToolCallDetail {

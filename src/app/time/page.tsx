@@ -14,7 +14,6 @@ import {
   TableRow,
   TableCell,
 } from '@/components/ui/table';
-import { Breadcrumbs } from '@/components/breadcrumbs';
 import { DateRangeControls } from '@/components/date-range-controls';
 import { TimeChart } from '@/components/time-chart';
 
@@ -58,7 +57,7 @@ export default async function TimePage({ searchParams }: TimePageProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Breadcrumbs crumbs={[{ label: 'time' }]} />
+        <h1 className="text-lg font-bold">Time</h1>
         <DateRangeControls from={range.from} to={range.to} />
       </div>
 

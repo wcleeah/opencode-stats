@@ -15,7 +15,6 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Breadcrumbs } from '@/components/breadcrumbs';
 import { ToolChart } from '@/components/tool-chart';
 
 export default async function ToolsPage() {
@@ -44,7 +43,7 @@ export default async function ToolsPage() {
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs crumbs={[{ label: 'tools' }]} />
+      <h1 className="text-lg font-bold">Tools</h1>
 
       {/* Summary stats */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

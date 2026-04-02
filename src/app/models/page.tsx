@@ -19,7 +19,6 @@ import {
   TableCell,
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Breadcrumbs } from '@/components/breadcrumbs';
 import { CacheChart } from '@/components/cache-chart';
 import { ErrorRateChart } from '@/components/error-rate-chart';
 import { DateRangeControls } from '@/components/date-range-controls';
@@ -86,7 +85,7 @@ export default async function ModelsPage({ searchParams }: ModelsPageProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Breadcrumbs crumbs={[{ label: 'models' }]} />
+        <h1 className="text-lg font-bold">Models</h1>
         <DateRangeControls from={range.from} to={range.to} />
       </div>
 

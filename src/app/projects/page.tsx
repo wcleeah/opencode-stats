@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { getProjects, getProjectCostBreakdowns } from '@/lib/queries/projects';
 import { formatTokens, formatRelativeTime, formatDuration, projectName, formatCost } from '@/lib/format';
 import { aggregateCostBreakdown } from '@/lib/pricing';
-import { Breadcrumbs } from '@/components/breadcrumbs';
 import {
   Table,
   TableHeader,
@@ -28,7 +27,6 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
   if (result.error) {
     return (
       <div className="space-y-6">
-        <Breadcrumbs crumbs={[{ label: 'projects' }]} />
         <div className="text-error text-sm">{result.error}</div>
       </div>
     );
@@ -38,7 +36,6 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
   if (!projects || projects.data.length === 0) {
     return (
       <div className="space-y-6">
-        <Breadcrumbs crumbs={[{ label: 'projects' }]} />
         <div className="text-muted text-sm">No projects found</div>
       </div>
     );
@@ -79,8 +76,6 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs crumbs={[{ label: 'projects' }]} />
-
       <div className="flex items-baseline justify-between">
         <h1 className="text-lg font-bold">Projects</h1>
         <span className="text-xs text-muted">

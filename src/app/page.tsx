@@ -17,7 +17,6 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { TokenChart } from '@/components/token-chart';
-import { Breadcrumbs } from '@/components/breadcrumbs';
 import { DateRangeControls } from '@/components/date-range-controls';
 
 interface HomePageProps {
@@ -72,7 +71,7 @@ export default async function Home({ searchParams }: HomePageProps) {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <Breadcrumbs crumbs={[{ label: 'dashboard' }]} />
+        <h1 className="text-lg font-bold">Dashboard</h1>
         <DateRangeControls from={range.from} to={range.to} />
       </div>
 

@@ -17,11 +17,11 @@ export default function ModelsLoading() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <div className="rounded-sm border border-border bg-grep-0 p-4">
+        <div className="rounded-sm border border-border bg-surface p-4">
           <Skeleton className="h-3 w-40 mb-3" />
           <Skeleton className="h-[280px] w-full" />
         </div>
-        <div className="rounded-sm border border-border bg-grep-0 p-4">
+        <div className="rounded-sm border border-border bg-surface p-4">
           <Skeleton className="h-3 w-36 mb-3" />
           <Skeleton className="h-[280px] w-full" />
         </div>

@@ -135,7 +135,7 @@ export default async function TimePage({ searchParams }: TimePageProps) {
                   <TableCell>
                     <Link
                       href={`/projects/${project.project_id}`}
-                      className="text-foreground hover:text-accent transition-colors font-medium"
+                      className="text-foreground hover:underline transition-colors font-medium"
                     >
                       {projectName(project.worktree)}
                     </Link>
@@ -144,7 +144,7 @@ export default async function TimePage({ searchParams }: TimePageProps) {
                     </div>
                   </TableCell>
                   <TableCell align="right">
-                    <span className="tabular-nums font-medium text-accent">
+                    <span className="tabular-nums font-medium text-foreground">
                       {formatDuration(project.total_turn_wall_time_ms)}
                     </span>
                   </TableCell>

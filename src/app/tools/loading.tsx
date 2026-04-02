@@ -11,7 +11,7 @@ export default function ToolsLoading() {
         ))}
       </div>
 
-      <div className="rounded-sm border border-border bg-grep-0 p-4">
+      <div className="rounded-sm border border-border bg-surface p-4">
         <Skeleton className="h-3 w-40 mb-3" />
         <Skeleton className="h-[320px] w-full" />
       </div>

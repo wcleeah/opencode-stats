@@ -105,7 +105,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
               <TableCell>
                 <Link
                   href={`/projects/${project.id}`}
-                  className="text-foreground hover:text-accent transition-colors font-medium"
+                  className="text-foreground hover:underline transition-colors font-medium"
                 >
                   {projectName(project.worktree)}
                 </Link>
@@ -122,7 +122,7 @@ export default async function ProjectsPage({ searchParams }: ProjectsPageProps) 
                     {formatDuration(project.total_turn_wall_time_ms)}
                   </span>
                 ) : (
-                  <span className="text-grep-5">--</span>
+                  <span className="text-subtle">--</span>
                 )}
               </TableCell>
               <TableCell align="right">

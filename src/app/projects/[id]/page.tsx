@@ -178,7 +178,7 @@ export default async function ProjectDetailPage({
                   <TableCell>
                     <Link
                       href={`/sessions/${session.id}`}
-                      className="text-foreground hover:text-accent transition-colors font-medium"
+                      className="text-foreground hover:underline transition-colors font-medium"
                     >
                       {session.title ?? truncateId(session.id)}
                     </Link>
@@ -197,7 +197,7 @@ export default async function ProjectDetailPage({
                         {formatDuration(session.total_turn_wall_time_ms)}
                       </span>
                     ) : (
-                      <span className="text-grep-5">--</span>
+                      <span className="text-subtle">--</span>
                     )}
                   </TableCell>
                   <TableCell align="right">
@@ -229,7 +229,7 @@ export default async function ProjectDetailPage({
                         </span>
                       </span>
                     ) : (
-                      <span className="text-grep-5">--</span>
+                      <span className="text-subtle">--</span>
                     )}
                   </TableCell>
                   <TableCell align="right">

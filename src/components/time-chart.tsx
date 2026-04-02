@@ -11,6 +11,7 @@ import {
   Legend,
 } from 'recharts';
 
+import { useChartColors } from '@/lib/use-chart-colors';
 import { formatDuration } from '@/lib/format';
 import type { DailyTimeUsage } from '@/types';
 
@@ -44,7 +45,7 @@ function CustomTooltip({
   const row = payload[0]?.payload;
 
   return (
-    <div className="rounded-sm border border-border bg-grep-1 px-3 py-2 text-xs">
+    <div className="rounded-sm border border-border bg-surface px-3 py-2 text-xs">
       <div className="mb-1 text-muted">{label}</div>
       {payload.map((entry) => (
         <div key={entry.name} className="flex items-center gap-2">
@@ -52,7 +53,7 @@ function CustomTooltip({
             className="inline-block h-2 w-2 rounded-full"
             style={{ backgroundColor: entry.color }}
           />
-          <span className="text-grep-11">{entry.name}:</span>
+          <span className="text-muted">{entry.name}:</span>
           <span className="font-medium tabular-nums text-foreground">
             {formatDuration(entry.value)}
           </span>
@@ -68,6 +69,8 @@ function CustomTooltip({
 }
 
 export function TimeChart({ data }: TimeChartProps) {
+  const c = useChartColors();
+
   if (data.length === 0) {
     return (
       <div className="flex h-64 items-center justify-center text-muted text-sm">
@@ -79,30 +82,30 @@ export function TimeChart({ data }: TimeChartProps) {
   return (
     <ResponsiveContainer width="100%" height={280}>
       <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />
+        <CartesianGrid strokeDasharray="3 3" stroke={c.grid} />
         <XAxis
           dataKey="day"
-          tick={{ fontSize: 10, fill: '#777' }}
+          tick={{ fontSize: 10, fill: c.axis }}
           tickLine={false}
-          axisLine={{ stroke: '#1a1a1a' }}
+          axisLine={{ stroke: c.grid }}
         />
         <YAxis
           tickFormatter={formatTimeTick}
-          tick={{ fontSize: 10, fill: '#777' }}
+          tick={{ fontSize: 10, fill: c.axis }}
           tickLine={false}
           axisLine={false}
           width={50}
         />
         <Tooltip content={<CustomTooltip />} />
         <Legend
-          wrapperStyle={{ fontSize: '11px', color: '#888' }}
+          wrapperStyle={{ fontSize: '11px', color: c.legend }}
         />
         <Area
           type="monotone"
           dataKey="total_turn_wall_time_ms"
           name="Turn Wall Time"
-          stroke="#52a9ff"
-          fill="#52a9ff"
+          stroke={c.chart1}
+          fill={c.chart1}
           fillOpacity={0.1}
           strokeWidth={1.5}
         />
@@ -110,8 +113,8 @@ export function TimeChart({ data }: TimeChartProps) {
           type="monotone"
           dataKey="total_assistant_time_ms"
           name="Assistant Time"
-          stroke="#03B000"
-          fill="#03B000"
+          stroke={c.chart2}
+          fill={c.chart2}
           fillOpacity={0.1}
           strokeWidth={1.5}
         />
@@ -119,8 +122,8 @@ export function TimeChart({ data }: TimeChartProps) {
           type="monotone"
           dataKey="total_tool_time_ms"
           name="Tool Time"
-          stroke="#ff9f43"
-          fill="#ff9f43"
+          stroke={c.chart3}
+          fill={c.chart3}
           fillOpacity={0.08}
           strokeWidth={1.5}
         />

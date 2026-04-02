@@ -9,7 +9,7 @@ export function Card({ children, className }: CardProps) {
   return (
     <div
       className={cn(
-        'rounded-sm border border-border bg-grep-0 p-4',
+        'rounded-sm border border-border bg-surface p-4',
         className,
       )}
     >
@@ -31,8 +31,8 @@ export function StatCard({ label, value, subValue, accent }: StatCardProps) {
       <div className="text-xs text-muted uppercase tracking-wider">{label}</div>
       <div
         className={cn(
-          'mt-1 text-2xl font-bold tabular-nums',
-          accent ? 'text-accent' : 'text-foreground',
+          'mt-1 text-2xl font-bold tabular-nums font-mono',
+          accent ? 'text-foreground' : 'text-foreground',
         )}
       >
         {value}

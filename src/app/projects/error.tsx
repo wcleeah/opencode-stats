@@ -15,7 +15,8 @@ export default function ProjectsError({ error, reset }: ErrorPageProps) {
         </div>
         <button
           onClick={reset}
-          className="rounded-sm border border-border bg-grep-1 px-3 py-1.5 text-xs text-foreground hover:bg-grep-2 transition-colors"
+          type="button"
+          className="rounded-sm border border-border bg-surface px-3 py-1.5 text-xs text-foreground hover:bg-surface-alt transition-colors"
         >
           Try again
         </button>

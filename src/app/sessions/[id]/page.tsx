@@ -22,6 +22,9 @@ import { Breadcrumbs } from '@/components/breadcrumbs';
 import { StatCard, Card } from '@/components/ui/card';
 import { Tooltip } from '@/components/ui/tooltip';
 import { Badge } from '@/components/ui/badge';
+import { ToolCallBlock } from '@/components/tool-call-block';
+import { MarkdownContent } from '@/components/markdown-content';
+import { CollapsibleContent } from '@/components/collapsible-content';
 import type { SessionDetailToolCall } from '@/types';
 
 interface SessionDetailPageProps {
@@ -49,8 +52,31 @@ function finishBadgeVariant(
 }
 
 /**
+ * Strip home directory prefix from absolute paths to show cleaner relative-ish paths.
+ * e.g. /Users/foo/Documents/project/src/file.ts -> src/file.ts
+ */
+function shortenPath(path: string): string {
+  // Strip common home directory patterns
+  return path.replace(/^\/Users\/[^/]+\/(?:Documents\/)?[^/]+\//, '');
+}
+
+/**
+ * Parse user content that contains XML-wrapped file content from OpenCode.
+ * Returns structured data if it's a file attachment, null otherwise.
+ */
+function parseFileAttachment(
+  content: string,
+): { path: string; fileContent: string } | null {
+  const match = content.match(
+    /^<path>(.*?)<\/path>\s*<type>file<\/type>\s*<content>([\s\S]*)<\/content>$/,
+  );
+  if (!match) return null;
+  return { path: match[1], fileContent: match[2] };
+}
+
+/**
  * Parse tool call input JSON and return readable key-value lines.
- * Each tool has different input fields — extract the meaningful ones.
+ * Each tool has different input fields -- extract the meaningful ones.
  */
 function formatToolInput(tool: string, raw: string | null): string | null {
   if (!raw) return null;
@@ -62,14 +88,14 @@ function formatToolInput(tool: string, raw: string | null): string | null {
       case 'bash': {
         const parts: string[] = [];
         if (parsed.command) parts.push(`$ ${parsed.command}`);
-        if (parsed.workdir) parts.push(`cwd: ${parsed.workdir}`);
+        if (parsed.workdir) parts.push(`cwd: ${shortenPath(String(parsed.workdir))}`);
         if (parsed.description) parts.push(`# ${parsed.description}`);
         return parts.length > 0 ? parts.join('\n') : raw;
       }
 
       case 'read': {
         const parts: string[] = [];
-        if (parsed.filePath) parts.push(`${parsed.filePath}`);
+        if (parsed.filePath) parts.push(shortenPath(String(parsed.filePath)));
         if (parsed.offset != null || parsed.limit != null) {
           const range: string[] = [];
           if (parsed.offset != null) range.push(`offset: ${parsed.offset}`);
@@ -81,7 +107,7 @@ function formatToolInput(tool: string, raw: string | null): string | null {
 
       case 'edit': {
         const parts: string[] = [];
-        if (parsed.filePath) parts.push(`${parsed.filePath}`);
+        if (parsed.filePath) parts.push(shortenPath(String(parsed.filePath)));
         if (parsed.oldString != null) {
           parts.push(`--- old`);
           parts.push(String(parsed.oldString));
@@ -94,7 +120,7 @@ function formatToolInput(tool: string, raw: string | null): string | null {
 
       case 'write': {
         const parts: string[] = [];
-        if (parsed.filePath) parts.push(`${parsed.filePath}`);
+        if (parsed.filePath) parts.push(shortenPath(String(parsed.filePath)));
         if (parsed.content != null) parts.push(String(parsed.content));
         return parts.length > 0 ? parts.join('\n') : raw;
       }
@@ -102,7 +128,7 @@ function formatToolInput(tool: string, raw: string | null): string | null {
       case 'glob': {
         const parts: string[] = [];
         if (parsed.pattern) parts.push(`pattern: ${parsed.pattern}`);
-        if (parsed.path) parts.push(`path: ${parsed.path}`);
+        if (parsed.path) parts.push(`path: ${shortenPath(String(parsed.path))}`);
         return parts.length > 0 ? parts.join('\n') : raw;
       }
 
@@ -110,7 +136,7 @@ function formatToolInput(tool: string, raw: string | null): string | null {
         const parts: string[] = [];
         if (parsed.pattern) parts.push(`pattern: ${parsed.pattern}`);
         if (parsed.include) parts.push(`include: ${parsed.include}`);
-        if (parsed.path) parts.push(`path: ${parsed.path}`);
+        if (parsed.path) parts.push(`path: ${shortenPath(String(parsed.path))}`);
         return parts.length > 0 ? parts.join('\n') : raw;
       }
 
@@ -155,65 +181,24 @@ function formatToolInput(tool: string, raw: string | null): string | null {
       }
     }
   } catch {
-    // Not JSON or parse failed — return raw content
+    // Not JSON or parse failed -- return raw content
     return raw;
   }
 }
 
-function ToolCallBlock({ tc }: { tc: SessionDetailToolCall }) {
-  const formattedInput = formatToolInput(tc.tool, tc.input_content);
+/**
+ * Shorten absolute paths in tool output content for readability.
+ */
+function shortenOutputPaths(content: string): string {
+  return content.replace(/\/Users\/[^\s/]+\/(?:Documents\/)?[^\s/]+\//g, '');
+}
 
-  return (
-    <div className="border border-border/50 rounded-sm overflow-hidden">
-      {/* Tool call header */}
-      <div className="flex items-center gap-2 px-2 py-1.5 bg-grep-1 border-b border-border/50">
-        <Badge variant={tc.status === 'error' ? 'error' : 'success'}>
-          {tc.tool}
-        </Badge>
-        {tc.title && (
-          <span className="text-xs text-grep-9 truncate flex-1">
-            {tc.title}
-          </span>
-        )}
-        {tc.duration_ms != null && (
-          <span className="text-xs text-grep-7 tabular-nums shrink-0">
-            {formatDuration(tc.duration_ms)}
-          </span>
-        )}
-      </div>
-
-      {/* Error */}
-      {tc.error && (
-        <div className="px-2 py-1.5 text-xs text-error bg-error/5 border-b border-border/50">
-          {tc.error}
-        </div>
-      )}
-
-      {/* Input content */}
-      {formattedInput && (
-        <div className="border-b border-border/50">
-          <div className="px-2 py-1 text-[10px] text-grep-5 uppercase tracking-wider">
-            input
-          </div>
-          <div className="px-2 pb-2 text-xs whitespace-pre-wrap text-grep-9 max-h-64 overflow-y-auto">
-            {formattedInput}
-          </div>
-        </div>
-      )}
-
-      {/* Output content */}
-      {tc.output_content && (
-        <div>
-          <div className="px-2 py-1 text-[10px] text-grep-5 uppercase tracking-wider">
-            output
-          </div>
-          <div className="px-2 pb-2 text-xs whitespace-pre-wrap text-grep-9 max-h-64 overflow-y-auto">
-            {tc.output_content}
-          </div>
-        </div>
-      )}
-    </div>
-  );
+/**
+ * For todowrite tool, the output is just the raw JSON of what's already
+ * formatted nicely in the input -- hide it to avoid redundancy.
+ */
+function shouldHideOutput(tool: string): boolean {
+  return tool === 'todowrite';
 }
 
 export default async function SessionDetailPage({
@@ -281,6 +266,9 @@ export default async function SessionDetailPage({
     grouped.get(key)!.push(msg);
   }
 
+  // Convert grouped entries to an array for indexing
+  const turnEntries = Array.from(grouped.entries());
+
   return (
     <div className="space-y-6">
       <Breadcrumbs crumbs={[
@@ -327,7 +315,8 @@ export default async function SessionDetailPage({
                 }
               >
                 <span>
-                  {formatTokens(stats.total_tokens_in)} in / {formatTokens(stats.total_tokens_out)} out
+                  {formatTokens(stats.total_tokens_in)} in /{' '}
+                  {formatTokens(stats.total_tokens_out)} out
                 </span>
               </Tooltip>
             }
@@ -336,7 +325,10 @@ export default async function SessionDetailPage({
           <StatCard
             label="Total Cost"
             value={formatCost(costBreakdown.total, costBreakdown.hasEstimated)}
-            subValue={formatCostBreakdown(costBreakdown.reported, costBreakdown.estimated)}
+            subValue={formatCostBreakdown(
+              costBreakdown.reported,
+              costBreakdown.estimated,
+            )}
           />
           <StatCard
             label="Changes"
@@ -363,11 +355,11 @@ export default async function SessionDetailPage({
                 className="text-xs"
                 style={{ paddingLeft: `${node.depth * 16}px` }}
               >
-                <span className="text-grep-5">
+                <span className="text-xs text-subtle">
                   {node.depth > 0 ? '|- ' : ''}
                 </span>
                 {node.id === id ? (
-                  <span className="text-accent font-medium">
+                  <span className="text-foreground font-medium">
                     {node.title ?? truncateId(node.id)}
                   </span>
                 ) : (
@@ -389,33 +381,48 @@ export default async function SessionDetailPage({
         <div className="text-xs text-muted uppercase tracking-wider mb-3">
           Conversation ({stats?.turn_count ?? userTurns.length} turns)
         </div>
-        <div className="space-y-4">
-          {Array.from(grouped.entries()).map(([umId, messages]) => {
+        <div className="space-y-5">
+          {turnEntries.map(([umId, messages], turnIndex) => {
             const first = messages[0];
             if (!first) return null;
 
             const isUndone = first.undone_at !== null;
+            const isSynthetic = !!first.synthetic;
 
             // Get all assistant responses for this user message
-            const assistantMsgs = messages.filter((m) => m.response_id !== null);
+            const assistantMsgs = messages.filter(
+              (m) => m.response_id !== null,
+            );
+
+            // Parse user content for file attachments
+            const fileAttachment = first.user_content
+              ? parseFileAttachment(first.user_content)
+              : null;
 
             return (
-              <div key={umId} className="border border-border rounded-sm">
+              <div
+                key={umId}
+                className="border border-border rounded-sm"
+              >
                 {/* User message */}
-                <div className="border-b border-border p-3 bg-grep-1">
+                <div className="border-b border-border p-3 bg-surface-alt">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-bold text-accent">
-                      &gt; user
+                    <span className="text-xs text-subtle tabular-nums shrink-0">
+                      #{turnIndex + 1}
                     </span>
-                    <span className="text-xs text-grep-7">
+                    <span className="text-xs font-bold text-foreground">
+                      user
+                    </span>
+                    <span className="text-xs text-muted">
                       {formatRelativeTime(first.user_created_at)}
                     </span>
-                    {first.turn_duration_ms != null && first.turn_duration_ms > 0 && (
-                      <span className="text-xs text-grep-5 tabular-nums">
+                    {first.turn_duration_ms != null
+                      && first.turn_duration_ms > 0 && (
+                      <span className="text-xs text-subtle tabular-nums">
                         {formatDuration(first.turn_duration_ms)}
                       </span>
                     )}
-                    {!!first.synthetic && (
+                    {isSynthetic && (
                       <Badge variant="warning">synthetic</Badge>
                     )}
                     {!!first.compaction && (
@@ -425,9 +432,36 @@ export default async function SessionDetailPage({
                       <Badge variant="error">undone</Badge>
                     )}
                   </div>
-                  <div className={`text-sm whitespace-pre-wrap${isUndone ? ' line-through text-grep-7' : ''}`}>
-                    {first.user_content ?? (
-                      <span className="text-grep-5 italic">
+
+                  {/* User content */}
+                  <div
+                    className={
+                      isUndone ? 'line-through text-muted' : ''
+                    }
+                  >
+                    {fileAttachment ? (
+                      // Render file attachment compactly
+                      <div>
+                        <div className="flex items-center gap-1.5 text-xs text-muted mb-1">
+                          <span className="text-muted">file:</span>
+                          <span className="text-foreground/70">
+                            {shortenPath(fileAttachment.path)}
+                          </span>
+                        </div>
+                        <CollapsibleContent
+                          content={fileAttachment.fileContent}
+                          maxLines={6}
+                          className="text-xs text-foreground/60 font-mono"
+                        />
+                      </div>
+                    ) : first.user_content ? (
+                      <CollapsibleContent
+                        content={first.user_content}
+                        maxLines={isSynthetic ? 6 : 20}
+                        className="text-sm text-foreground/90"
+                      />
+                    ) : (
+                      <span className="text-muted italic text-sm">
                         [no content]
                       </span>
                     )}
@@ -435,16 +469,26 @@ export default async function SessionDetailPage({
                 </div>
 
                 {/* Assistant response(s) */}
-                {assistantMsgs.map((am) => {
+                {assistantMsgs.map((am, responseIndex) => {
                   if (!am.response_id) return null;
 
                   const msgToolCalls =
                     toolCallsByMessage.get(am.response_id) ?? [];
 
+                  // Is this the final response (stop/end-turn) vs intermediate
+                  const isFinal =
+                    am.finish === 'stop' || am.finish === 'end-turn';
+                  const isLastResponse =
+                    responseIndex === assistantMsgs.length - 1;
+
                   return (
                     <div
                       key={am.response_id}
-                      className="p-3 border-b border-border last:border-b-0"
+                      className={`p-3 border-b border-border last:border-b-0${
+                        isFinal && isLastResponse
+                          ? ' bg-surface'
+                          : ''
+                      }`}
                     >
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <span className="text-xs font-bold text-info">
@@ -459,13 +503,13 @@ export default async function SessionDetailPage({
                           </Badge>
                         )}
                         {am.tokens_in != null && (
-                          <span className="text-xs text-grep-7">
+                          <span className="text-xs text-muted tabular-nums">
                             {formatTokens(am.tokens_in)} in /{' '}
                             {formatTokens(am.tokens_out ?? 0)} out
                           </span>
                         )}
                         {am.time_completed && am.response_created_at && (
-                          <span className="text-xs text-grep-7">
+                          <span className="text-xs text-muted tabular-nums">
                             {formatDuration(
                               am.time_completed - am.response_created_at,
                             )}
@@ -478,21 +522,42 @@ export default async function SessionDetailPage({
                         </div>
                       )}
                       {am.response_text && (
-                        <div className={`text-sm whitespace-pre-wrap text-grep-11 max-h-96 overflow-y-auto${isUndone ? ' line-through text-grep-7' : ''}`}>
-                          {am.response_text}
-                        </div>
+                        <MarkdownContent
+                          content={am.response_text}
+                          className={`text-sm text-foreground/90 max-h-96 overflow-y-auto${
+                            isUndone ? ' line-through text-muted' : ''
+                          }`}
+                        />
                       )}
                       {/* Inline tool calls */}
                       {msgToolCalls.length > 0 && (
-                        <div className="mt-2 space-y-2">
+                        <div className="mt-2 space-y-1.5">
                           {msgToolCalls.map((tc) => (
-                            <ToolCallBlock key={tc.id} tc={tc} />
+                            <ToolCallBlock
+                              key={tc.id}
+                              tool={tc.tool}
+                              title={tc.title}
+                              status={tc.status}
+                              error={tc.error}
+                              durationMs={tc.duration_ms}
+                              formattedInput={formatToolInput(
+                                tc.tool,
+                                tc.input_content,
+                              )}
+                              outputContent={
+                                shouldHideOutput(tc.tool)
+                                  ? null
+                                  : tc.output_content
+                                    ? shortenOutputPaths(tc.output_content)
+                                    : null
+                              }
+                            />
                           ))}
                         </div>
                       )}
-                     </div>
-                   );
-                 })}
+                    </div>
+                  );
+                })}
               </div>
             );
           })}

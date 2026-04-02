@@ -8,7 +8,7 @@ export function Skeleton({ className }: SkeletonProps) {
   return (
     <div
       className={cn(
-        'animate-pulse rounded-sm bg-grep-2',
+        'animate-pulse rounded-sm bg-surface-alt',
         className,
       )}
     />
@@ -17,7 +17,7 @@ export function Skeleton({ className }: SkeletonProps) {
 
 export function StatCardSkeleton() {
   return (
-    <div className="rounded-sm border border-border bg-grep-0 p-4">
+    <div className="rounded-sm border border-border bg-surface p-4">
       <Skeleton className="h-3 w-16 mb-2" />
       <Skeleton className="h-7 w-24 mb-1" />
       <Skeleton className="h-3 w-20" />
@@ -27,7 +27,7 @@ export function StatCardSkeleton() {
 
 export function TableSkeleton({ rows = 5 }: { rows?: number }) {
   return (
-    <div className="rounded-sm border border-border bg-grep-0">
+    <div className="rounded-sm border border-border bg-surface">
       <div className="border-b border-border p-3">
         <Skeleton className="h-4 w-full" />
       </div>

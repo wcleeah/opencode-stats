@@ -11,6 +11,7 @@ import {
   Cell,
 } from 'recharts';
 
+import { useChartColors } from '@/lib/use-chart-colors';
 import type { ToolUsage } from '@/types';
 import { formatDuration } from '@/lib/format';
 
@@ -34,9 +35,9 @@ function CustomTooltip({
   const tool = payload[0].payload;
 
   return (
-    <div className="rounded-sm border border-border bg-grep-1 px-3 py-2 text-xs">
+    <div className="rounded-sm border border-border bg-surface px-3 py-2 text-xs">
       <div className="mb-1 font-medium text-foreground">{tool.tool}</div>
-      <div className="space-y-0.5 text-grep-11">
+      <div className="space-y-0.5 text-muted">
         <div>
           Calls:{' '}
           <span className="text-foreground tabular-nums">
@@ -61,6 +62,8 @@ function CustomTooltip({
 }
 
 export function ToolChart({ data }: ToolChartProps) {
+  const c = useChartColors();
+
   if (data.length === 0) {
     return (
       <div className="flex h-64 items-center justify-center text-muted text-sm">
@@ -79,17 +82,17 @@ export function ToolChart({ data }: ToolChartProps) {
         layout="vertical"
         margin={{ top: 8, right: 8, left: 0, bottom: 0 }}
       >
-        <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" horizontal={false} />
+        <CartesianGrid strokeDasharray="3 3" stroke={c.grid} horizontal={false} />
         <XAxis
           type="number"
-          tick={{ fontSize: 10, fill: '#777' }}
+          tick={{ fontSize: 10, fill: c.axis }}
           tickLine={false}
-          axisLine={{ stroke: '#1a1a1a' }}
+          axisLine={{ stroke: c.grid }}
         />
         <YAxis
           type="category"
           dataKey="tool"
-          tick={{ fontSize: 10, fill: '#888' }}
+          tick={{ fontSize: 10, fill: c.axis }}
           tickLine={false}
           axisLine={false}
           width={140}
@@ -99,7 +102,7 @@ export function ToolChart({ data }: ToolChartProps) {
           {chartData.map((entry) => (
             <Cell
               key={entry.tool}
-              fill={entry.error_rate > 10 ? '#f76190' : '#03B000'}
+              fill={entry.error_rate > 10 ? c.chart4 : c.chart2}
               fillOpacity={0.7}
             />
           ))}

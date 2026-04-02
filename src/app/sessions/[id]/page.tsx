@@ -74,133 +74,6 @@ function parseFileAttachment(
   return { path: match[1], fileContent: match[2] };
 }
 
-/**
- * Parse tool call input JSON and return readable key-value lines.
- * Each tool has different input fields -- extract the meaningful ones.
- */
-function formatToolInput(tool: string, raw: string | null): string | null {
-  if (!raw) return null;
-
-  try {
-    const parsed: Record<string, unknown> = JSON.parse(raw);
-
-    switch (tool) {
-      case 'bash': {
-        const parts: string[] = [];
-        if (parsed.command) parts.push(`$ ${parsed.command}`);
-        if (parsed.workdir) parts.push(`cwd: ${shortenPath(String(parsed.workdir))}`);
-        if (parsed.description) parts.push(`# ${parsed.description}`);
-        return parts.length > 0 ? parts.join('\n') : raw;
-      }
-
-      case 'read': {
-        const parts: string[] = [];
-        if (parsed.filePath) parts.push(shortenPath(String(parsed.filePath)));
-        if (parsed.offset != null || parsed.limit != null) {
-          const range: string[] = [];
-          if (parsed.offset != null) range.push(`offset: ${parsed.offset}`);
-          if (parsed.limit != null) range.push(`limit: ${parsed.limit}`);
-          parts.push(range.join(', '));
-        }
-        return parts.length > 0 ? parts.join('\n') : raw;
-      }
-
-      case 'edit': {
-        const parts: string[] = [];
-        if (parsed.filePath) parts.push(shortenPath(String(parsed.filePath)));
-        if (parsed.oldString != null) {
-          parts.push(`--- old`);
-          parts.push(String(parsed.oldString));
-          parts.push(`+++ new`);
-          parts.push(String(parsed.newString ?? ''));
-        }
-        if (parsed.replaceAll) parts.push(`(replace all)`);
-        return parts.length > 0 ? parts.join('\n') : raw;
-      }
-
-      case 'write': {
-        const parts: string[] = [];
-        if (parsed.filePath) parts.push(shortenPath(String(parsed.filePath)));
-        if (parsed.content != null) parts.push(String(parsed.content));
-        return parts.length > 0 ? parts.join('\n') : raw;
-      }
-
-      case 'glob': {
-        const parts: string[] = [];
-        if (parsed.pattern) parts.push(`pattern: ${parsed.pattern}`);
-        if (parsed.path) parts.push(`path: ${shortenPath(String(parsed.path))}`);
-        return parts.length > 0 ? parts.join('\n') : raw;
-      }
-
-      case 'grep': {
-        const parts: string[] = [];
-        if (parsed.pattern) parts.push(`pattern: ${parsed.pattern}`);
-        if (parsed.include) parts.push(`include: ${parsed.include}`);
-        if (parsed.path) parts.push(`path: ${shortenPath(String(parsed.path))}`);
-        return parts.length > 0 ? parts.join('\n') : raw;
-      }
-
-      case 'task': {
-        const parts: string[] = [];
-        if (parsed.description) parts.push(`# ${parsed.description}`);
-        if (parsed.prompt) parts.push(String(parsed.prompt));
-        return parts.length > 0 ? parts.join('\n') : raw;
-      }
-
-      case 'webfetch': {
-        const parts: string[] = [];
-        if (parsed.url) parts.push(`${parsed.url}`);
-        if (parsed.format) parts.push(`format: ${parsed.format}`);
-        return parts.length > 0 ? parts.join('\n') : raw;
-      }
-
-      case 'todowrite': {
-        if (Array.isArray(parsed.todos)) {
-          return (parsed.todos as Array<Record<string, unknown>>)
-            .map((t) => {
-              const status = t.status === 'completed' ? '[x]'
-                : t.status === 'in_progress' ? '[~]'
-                : '[ ]';
-              return `${status} ${t.content ?? t.id}`;
-            })
-            .join('\n');
-        }
-        return raw;
-      }
-
-      default: {
-        // Generic: show all key-value pairs
-        const entries = Object.entries(parsed);
-        if (entries.length === 0) return null;
-        return entries
-          .map(([k, v]) => {
-            const val = typeof v === 'string' ? v : JSON.stringify(v);
-            return `${k}: ${val}`;
-          })
-          .join('\n');
-      }
-    }
-  } catch {
-    // Not JSON or parse failed -- return raw content
-    return raw;
-  }
-}
-
-/**
- * Shorten absolute paths in tool output content for readability.
- */
-function shortenOutputPaths(content: string): string {
-  return content.replace(/\/Users\/[^\s/]+\/(?:Documents\/)?[^\s/]+\//g, '');
-}
-
-/**
- * For todowrite tool, the output is just the raw JSON of what's already
- * formatted nicely in the input -- hide it to avoid redundancy.
- */
-function shouldHideOutput(tool: string): boolean {
-  return tool === 'todowrite';
-}
-
 export default async function SessionDetailPage({
   params,
 }: SessionDetailPageProps) {
@@ -540,17 +413,8 @@ export default async function SessionDetailPage({
                               status={tc.status}
                               error={tc.error}
                               durationMs={tc.duration_ms}
-                              formattedInput={formatToolInput(
-                                tc.tool,
-                                tc.input_content,
-                              )}
-                              outputContent={
-                                shouldHideOutput(tc.tool)
-                                  ? null
-                                  : tc.output_content
-                                    ? shortenOutputPaths(tc.output_content)
-                                    : null
-                              }
+                              inputRaw={tc.input_content}
+                              outputRaw={tc.output_content}
                             />
                           ))}
                         </div>

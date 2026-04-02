@@ -36,13 +36,13 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
             const isBlock = codeClassName?.includes('language-');
             if (isBlock) {
               return (
-                <code className="block bg-grep-1 border border-border/50 rounded-sm px-2 py-1.5 text-xs text-foreground/80 overflow-x-auto my-1">
+                <code className="block bg-surface border border-border/50 rounded-sm px-2 py-1.5 text-xs text-foreground/80 overflow-x-auto my-1">
                   {children}
                 </code>
               );
             }
             return (
-              <code className="bg-grep-2 px-1 py-0.5 rounded-sm text-accent/80 text-[0.9em]">
+              <code className="bg-surface-alt px-1 py-0.5 rounded-sm text-foreground/80 text-[0.9em]">
                 {children}
               </code>
             );
@@ -68,7 +68,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
             </a>
           ),
           blockquote: ({ children }) => (
-            <blockquote className="border-l-2 border-grep-5 pl-3 my-2 text-muted italic">
+            <blockquote className="border-l-2 border-border pl-3 my-2 text-muted italic">
               {children}
             </blockquote>
           ),
@@ -84,7 +84,7 @@ export function MarkdownContent({ content, className }: MarkdownContentProps) {
             <tbody className="divide-y divide-border/50">{children}</tbody>
           ),
           tr: ({ children }) => (
-            <tr className="hover:bg-grep-1 transition-colors">{children}</tr>
+            <tr className="hover:bg-surface-alt transition-colors">{children}</tr>
           ),
           th: ({ children }) => (
             <th className="px-2 py-1.5 text-left font-semibold text-foreground whitespace-nowrap">

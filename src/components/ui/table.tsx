@@ -17,7 +17,7 @@ export function Table({ children, className }: TableProps) {
 
 export function TableHeader({ children }: { children: React.ReactNode }) {
   return (
-    <thead className="border-b border-border bg-grep-1">
+    <thead className="border-b border-border bg-surface-alt">
       {children}
     </thead>
   );
@@ -37,7 +37,7 @@ export function TableRow({
   return (
     <tr
       className={cn(
-        'border-b border-border last:border-b-0 hover:bg-grep-1/50 transition-colors',
+        'border-b border-border last:border-b-0 hover:bg-surface-alt/50 transition-colors',
         className,
       )}
     >

@@ -15,7 +15,7 @@ export default function SessionDetailLoading() {
         <Skeleton className="h-3 w-32 mb-3" />
         <div className="space-y-4">
           {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="rounded-sm border border-border bg-grep-0 p-4">
+            <div key={i} className="rounded-sm border border-border bg-surface p-4">
               <Skeleton className="h-3 w-20 mb-2" />
               <Skeleton className="h-16 w-full" />
             </div>

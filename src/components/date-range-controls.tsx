@@ -108,7 +108,7 @@ export function DateRangeControls({ from, to, className }: DateRangeControlsProp
           className={cn(
             'rounded-md border border-border px-2 py-1 text-[10px] uppercase tracking-wide',
             activePreset === 'today'
-              ? 'text-foreground border-accent'
+              ? 'text-foreground border-foreground'
               : 'text-muted hover:text-foreground transition-colors',
           )}
         >
@@ -120,7 +120,7 @@ export function DateRangeControls({ from, to, className }: DateRangeControlsProp
           className={cn(
             'rounded-md border border-border px-2 py-1 text-[10px] uppercase tracking-wide',
             activePreset === 'sevenDays'
-              ? 'text-foreground border-accent'
+              ? 'text-foreground border-foreground'
               : 'text-muted hover:text-foreground transition-colors',
           )}
         >
@@ -132,7 +132,7 @@ export function DateRangeControls({ from, to, className }: DateRangeControlsProp
           className={cn(
             'rounded-md border border-border px-2 py-1 text-[10px] uppercase tracking-wide',
             activePreset === 'month'
-              ? 'text-foreground border-accent'
+              ? 'text-foreground border-foreground'
               : 'text-muted hover:text-foreground transition-colors',
           )}
         >
@@ -164,8 +164,8 @@ export function DateRangeControls({ from, to, className }: DateRangeControlsProp
         className={cn(
           'rounded-md border border-border px-3 py-1 text-xs uppercase tracking-wide',
           canApply
-            ? 'text-foreground hover:text-accent transition-colors'
-            : 'text-grep-8 cursor-not-allowed',
+            ? 'text-foreground hover:text-foreground transition-colors'
+            : 'text-subtle cursor-not-allowed',
         )}
       >
         Apply
@@ -178,7 +178,7 @@ export function DateRangeControls({ from, to, className }: DateRangeControlsProp
           'rounded-md border border-border px-3 py-1 text-xs uppercase tracking-wide',
           localFrom || localTo
             ? 'text-muted hover:text-foreground transition-colors'
-            : 'text-grep-8 cursor-not-allowed',
+            : 'text-subtle cursor-not-allowed',
         )}
       >
         Clear

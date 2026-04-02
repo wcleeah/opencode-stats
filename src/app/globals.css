@@ -1,57 +1,85 @@
 @import "tailwindcss";
 
+/*
+ * Design tokens — Monochrome Editorial
+ * Gray: Tailwind Zinc
+ * Accent: neutral (foreground)
+ * Status: emerald / rose / amber / sky
+ */
+
 :root {
-  /* grep.app gray scale */
-  --grep-0: #0a0a0a;
-  --grep-1: #111;
-  --grep-2: #1a1a1a;
-  --grep-3: #222;
-  --grep-4: #2a2a2a;
-  --grep-5: #333;
-  --grep-6: #3e3e3e;
-  --grep-7: #4a4a4a;
-  --grep-8: #555;
-  --grep-9: #616161;
-  --grep-10: #6e6e6e;
-  --grep-11: #777;
-  --grep-12: #888;
+  --background: #ffffff;
+  --foreground: #09090b;
+  --muted: #71717a;
+  --subtle: #a1a1aa;
 
-  /* core colors */
-  --background: #000;
-  --foreground: #ededed;
-  --muted: #888;
+  --surface: #fafafa;
+  --surface-alt: #f4f4f5;
 
-  /* accent -- opencode terminal green */
-  --accent: #03B000;
-  --accent-muted: #03B00033;
+  --accent: #09090b;
+  --accent-muted: rgba(9, 9, 11, 0.08);
 
-  /* status colors -- syntax-highlight-inspired */
-  --success: #03B000;
-  --error: #f76190;
-  --warning: #f1a10d;
-  --info: #52a9ff;
+  --border: #e4e4e7;
+  --border-hover: #d4d4d8;
 
-  /* chart colors -- grep.app dark mode */
-  --chart-1: #52a9ff;
-  --chart-2: #03B000;
-  --chart-3: #f1a10d;
-  --chart-4: #f76190;
+  --success: #059669;
+  --error: #e11d48;
+  --warning: #d97706;
+  --info: #0284c7;
+
+  --chart-1: #0ea5e9;
+  --chart-2: #10b981;
+  --chart-3: #f59e0b;
+  --chart-4: #f43f5e;
+  --chart-5: #8b5cf6;
+
+  --chart-grid: #e4e4e7;
+  --chart-axis: #a1a1aa;
+  --chart-legend: #71717a;
+
+  --radius: 6px;
+}
+
+.dark {
+  --background: #09090b;
+  --foreground: #fafafa;
+  --muted: #a1a1aa;
+  --subtle: #52525b;
+
+  --surface: #18181b;
+  --surface-alt: #27272a;
+
+  --accent: #fafafa;
+  --accent-muted: rgba(250, 250, 250, 0.08);
+
+  --border: #27272a;
+  --border-hover: #3f3f46;
+
+  --success: #34d399;
+  --error: #fb7185;
+  --warning: #fbbf24;
+  --info: #38bdf8;
+
+  --chart-1: #38bdf8;
+  --chart-2: #34d399;
+  --chart-3: #fbbf24;
+  --chart-4: #fb7185;
   --chart-5: #a78bfa;
 
-  /* borders */
-  --border: var(--grep-2);
-  --border-hover: var(--grep-5);
-
-  /* radius */
-  --radius: 4px;
+  --chart-grid: #27272a;
+  --chart-axis: #71717a;
+  --chart-legend: #a1a1aa;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
   --color-accent: var(--accent);
   --color-accent-muted: var(--accent-muted);
+  --color-surface: var(--surface);
+  --color-surface-alt: var(--surface-alt);
   --color-success: var(--success);
   --color-error: var(--error);
   --color-warning: var(--warning);
@@ -63,53 +91,38 @@
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --color-grep-0: var(--grep-0);
-  --color-grep-1: var(--grep-1);
-  --color-grep-2: var(--grep-2);
-  --color-grep-3: var(--grep-3);
-  --color-grep-4: var(--grep-4);
-  --color-grep-5: var(--grep-5);
-  --color-grep-6: var(--grep-6);
-  --color-grep-7: var(--grep-7);
-  --color-grep-8: var(--grep-8);
-  --color-grep-9: var(--grep-9);
-  --color-grep-10: var(--grep-10);
-  --color-grep-11: var(--grep-11);
-  --color-grep-12: var(--grep-12);
-  --font-sans: var(--font-geist-mono);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   --radius-sm: var(--radius);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-geist-mono), ui-monospace, monospace;
-  font-feature-settings: "tnum";
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* scrollbar styling */
+/* scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--grep-0);
+  background: var(--background);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--grep-4);
+  background: var(--border);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--grep-6);
+  background: var(--border-hover);
 }
 
-/* selection */
 ::selection {
   background: var(--accent-muted);
   color: var(--foreground);

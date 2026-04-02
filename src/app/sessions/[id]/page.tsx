@@ -355,11 +355,11 @@ export default async function SessionDetailPage({
                 className="text-xs"
                 style={{ paddingLeft: `${node.depth * 16}px` }}
               >
-                <span className="text-grep-7">
+                <span className="text-xs text-subtle">
                   {node.depth > 0 ? '|- ' : ''}
                 </span>
                 {node.id === id ? (
-                  <span className="text-accent font-medium">
+                  <span className="text-foreground font-medium">
                     {node.title ?? truncateId(node.id)}
                   </span>
                 ) : (
@@ -405,20 +405,20 @@ export default async function SessionDetailPage({
                 className="border border-border rounded-sm"
               >
                 {/* User message */}
-                <div className="border-b border-border p-3 bg-grep-1">
+                <div className="border-b border-border p-3 bg-surface-alt">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs text-grep-8 tabular-nums shrink-0">
+                    <span className="text-xs text-subtle tabular-nums shrink-0">
                       #{turnIndex + 1}
                     </span>
-                    <span className="text-xs font-bold text-accent">
-                      &gt; user
+                    <span className="text-xs font-bold text-foreground">
+                      user
                     </span>
                     <span className="text-xs text-muted">
                       {formatRelativeTime(first.user_created_at)}
                     </span>
                     {first.turn_duration_ms != null
                       && first.turn_duration_ms > 0 && (
-                      <span className="text-xs text-grep-8 tabular-nums">
+                      <span className="text-xs text-subtle tabular-nums">
                         {formatDuration(first.turn_duration_ms)}
                       </span>
                     )}
@@ -443,7 +443,7 @@ export default async function SessionDetailPage({
                       // Render file attachment compactly
                       <div>
                         <div className="flex items-center gap-1.5 text-xs text-muted mb-1">
-                          <span className="text-accent/70">file:</span>
+                          <span className="text-muted">file:</span>
                           <span className="text-foreground/70">
                             {shortenPath(fileAttachment.path)}
                           </span>
@@ -486,7 +486,7 @@ export default async function SessionDetailPage({
                       key={am.response_id}
                       className={`p-3 border-b border-border last:border-b-0${
                         isFinal && isLastResponse
-                          ? ' bg-grep-0'
+                          ? ' bg-surface'
                           : ''
                       }`}
                     >

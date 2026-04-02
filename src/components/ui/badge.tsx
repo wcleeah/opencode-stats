@@ -7,7 +7,7 @@ interface BadgeProps {
 }
 
 const VARIANT_CLASSES: Record<string, string> = {
-  default: 'bg-grep-3 text-muted',
+  default: 'bg-surface-alt text-muted',
   success: 'bg-success/10 text-success',
   error: 'bg-error/10 text-error',
   warning: 'bg-warning/10 text-warning',

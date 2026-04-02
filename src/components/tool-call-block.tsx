@@ -33,7 +33,7 @@ export function ToolCallBlock({
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-2 px-2 py-1.5 bg-grep-1 border-b border-border/50 w-full text-left cursor-pointer hover:bg-grep-2 transition-colors"
+        className="flex items-center gap-2 px-2 py-1.5 bg-surface-alt border-b border-border/50 w-full text-left cursor-pointer hover:bg-surface transition-colors"
       >
         <span className="text-muted text-xs shrink-0 w-4">
           {expanded ? '\u25BC' : '\u25B6'}

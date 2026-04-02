@@ -10,6 +10,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
+import { useChartColors } from '@/lib/use-chart-colors';
 import type { DailyErrorRate } from '@/types';
 
 interface ErrorRateChartProps {
@@ -28,7 +29,7 @@ function CustomTooltip({
   if (!active || !payload?.length) return null;
 
   return (
-    <div className="rounded-sm border border-border bg-grep-1 px-3 py-2 text-xs">
+    <div className="rounded-sm border border-border bg-surface px-3 py-2 text-xs">
       <div className="mb-1 text-muted">{label}</div>
       {payload.map((entry) => (
         <div key={entry.name} className="flex items-center gap-2">
@@ -47,6 +48,8 @@ function CustomTooltip({
 }
 
 export function ErrorRateChart({ data }: ErrorRateChartProps) {
+  const c = useChartColors();
+
   if (data.length === 0) {
     return (
       <div className="flex h-64 items-center justify-center text-muted text-sm">
@@ -58,16 +61,16 @@ export function ErrorRateChart({ data }: ErrorRateChartProps) {
   return (
     <ResponsiveContainer width="100%" height={280}>
       <AreaChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#1a1a1a" />
+        <CartesianGrid strokeDasharray="3 3" stroke={c.grid} />
         <XAxis
           dataKey="day"
-          tick={{ fontSize: 10, fill: '#777' }}
+          tick={{ fontSize: 10, fill: c.axis }}
           tickLine={false}
-          axisLine={{ stroke: '#1a1a1a' }}
+          axisLine={{ stroke: c.grid }}
         />
         <YAxis
           tickFormatter={(v: number) => `${v}%`}
-          tick={{ fontSize: 10, fill: '#777' }}
+          tick={{ fontSize: 10, fill: c.axis }}
           tickLine={false}
           axisLine={false}
           width={45}
@@ -77,8 +80,8 @@ export function ErrorRateChart({ data }: ErrorRateChartProps) {
           type="monotone"
           dataKey="error_rate"
           name="Error Rate"
-          stroke="#f76190"
-          fill="#f76190"
+          stroke={c.chart4}
+          fill={c.chart4}
           fillOpacity={0.15}
           strokeWidth={1.5}
         />

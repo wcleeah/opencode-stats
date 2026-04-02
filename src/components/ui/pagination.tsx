@@ -20,7 +20,6 @@ export function Pagination({ page, totalPages, baseUrl, className }: PaginationP
     return `${baseUrl}${separator}page=${p}`;
   }
 
-  // Show up to 5 page numbers centered around current page
   const start = Math.max(1, page - 2);
   const end = Math.min(totalPages, start + 4);
   const pages = Array.from({ length: end - start + 1 }, (_, i) => start + i);
@@ -35,7 +34,7 @@ export function Pagination({ page, totalPages, baseUrl, className }: PaginationP
           &lt; prev
         </Link>
       ) : (
-        <span className="px-2 py-1 text-grep-8">&lt; prev</span>
+        <span className="px-2 py-1 text-subtle">&lt; prev</span>
       )}
 
       {start > 1 && (
@@ -46,7 +45,7 @@ export function Pagination({ page, totalPages, baseUrl, className }: PaginationP
           >
             1
           </Link>
-          {start > 2 && <span className="px-1 text-grep-8">...</span>}
+          {start > 2 && <span className="px-1 text-subtle">...</span>}
         </>
       )}
 
@@ -57,7 +56,7 @@ export function Pagination({ page, totalPages, baseUrl, className }: PaginationP
           className={cn(
             'px-2 py-1 transition-colors',
             p === page
-              ? 'text-accent font-bold'
+              ? 'text-foreground font-bold'
               : 'text-muted hover:text-foreground',
           )}
         >
@@ -67,7 +66,7 @@ export function Pagination({ page, totalPages, baseUrl, className }: PaginationP
 
       {end < totalPages && (
         <>
-          {end < totalPages - 1 && <span className="px-1 text-grep-8">...</span>}
+          {end < totalPages - 1 && <span className="px-1 text-subtle">...</span>}
           <Link
             href={pageUrl(totalPages)}
             className="px-2 py-1 text-muted hover:text-foreground transition-colors"
@@ -85,7 +84,7 @@ export function Pagination({ page, totalPages, baseUrl, className }: PaginationP
           next &gt;
         </Link>
       ) : (
-        <span className="px-2 py-1 text-grep-8">next &gt;</span>
+        <span className="px-2 py-1 text-subtle">next &gt;</span>
       )}
     </nav>
   );

@@ -1,22 +1,24 @@
 import Link from 'next/link';
 
+import { ThemeToggle } from '@/components/theme-toggle';
+
 const NAV_ITEMS = [
-  { href: '/', label: 'dashboard' },
-  { href: '/projects', label: 'projects' },
-  { href: '/time', label: 'time' },
-  { href: '/tools', label: 'tools' },
-  { href: '/models', label: 'models' },
+  { href: '/', label: 'Dashboard' },
+  { href: '/projects', label: 'Projects' },
+  { href: '/time', label: 'Time' },
+  { href: '/tools', label: 'Tools' },
+  { href: '/models', label: 'Models' },
 ] as const;
 
 export function Nav() {
   return (
-    <header className="border-b border-border bg-grep-0">
+    <header className="border-b border-border bg-background">
       <div className="mx-auto flex max-w-7xl items-center gap-6 px-4 py-3">
         <Link
           href="/"
-          className="text-sm font-bold text-accent hover:text-accent/80 transition-colors"
+          className="text-sm font-semibold text-foreground hover:text-muted transition-colors"
         >
-          &gt;_ opencode-stats
+          OpenCode Stats
         </Link>
         <nav className="flex items-center gap-4">
           {NAV_ITEMS.map((item) => (
@@ -29,6 +31,9 @@ export function Nav() {
             </Link>
           ))}
         </nav>
+        <div className="ml-auto">
+          <ThemeToggle />
+        </div>
       </div>
     </header>
   );

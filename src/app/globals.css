@@ -38,6 +38,17 @@
   --chart-legend: #71717a;
 
   --radius: 6px;
+
+  /* sugar-high syntax highlighting */
+  --sh-class: #2d5e9d;
+  --sh-identifier: #354150;
+  --sh-sign: #8996a3;
+  --sh-property: #0550ae;
+  --sh-entity: #249a97;
+  --sh-jsxliterals: #6266d1;
+  --sh-string: #00a99a;
+  --sh-keyword: #f47067;
+  --sh-comment: #a19595;
 }
 
 .dark {
@@ -69,6 +80,17 @@
   --chart-grid: #27272a;
   --chart-axis: #71717a;
   --chart-legend: #a1a1aa;
+
+  /* sugar-high syntax highlighting — dark */
+  --sh-class: #8db6f2;
+  --sh-identifier: #c8d3de;
+  --sh-sign: #7d8a97;
+  --sh-property: #79b8ff;
+  --sh-entity: #56d4cf;
+  --sh-jsxliterals: #9fa1f6;
+  --sh-string: #4ec9b0;
+  --sh-keyword: #f47067;
+  --sh-comment: #6b6363;
 }
 
 @theme inline {

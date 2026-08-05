@@ -5,6 +5,7 @@ import { ensureCursorSchema } from '@/lib/cursor/schema';
 import type { CursorCsvEvent } from '@/lib/cursor/csv';
 import type {
   CursorAgentUsageRow,
+  CursorCyclePool,
   CursorDailyModelUsageRow,
   CursorDailyUsage,
   CursorEventCostRow,
@@ -17,6 +18,7 @@ import type {
 const DEFAULT_SETTINGS: CursorSettings = {
   plan_amount_usd: 200,
   included_pool_usd: 400,
+  cursor_models_included_usd: 2000,
   billing_cycle_start_day: 1,
   updated_at: 0,
 };
@@ -63,6 +65,7 @@ export async function getCursorSettings(): Promise<{
       SELECT
         plan_amount_usd,
         included_pool_usd,
+        COALESCE(cursor_models_included_usd, 2000) AS cursor_models_included_usd,
         billing_cycle_start_day,
         updated_at
       FROM cursor_settings
@@ -79,6 +82,7 @@ export async function getCursorSettings(): Promise<{
 export async function updateCursorSettings(input: {
   planAmountUsd: number;
   includedPoolUsd: number;
+  cursorModelsIncludedUsd: number;
   billingCycleStartDay: number;
 }): Promise<{ data: CursorSettings | null; error: string | null }> {
   return withSchema(async () => {
@@ -87,12 +91,14 @@ export async function updateCursorSettings(input: {
       `UPDATE cursor_settings
        SET plan_amount_usd = ?,
            included_pool_usd = ?,
+           cursor_models_included_usd = ?,
            billing_cycle_start_day = ?,
            updated_at = ?
        WHERE id = 1`,
       [
         input.planAmountUsd,
         input.includedPoolUsd,
+        input.cursorModelsIncludedUsd,
         input.billingCycleStartDay,
         updatedAt,
       ],
@@ -101,6 +107,71 @@ export async function updateCursorSettings(input: {
       return { data: null, error: write.error };
     }
     return getCursorSettings();
+  });
+}
+
+export async function getCursorCyclePool(cycleStart: string): Promise<{
+  data: CursorCyclePool | null;
+  error: string | null;
+}> {
+  return withSchema(() =>
+    queryOne<CursorCyclePool>(
+      `SELECT
+         cycle_start,
+         cursor_models_included_usd,
+         updated_at
+       FROM cursor_cycle_pools
+       WHERE cycle_start = ?`,
+      [cycleStart],
+    ),
+  );
+}
+
+/**
+ * Resolve Cursor Models pool size for a cycle.
+ * Per-cycle override wins; otherwise falls back to global default.
+ */
+export async function resolveCursorModelsPoolUsd(params: {
+  cycleStart: string;
+  defaultUsd: number;
+}): Promise<{ data: { amountUsd: number; fromCycleOverride: boolean } | null; error: string | null }> {
+  const override = await getCursorCyclePool(params.cycleStart);
+  if (override.error) {
+    return { data: null, error: override.error };
+  }
+  if (override.data) {
+    return {
+      data: {
+        amountUsd: override.data.cursor_models_included_usd,
+        fromCycleOverride: true,
+      },
+      error: null,
+    };
+  }
+  return {
+    data: { amountUsd: params.defaultUsd, fromCycleOverride: false },
+    error: null,
+  };
+}
+
+export async function upsertCursorCyclePool(input: {
+  cycleStart: string;
+  cursorModelsIncludedUsd: number;
+}): Promise<{ data: CursorCyclePool | null; error: string | null }> {
+  return withSchema(async () => {
+    const updatedAt = Date.now();
+    const write = await execute(
+      `INSERT INTO cursor_cycle_pools (cycle_start, cursor_models_included_usd, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(cycle_start) DO UPDATE SET
+         cursor_models_included_usd = excluded.cursor_models_included_usd,
+         updated_at = excluded.updated_at`,
+      [input.cycleStart, input.cursorModelsIncludedUsd, updatedAt],
+    );
+    if (write.error) {
+      return { data: null, error: write.error };
+    }
+    return getCursorCyclePool(input.cycleStart);
   });
 }
 

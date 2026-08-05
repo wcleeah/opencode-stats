@@ -17,6 +17,9 @@ export function CursorSettingsForm({ settings }: CursorSettingsFormProps) {
   const [includedPoolUsd, setIncludedPoolUsd] = useState(
     String(settings.included_pool_usd),
   );
+  const [cursorModelsIncludedUsd, setCursorModelsIncludedUsd] = useState(
+    String(settings.cursor_models_included_usd),
+  );
   const [billingCycleStartDay, setBillingCycleStartDay] = useState(
     String(settings.billing_cycle_start_day),
   );
@@ -37,6 +40,7 @@ export function CursorSettingsForm({ settings }: CursorSettingsFormProps) {
     const body = {
       planAmountUsd: Number(planAmountUsd),
       includedPoolUsd: Number(includedPoolUsd),
+      cursorModelsIncludedUsd: Number(cursorModelsIncludedUsd),
       billingCycleStartDay: Number(billingCycleStartDay),
     };
 
@@ -75,7 +79,7 @@ export function CursorSettingsForm({ settings }: CursorSettingsFormProps) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="block space-y-1">
           <span className="text-[10px] uppercase tracking-wide text-muted">
             Plan paid ($/mo)
@@ -91,22 +95,6 @@ export function CursorSettingsForm({ settings }: CursorSettingsFormProps) {
         </label>
         <label className="block space-y-1">
           <span className="text-[10px] uppercase tracking-wide text-muted">
-            Other Models included (at least $)
-          </span>
-          <input
-            type="number"
-            min={0}
-            step="1"
-            value={includedPoolUsd}
-            onChange={(e) => setIncludedPoolUsd(e.target.value)}
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-          />
-          <span className="block text-[10px] text-muted">
-            Floor for third-party models (Ultra ≥$400). Cursor Models are separate.
-          </span>
-        </label>
-        <label className="block space-y-1">
-          <span className="text-[10px] uppercase tracking-wide text-muted">
             Cycle start day (1–28)
           </span>
           <input
@@ -118,6 +106,38 @@ export function CursorSettingsForm({ settings }: CursorSettingsFormProps) {
             onChange={(e) => setBillingCycleStartDay(e.target.value)}
             className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
           />
+        </label>
+        <label className="block space-y-1">
+          <span className="text-[10px] uppercase tracking-wide text-muted">
+            Default Cursor Models pool ($)
+          </span>
+          <input
+            type="number"
+            min={0}
+            step="1"
+            value={cursorModelsIncludedUsd}
+            onChange={(e) => setCursorModelsIncludedUsd(e.target.value)}
+            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+          />
+          <span className="block text-[10px] text-muted">
+            Fallback when a billing cycle has no override. Per-cycle values edit above.
+          </span>
+        </label>
+        <label className="block space-y-1">
+          <span className="text-[10px] uppercase tracking-wide text-muted">
+            Other Models included (at least $)
+          </span>
+          <input
+            type="number"
+            min={0}
+            step="1"
+            value={includedPoolUsd}
+            onChange={(e) => setIncludedPoolUsd(e.target.value)}
+            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+          />
+          <span className="block text-[10px] text-muted">
+            Floor for third-party models (Ultra ≥$400).
+          </span>
         </label>
       </div>
 

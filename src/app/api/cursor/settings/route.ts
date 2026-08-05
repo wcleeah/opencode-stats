@@ -41,6 +41,10 @@ export async function PUT(request: Request): Promise<NextResponse> {
       record.includedPoolUsd,
       'includedPoolUsd',
     );
+    const cursorModelsIncludedUsd = parsePositiveNumber(
+      record.cursorModelsIncludedUsd,
+      'cursorModelsIncludedUsd',
+    );
     const billingCycleStartDay = parsePositiveNumber(
       record.billingCycleStartDay,
       'billingCycleStartDay',
@@ -49,13 +53,14 @@ export async function PUT(request: Request): Promise<NextResponse> {
     if (
       planAmountUsd === null ||
       includedPoolUsd === null ||
+      cursorModelsIncludedUsd === null ||
       billingCycleStartDay === null
     ) {
       return NextResponse.json(
         {
           error:
             'Invalid settings. Expect planAmountUsd >= 0, includedPoolUsd >= 0, ' +
-            'billingCycleStartDay between 1 and 28.',
+            'cursorModelsIncludedUsd >= 0, billingCycleStartDay between 1 and 28.',
         },
         { status: 400 },
       );
@@ -64,6 +69,7 @@ export async function PUT(request: Request): Promise<NextResponse> {
     const result = await updateCursorSettings({
       planAmountUsd,
       includedPoolUsd,
+      cursorModelsIncludedUsd,
       billingCycleStartDay,
     });
 

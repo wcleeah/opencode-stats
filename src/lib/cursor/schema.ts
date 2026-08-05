@@ -44,7 +44,13 @@ const SCHEMA_STATEMENTS = [
     id INTEGER PRIMARY KEY CHECK (id = 1),
     plan_amount_usd REAL NOT NULL DEFAULT 200,
     included_pool_usd REAL NOT NULL DEFAULT 400,
+    cursor_models_included_usd REAL NOT NULL DEFAULT 2000,
     billing_cycle_start_day INTEGER NOT NULL DEFAULT 1,
+    updated_at INTEGER NOT NULL
+  )`,
+  `CREATE TABLE IF NOT EXISTS cursor_cycle_pools (
+    cycle_start TEXT PRIMARY KEY,
+    cursor_models_included_usd REAL NOT NULL,
     updated_at INTEGER NOT NULL
   )`,
 ] as const;
@@ -60,10 +66,24 @@ export async function ensureCursorSchema(): Promise<{ error: string | null }> {
         throw new Error(result.error);
       }
 
+      // Existing DBs created before this column — add if missing.
+      const migrate = await execute(
+        `ALTER TABLE cursor_settings
+         ADD COLUMN cursor_models_included_usd REAL NOT NULL DEFAULT 2000`,
+      );
+      if (
+        migrate.error &&
+        !migrate.error.toLowerCase().includes('duplicate column')
+      ) {
+        schemaReady = null;
+        throw new Error(migrate.error);
+      }
+
       const seed = await execute(
         `INSERT OR IGNORE INTO cursor_settings
-          (id, plan_amount_usd, included_pool_usd, billing_cycle_start_day, updated_at)
-         VALUES (1, 200, 400, 1, ?)`,
+          (id, plan_amount_usd, included_pool_usd, cursor_models_included_usd,
+           billing_cycle_start_day, updated_at)
+         VALUES (1, 200, 400, 2000, 1, ?)`,
         [Date.now()],
       );
       if (seed.error) {

@@ -5,6 +5,7 @@ import {
   getBillingCycleBounds,
   matchBillingCycleOffset,
   billingCycleElapsedRatio,
+  resolveSelectedCycle,
 } from './billing-cycle';
 
 test('getBillingCycleBounds returns current month window for day-1 cycles', () => {
@@ -42,4 +43,18 @@ test('billingCycleElapsedRatio is between 0 and 1 mid-cycle', () => {
   const now = new Date(2026, 7, 15, 12, 0, 0);
   const ratio = billingCycleElapsedRatio(now, 1);
   assert.ok(ratio > 0.4 && ratio < 0.6);
+});
+
+test('resolveSelectedCycle prefers exact from/to cycle match', () => {
+  const now = new Date(2026, 7, 15, 12, 0, 0);
+  const cycle = resolveSelectedCycle(1, '2026-07-01', '2026-07-31', now);
+  assert.equal(cycle.from, '2026-07-01');
+  assert.equal(cycle.to, '2026-07-31');
+});
+
+test('resolveSelectedCycle falls back to cycle containing from', () => {
+  const now = new Date(2026, 7, 15, 12, 0, 0);
+  const cycle = resolveSelectedCycle(1, '2026-06-10', '2026-06-20', now);
+  assert.equal(cycle.from, '2026-06-01');
+  assert.equal(cycle.to, '2026-06-30');
 });

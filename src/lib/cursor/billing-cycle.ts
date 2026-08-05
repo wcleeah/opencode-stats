@@ -122,3 +122,29 @@ export function billingCycleElapsedRatio(
   );
   return elapsedMs / totalMs;
 }
+
+/**
+ * Resolve which billing cycle a dashboard date range maps to.
+ * Prefers an exact from/to cycle match; otherwise the cycle containing `from`,
+ * then today's cycle.
+ */
+export function resolveSelectedCycle(
+  billingCycleStartDay: number,
+  from?: string,
+  to?: string,
+  now: Date = new Date(),
+): BillingCycleBounds {
+  const offset = matchBillingCycleOffset(billingCycleStartDay, from, to, now);
+  if (offset !== null) {
+    return getBillingCycleBounds(billingCycleStartDay, now, offset);
+  }
+
+  if (from) {
+    const anchor = new Date(`${from}T12:00:00`);
+    if (!Number.isNaN(anchor.getTime())) {
+      return getBillingCycleBounds(billingCycleStartDay, anchor, 0);
+    }
+  }
+
+  return getBillingCycleBounds(billingCycleStartDay, now, 0);
+}

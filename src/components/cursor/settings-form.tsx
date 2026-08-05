@@ -91,7 +91,7 @@ export function CursorSettingsForm({ settings }: CursorSettingsFormProps) {
         </label>
         <label className="block space-y-1">
           <span className="text-[10px] uppercase tracking-wide text-muted">
-            Included pool (at least $)
+            Other Models included (at least $)
           </span>
           <input
             type="number"
@@ -102,7 +102,7 @@ export function CursorSettingsForm({ settings }: CursorSettingsFormProps) {
             className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
           />
           <span className="block text-[10px] text-muted">
-            Floor Cursor guarantees; actual pool is estimated usage
+            Floor for third-party models (Ultra ≥$400). Cursor Models are separate.
           </span>
         </label>
         <label className="block space-y-1">

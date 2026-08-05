@@ -5,15 +5,18 @@
 import { billingCycleElapsedRatio } from '@/lib/cursor/billing-cycle';
 
 export interface CursorValueMetrics {
+  /** Combined est. cost (Cursor Models + Other Models) */
   estimatedCost: number;
-  /** Alias for estimatedCost — actual API-equivalent pool used */
-  actualPoolUsd: number;
+  /** Est. cost for Cursor Models pool (Grok / Composer / Auto) */
+  cursorPoolUsd: number;
+  /** Est. cost for Other Models pool (third-party) */
+  otherPoolUsd: number;
   planAmountUsd: number;
-  /** Configured floor ("at least this amount") */
+  /** Configured Other Models included floor ("at least this amount") */
   includedPoolUsd: number;
   valueVsPlan: number;
-  /** actualPool / includedPool (at-least floor) */
-  actualVsIncluded: number;
+  /** otherPool / includedPool (at-least floor for Other Models) */
+  otherVsIncluded: number;
   exceededIncluded: boolean;
   dollarsPerMillionTokens: number;
   estimatedCostPerMillionTokens: number;
@@ -28,7 +31,8 @@ function safeRatio(numerator: number, denominator: number): number {
 }
 
 export function computeCursorValueMetrics(params: {
-  estimatedCost: number;
+  cursorPoolUsd: number;
+  otherPoolUsd: number;
   totalTokens: number;
   planAmountUsd: number;
   includedPoolUsd: number;
@@ -36,35 +40,37 @@ export function computeCursorValueMetrics(params: {
   now?: Date;
 }): CursorValueMetrics {
   const now = params.now ?? new Date();
+  const estimatedCost = params.cursorPoolUsd + params.otherPoolUsd;
   const cycleElapsedRatio = billingCycleElapsedRatio(
     now,
     params.billingCycleStartDay,
   );
   const expectedProRataCost = params.planAmountUsd * cycleElapsedRatio;
-  const actualVsIncluded = safeRatio(
-    params.estimatedCost,
+  const otherVsIncluded = safeRatio(
+    params.otherPoolUsd,
     params.includedPoolUsd,
   );
 
   return {
-    estimatedCost: params.estimatedCost,
-    actualPoolUsd: params.estimatedCost,
+    estimatedCost,
+    cursorPoolUsd: params.cursorPoolUsd,
+    otherPoolUsd: params.otherPoolUsd,
     planAmountUsd: params.planAmountUsd,
     includedPoolUsd: params.includedPoolUsd,
-    valueVsPlan: safeRatio(params.estimatedCost, params.planAmountUsd),
-    actualVsIncluded,
-    exceededIncluded: params.estimatedCost > params.includedPoolUsd,
+    valueVsPlan: safeRatio(estimatedCost, params.planAmountUsd),
+    otherVsIncluded,
+    exceededIncluded: params.otherPoolUsd > params.includedPoolUsd,
     dollarsPerMillionTokens: safeRatio(
       params.planAmountUsd * 1_000_000,
       params.totalTokens,
     ),
     estimatedCostPerMillionTokens: safeRatio(
-      params.estimatedCost * 1_000_000,
+      estimatedCost * 1_000_000,
       params.totalTokens,
     ),
     cycleElapsedRatio,
     expectedProRataCost,
-    burnRatio: safeRatio(params.estimatedCost, expectedProRataCost),
+    burnRatio: safeRatio(estimatedCost, expectedProRataCost),
   };
 }
 

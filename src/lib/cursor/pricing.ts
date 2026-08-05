@@ -199,6 +199,31 @@ export function hasCursorPricing(modelId: string): boolean {
   return getCursorPricing(modelId) !== null;
 }
 
+/**
+ * Cursor's two usage pools:
+ * - `cursor`: Cursor Models (Grok 4.5, Composer 2.5) + Auto Cost
+ * - `other`: third-party models (Claude, GPT, Gemini, …)
+ *
+ * Ultra's "$400 included" floor applies to the Other Models pool.
+ * Source: https://cursor.com/docs/models-and-pricing
+ */
+export type CursorUsagePool = 'cursor' | 'other';
+
+export function getCursorUsagePool(modelId: string): CursorUsagePool {
+  const key = resolvePricingKey(modelId) ?? normalizeCursorModelId(modelId);
+  if (
+    key === 'auto' ||
+    key === 'auto-cost' ||
+    key.startsWith('composer-') ||
+    key.startsWith('cursor-grok-') ||
+    key.startsWith('grok-')
+  ) {
+    return 'cursor';
+  }
+  // Unresolved / third-party slugs draw from Other Models.
+  return 'other';
+}
+
 export interface CursorCostEstimate {
   cost: number;
   estimated: boolean;

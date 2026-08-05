@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 import Link from 'next/link';
 
 import { parseDateRange } from '@/lib/date-range';
+import { resolveSelectedCycle } from '@/lib/cursor/billing-cycle';
 import {
   estimateCursorCost,
   getCursorUsagePool,
@@ -26,6 +27,7 @@ import {
   getCursorModelUsage,
   getCursorSettings,
   listCursorImports,
+  resolveCursorModelsPoolUsd,
 } from '@/lib/queries/cursor';
 
 import { Card, StatCard } from '@/components/ui/card';
@@ -42,6 +44,7 @@ import { BillingCycleControls } from '@/components/cursor/billing-cycle-controls
 import { CursorTokenChart } from '@/components/cursor/token-chart';
 import { CursorCostChart } from '@/components/cursor/cost-chart';
 import { CursorSettingsForm } from '@/components/cursor/settings-form';
+import { CyclePoolForm } from '@/components/cursor/cycle-pool-form';
 
 interface CursorPageProps {
   searchParams: Promise<{ from?: string; to?: string }>;
@@ -90,6 +93,19 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
   const dailyModels = dailyModelResult.data ?? [];
   const imports = importsResult.data ?? [];
 
+  const selectedCycle = resolveSelectedCycle(
+    settings.billing_cycle_start_day,
+    range.from,
+    range.to,
+  );
+  const cyclePoolResult = await resolveCursorModelsPoolUsd({
+    cycleStart: selectedCycle.from,
+    defaultUsd: settings.cursor_models_included_usd,
+  });
+  const cursorModelsIncludedUsd =
+    cyclePoolResult.data?.amountUsd ?? settings.cursor_models_included_usd;
+  const fromCycleOverride = cyclePoolResult.data?.fromCycleOverride ?? false;
+
   if (!stats || stats.event_count === 0) {
     return (
       <div className="space-y-6">
@@ -109,6 +125,13 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
             to={range.to}
           />
           <DateRangeControls from={range.from} to={range.to} />
+          <CyclePoolForm
+            cycleStart={selectedCycle.from}
+            cycleLabel={selectedCycle.label}
+            amountUsd={cursorModelsIncludedUsd}
+            fromCycleOverride={fromCycleOverride}
+            defaultUsd={settings.cursor_models_included_usd}
+          />
         </div>
         <Card className="space-y-3">
           <div className="text-sm text-foreground">No Cursor usage imported yet</div>
@@ -196,7 +219,6 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
     ? (stats.cloud_agent_count / stats.event_count) * 100
     : 0;
 
-  const cursorModelsIncludedUsd = settings.cursor_models_included_usd;
   const cursorIncludedPct = cursorModelsIncludedUsd > 0
     ? Math.min(100, (value.cursorPoolUsd / cursorModelsIncludedUsd) * 100)
     : 0;
@@ -210,8 +232,9 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
         <div className="space-y-1">
           <h1 className="text-lg font-bold">Cursor Dashboard</h1>
           <div className="text-xs text-muted">
-            Plan ${settings.plan_amount_usd}/mo · Cursor pool $
-            {settings.cursor_models_included_usd} · Other ≥$
+            Plan ${settings.plan_amount_usd}/mo · this cycle pool $
+            {cursorModelsIncludedUsd}
+            {fromCycleOverride ? '' : ' (default)'} · Other ≥$
             {settings.included_pool_usd} · cycle day {settings.billing_cycle_start_day}
           </div>
         </div>
@@ -230,6 +253,13 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
           to={range.to}
         />
         <DateRangeControls from={range.from} to={range.to} />
+        <CyclePoolForm
+          cycleStart={selectedCycle.from}
+          cycleLabel={selectedCycle.label}
+          amountUsd={cursorModelsIncludedUsd}
+          fromCycleOverride={fromCycleOverride}
+          defaultUsd={settings.cursor_models_included_usd}
+        />
       </div>
 
       {/* Value strip */}
@@ -301,8 +331,9 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
             />
           </div>
           <div className="mt-2 text-xs text-muted">
-            {cursorIncludedPct.toFixed(0)}% of fixed pool ($
-            {cursorModelsIncludedUsd})
+            {cursorIncludedPct.toFixed(0)}% of cycle pool ($
+            {cursorModelsIncludedUsd}
+            {fromCycleOverride ? '' : ', default'})
           </div>
         </Card>
         <Card>

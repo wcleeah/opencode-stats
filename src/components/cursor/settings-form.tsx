@@ -109,7 +109,7 @@ export function CursorSettingsForm({ settings }: CursorSettingsFormProps) {
         </label>
         <label className="block space-y-1">
           <span className="text-[10px] uppercase tracking-wide text-muted">
-            Cursor Models pool ($)
+            Default Cursor Models pool ($)
           </span>
           <input
             type="number"
@@ -120,7 +120,7 @@ export function CursorSettingsForm({ settings }: CursorSettingsFormProps) {
             className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
           />
           <span className="block text-[10px] text-muted">
-            Fixed denominator for Cursor Models %. Default $2000 (ballpark).
+            Fallback when a billing cycle has no override. Per-cycle values edit above.
           </span>
         </label>
         <label className="block space-y-1">

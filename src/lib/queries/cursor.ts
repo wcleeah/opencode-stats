@@ -5,6 +5,7 @@ import { ensureCursorSchema } from '@/lib/cursor/schema';
 import type { CursorCsvEvent } from '@/lib/cursor/csv';
 import type {
   CursorAgentUsageRow,
+  CursorCyclePool,
   CursorDailyModelUsageRow,
   CursorDailyUsage,
   CursorEventCostRow,
@@ -106,6 +107,71 @@ export async function updateCursorSettings(input: {
       return { data: null, error: write.error };
     }
     return getCursorSettings();
+  });
+}
+
+export async function getCursorCyclePool(cycleStart: string): Promise<{
+  data: CursorCyclePool | null;
+  error: string | null;
+}> {
+  return withSchema(() =>
+    queryOne<CursorCyclePool>(
+      `SELECT
+         cycle_start,
+         cursor_models_included_usd,
+         updated_at
+       FROM cursor_cycle_pools
+       WHERE cycle_start = ?`,
+      [cycleStart],
+    ),
+  );
+}
+
+/**
+ * Resolve Cursor Models pool size for a cycle.
+ * Per-cycle override wins; otherwise falls back to global default.
+ */
+export async function resolveCursorModelsPoolUsd(params: {
+  cycleStart: string;
+  defaultUsd: number;
+}): Promise<{ data: { amountUsd: number; fromCycleOverride: boolean } | null; error: string | null }> {
+  const override = await getCursorCyclePool(params.cycleStart);
+  if (override.error) {
+    return { data: null, error: override.error };
+  }
+  if (override.data) {
+    return {
+      data: {
+        amountUsd: override.data.cursor_models_included_usd,
+        fromCycleOverride: true,
+      },
+      error: null,
+    };
+  }
+  return {
+    data: { amountUsd: params.defaultUsd, fromCycleOverride: false },
+    error: null,
+  };
+}
+
+export async function upsertCursorCyclePool(input: {
+  cycleStart: string;
+  cursorModelsIncludedUsd: number;
+}): Promise<{ data: CursorCyclePool | null; error: string | null }> {
+  return withSchema(async () => {
+    const updatedAt = Date.now();
+    const write = await execute(
+      `INSERT INTO cursor_cycle_pools (cycle_start, cursor_models_included_usd, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT(cycle_start) DO UPDATE SET
+         cursor_models_included_usd = excluded.cursor_models_included_usd,
+         updated_at = excluded.updated_at`,
+      [input.cycleStart, input.cursorModelsIncludedUsd, updatedAt],
+    );
+    if (write.error) {
+      return { data: null, error: write.error };
+    }
+    return getCursorCyclePool(input.cycleStart);
   });
 }
 

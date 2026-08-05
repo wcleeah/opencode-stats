@@ -48,6 +48,11 @@ const SCHEMA_STATEMENTS = [
     billing_cycle_start_day INTEGER NOT NULL DEFAULT 1,
     updated_at INTEGER NOT NULL
   )`,
+  `CREATE TABLE IF NOT EXISTS cursor_cycle_pools (
+    cycle_start TEXT PRIMARY KEY,
+    cursor_models_included_usd REAL NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
 ] as const;
 
 export async function ensureCursorSchema(): Promise<{ error: string | null }> {

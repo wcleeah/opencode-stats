@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { parseDateRange } from '@/lib/date-range';
 import {
   estimateCursorCost,
+  getCursorUsagePool,
   hasCursorPricing,
 } from '@/lib/cursor/pricing';
 import {
@@ -135,11 +136,28 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
       tokensCacheRead: model.tokens_cache_read,
       tokensOutput: model.tokens_output,
     });
-    return { ...model, estimatedCost: est.cost, knownPricing: est.knownPricing };
+    return {
+      ...model,
+      estimatedCost: est.cost,
+      knownPricing: est.knownPricing,
+      pool: getCursorUsagePool(model.model),
+    };
   });
 
   const totalEstimatedCost = modelCosts.reduce((sum, row) => sum + row.estimatedCost, 0);
+  const cursorPoolUsd = modelCosts
+    .filter((row) => row.pool === 'cursor')
+    .reduce((sum, row) => sum + row.estimatedCost, 0);
+  const otherPoolUsd = modelCosts
+    .filter((row) => row.pool === 'other')
+    .reduce((sum, row) => sum + row.estimatedCost, 0);
   const unknownPricingCount = modelCosts.filter((row) => !row.knownPricing).length;
+  const cursorEventCount = modelCosts
+    .filter((row) => row.pool === 'cursor')
+    .reduce((sum, row) => sum + row.event_count, 0);
+  const otherEventCount = modelCosts
+    .filter((row) => row.pool === 'other')
+    .reduce((sum, row) => sum + row.event_count, 0);
 
   const dailyCostMap = new Map<string, number>();
   for (const row of dailyModels) {
@@ -166,7 +184,8 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
   }));
 
   const value = computeCursorValueMetrics({
-    estimatedCost: totalEstimatedCost,
+    cursorPoolUsd,
+    otherPoolUsd,
     totalTokens: stats.tokens_total,
     planAmountUsd: settings.plan_amount_usd,
     includedPoolUsd: settings.included_pool_usd,
@@ -177,8 +196,8 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
     ? (stats.cloud_agent_count / stats.event_count) * 100
     : 0;
 
-  const includedPct = settings.included_pool_usd > 0
-    ? Math.min(100, (value.actualPoolUsd / settings.included_pool_usd) * 100)
+  const otherIncludedPct = settings.included_pool_usd > 0
+    ? Math.min(100, (value.otherPoolUsd / settings.included_pool_usd) * 100)
     : 0;
 
   return (
@@ -187,8 +206,8 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
         <div className="space-y-1">
           <h1 className="text-lg font-bold">Cursor Dashboard</h1>
           <div className="text-xs text-muted">
-            Plan ${settings.plan_amount_usd}/mo · included ≥${settings.included_pool_usd} · cycle day{' '}
-            {settings.billing_cycle_start_day}
+            Plan ${settings.plan_amount_usd}/mo · Other Models ≥$
+            {settings.included_pool_usd} · cycle day {settings.billing_cycle_start_day}
           </div>
         </div>
         <Link
@@ -211,33 +230,30 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
       {/* Value strip */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <StatCard
-          label="Actual pool"
-          value={formatCost(value.actualPoolUsd, true)}
-          subValue={
-            unknownPricingCount > 0
-              ? `${unknownPricingCount} model(s) missing rates`
-              : 'Est. API-equivalent usage'
-          }
+          label="Cursor Models"
+          value={formatCost(value.cursorPoolUsd, true)}
+          subValue={`${cursorEventCount.toLocaleString()} events · Grok / Composer`}
           accent
         />
         <StatCard
-          label="Included (at least)"
-          value={`≥$${settings.included_pool_usd}`}
-          subValue={
-            value.exceededIncluded
-              ? `${formatMultiplier(value.actualVsIncluded)} of floor · over`
-              : `${includedPct.toFixed(0)}% of floor used`
-          }
+          label="Other Models"
+          value={formatCost(value.otherPoolUsd, true)}
+          subValue={`${otherEventCount.toLocaleString()} events · third-party`}
+          accent
         />
         <StatCard
-          label="Actual vs included"
-          value={formatMultiplier(value.actualVsIncluded)}
-          subValue={`${formatCost(value.actualPoolUsd, true)} / ≥$${settings.included_pool_usd}`}
+          label="Other vs included"
+          value={formatMultiplier(value.otherVsIncluded)}
+          subValue={
+            value.exceededIncluded
+              ? `${formatCost(value.otherPoolUsd, true)} / ≥$${settings.included_pool_usd} · over`
+              : `${formatCost(value.otherPoolUsd, true)} / ≥$${settings.included_pool_usd}`
+          }
         />
         <StatCard
           label="Value vs plan"
           value={formatMultiplier(value.valueVsPlan)}
-          subValue={`${formatCost(value.actualPoolUsd, true)} / $${settings.plan_amount_usd}`}
+          subValue={`${formatCost(value.estimatedCost, true)} total / $${settings.plan_amount_usd}`}
         />
         <StatCard
           label="$ / 1M tokens (plan)"
@@ -251,33 +267,68 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
         />
       </div>
 
-      {/* Included floor meter */}
-      <Card>
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-          <div className="text-xs text-muted uppercase tracking-wider">
-            Pool vs included floor
+      {/* Dual pool meters */}
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <Card>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <div className="text-xs text-muted uppercase tracking-wider">
+              Cursor Models pool
+            </div>
+            <div className="text-xs tabular-nums text-foreground">
+              {formatCost(value.cursorPoolUsd, true)}
+              {unknownPricingCount > 0 ? ' · some rates missing' : ''}
+            </div>
           </div>
-          <div className="text-xs tabular-nums text-foreground">
-            {formatCost(value.actualPoolUsd, true)} actual · ≥$
-            {settings.included_pool_usd} included
-            {value.exceededIncluded ? ' · exceeded' : ''}
+          <div className="h-2 overflow-hidden rounded-sm bg-surface-alt">
+            <div
+              className="h-full bg-foreground/70 transition-all"
+              style={{
+                width: `${
+                  value.estimatedCost > 0
+                    ? Math.max(2, (value.cursorPoolUsd / value.estimatedCost) * 100)
+                    : 0
+                }%`,
+              }}
+            />
           </div>
-        </div>
-        <div className="h-2 overflow-hidden rounded-sm bg-surface-alt">
-          <div
-            className={
-              value.exceededIncluded
-                ? 'h-full bg-warning transition-all'
-                : 'h-full bg-foreground/70 transition-all'
-            }
-            style={{ width: `${Math.min(100, Math.max(includedPct, value.actualPoolUsd > 0 ? 2 : 0))}%` }}
-          />
-        </div>
-        <div className="mt-2 text-xs text-muted">
-          Events: {stats.event_count.toLocaleString()} · {stats.charged_count} included ·{' '}
-          {stats.errored_count} errored/free
-        </div>
-      </Card>
+          <div className="mt-2 text-xs text-muted">
+            Generous included usage · share of total est.{' '}
+            {value.estimatedCost > 0
+              ? `${((value.cursorPoolUsd / value.estimatedCost) * 100).toFixed(0)}%`
+              : '0%'}
+          </div>
+        </Card>
+        <Card>
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <div className="text-xs text-muted uppercase tracking-wider">
+              Other Models vs included floor
+            </div>
+            <div className="text-xs tabular-nums text-foreground">
+              {formatCost(value.otherPoolUsd, true)} · ≥${settings.included_pool_usd}
+              {value.exceededIncluded ? ' · exceeded' : ''}
+            </div>
+          </div>
+          <div className="h-2 overflow-hidden rounded-sm bg-surface-alt">
+            <div
+              className={
+                value.exceededIncluded
+                  ? 'h-full bg-warning transition-all'
+                  : 'h-full bg-foreground/70 transition-all'
+              }
+              style={{
+                width: `${Math.min(
+                  100,
+                  Math.max(otherIncludedPct, value.otherPoolUsd > 0 ? 2 : 0),
+                )}%`,
+              }}
+            />
+          </div>
+          <div className="mt-2 text-xs text-muted">
+            Events: {stats.event_count.toLocaleString()} · {stats.charged_count} included ·{' '}
+            {stats.errored_count} errored/free
+          </div>
+        </Card>
+      </div>
 
       {/* Token strip */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -332,6 +383,7 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
           <TableHeader>
             <TableRow>
               <TableCell header>Model</TableCell>
+              <TableCell header>Pool</TableCell>
               <TableCell header align="right">Events</TableCell>
               <TableCell header align="right">Tokens</TableCell>
               <TableCell header align="right">In / Out</TableCell>
@@ -348,6 +400,11 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
                       <Badge variant="warning">no rate</Badge>
                     )}
                   </div>
+                </TableCell>
+                <TableCell>
+                  <Badge variant={model.pool === 'cursor' ? 'info' : 'default'}>
+                    {model.pool === 'cursor' ? 'Cursor' : 'Other'}
+                  </Badge>
                 </TableCell>
                 <TableCell align="right">{model.event_count.toLocaleString()}</TableCell>
                 <TableCell align="right">{formatTokens(model.tokens_total)}</TableCell>

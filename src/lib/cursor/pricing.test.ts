@@ -6,6 +6,7 @@ import {
   hasCursorPricing,
   aggregateCursorCost,
   resolvePricingKey,
+  getCursorUsagePool,
   SAMPLE_CSV_MODELS,
 } from './pricing';
 
@@ -29,6 +30,15 @@ test('resolvePricingKey maps CSV effort variants to base families', () => {
   assert.equal(resolvePricingKey('cursor-grok-4.5-high'), 'cursor-grok-4.5');
   assert.equal(resolvePricingKey('composer-2.5-fast'), 'composer-2.5-fast');
   assert.equal(resolvePricingKey('claude-4.5-sonnet'), 'claude-4.5-sonnet');
+});
+
+test('getCursorUsagePool classifies first-party vs third-party', () => {
+  assert.equal(getCursorUsagePool('cursor-grok-4.5-high-fast'), 'cursor');
+  assert.equal(getCursorUsagePool('composer-2.5-fast'), 'cursor');
+  assert.equal(getCursorUsagePool('auto-cost'), 'cursor');
+  assert.equal(getCursorUsagePool('gpt-5.6-sol-medium'), 'other');
+  assert.equal(getCursorUsagePool('claude-sonnet-5-thinking-high'), 'other');
+  assert.equal(getCursorUsagePool('claude-4.5-sonnet'), 'other');
 });
 
 test('estimateCursorCost uses published grok fast rates', () => {

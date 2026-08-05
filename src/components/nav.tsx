@@ -1,8 +1,11 @@
 import Link from 'next/link';
+import { cookies } from 'next/headers';
 
 import { ThemeToggle } from '@/components/theme-toggle';
+import { SourceToggle } from '@/components/source-toggle';
+import { parseStatsSource, STATS_SOURCE_COOKIE } from '@/lib/source-mode';
 
-const NAV_ITEMS = [
+const OPENCODE_NAV = [
   { href: '/', label: 'Dashboard' },
   { href: '/projects', label: 'Projects' },
   { href: '/time', label: 'Time' },
@@ -10,18 +13,29 @@ const NAV_ITEMS = [
   { href: '/models', label: 'Models' },
 ] as const;
 
-export function Nav() {
+const CURSOR_NAV = [
+  { href: '/cursor', label: 'Dashboard' },
+  { href: '/cursor/upload', label: 'Upload' },
+] as const;
+
+export async function Nav() {
+  const cookieStore = await cookies();
+  const source = parseStatsSource(cookieStore.get(STATS_SOURCE_COOKIE)?.value);
+  const items = source === 'cursor' ? CURSOR_NAV : OPENCODE_NAV;
+  const brandHref = source === 'cursor' ? '/cursor' : '/';
+  const brandLabel = source === 'cursor' ? 'Cursor Stats' : 'OpenCode Stats';
+
   return (
     <header className="border-b border-border bg-background">
-      <div className="mx-auto flex max-w-[120rem] items-center gap-6 px-4 py-3">
+      <div className="mx-auto flex max-w-[120rem] flex-wrap items-center gap-3 px-4 py-3 sm:gap-6">
         <Link
-          href="/"
+          href={brandHref}
           className="text-sm font-semibold text-foreground hover:text-muted transition-colors"
         >
-          OpenCode Stats
+          {brandLabel}
         </Link>
-        <nav className="flex items-center gap-4">
-          {NAV_ITEMS.map((item) => (
+        <nav className="flex flex-wrap items-center gap-3 sm:gap-4">
+          {items.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -31,7 +45,8 @@ export function Nav() {
             </Link>
           ))}
         </nav>
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-3">
+          <SourceToggle source={source} />
           <ThemeToggle />
         </div>
       </div>

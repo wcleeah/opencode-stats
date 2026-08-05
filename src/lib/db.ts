@@ -1,5 +1,11 @@
 import 'server-only';
-import { createClient, type InArgs, type Client } from '@libsql/client/web';
+import {
+  createClient,
+  type InArgs,
+  type Client,
+  type InStatement,
+  type ResultSet,
+} from '@libsql/client/web';
 
 let client: Client | null = null;
 
@@ -27,6 +33,17 @@ export interface QueryResult<T> {
 
 export type Params = InArgs;
 
+function rowToObject<T>(
+  columns: string[],
+  row: Record<string, unknown>,
+): T {
+  const obj: Record<string, unknown> = {};
+  for (const col of columns) {
+    obj[col] = row[col];
+  }
+  return obj as T;
+}
+
 export async function queryAll<T>(
   sql: string,
   params?: Params,
@@ -38,13 +55,9 @@ export async function queryAll<T>(
     );
     // Row objects have named properties matching column names.
     // Spread into plain objects so they match our TypeScript interfaces.
-    const rows = result.rows.map((row) => {
-      const obj: Record<string, unknown> = {};
-      for (const col of result.columns) {
-        obj[col] = row[col];
-      }
-      return obj as T;
-    });
+    const rows = result.rows.map((row) =>
+      rowToObject<T>(result.columns, row as unknown as Record<string, unknown>),
+    );
     return { data: rows, error: null };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
@@ -66,14 +79,49 @@ export async function queryOne<T>(
       return { data: null, error: null };
     }
     const row = result.rows[0];
-    const obj: Record<string, unknown> = {};
-    for (const col of result.columns) {
-      obj[col] = row[col];
-    }
-    return { data: obj as T, error: null };
+    return {
+      data: rowToObject<T>(
+        result.columns,
+        row as unknown as Record<string, unknown>,
+      ),
+      error: null,
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error(`[db.queryOne] ${message}`, { sql, params });
+    return { data: null, error: message };
+  }
+}
+
+export async function execute(
+  sql: string,
+  params?: Params,
+): Promise<QueryResult<ResultSet>> {
+  try {
+    const db = getClient();
+    const result = await db.execute(
+      params ? { sql, args: params } : sql,
+    );
+    return { data: result, error: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[db.execute] ${message}`, { sql, params });
+    return { data: null, error: message };
+  }
+}
+
+export async function executeBatch(
+  statements: InStatement[],
+): Promise<QueryResult<ResultSet[]>> {
+  try {
+    const db = getClient();
+    const results = await db.batch(statements, 'write');
+    return { data: results, error: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(`[db.executeBatch] ${message}`, {
+      statementCount: statements.length,
+    });
     return { data: null, error: message };
   }
 }

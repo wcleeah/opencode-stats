@@ -10,6 +10,7 @@ OpenCode Stats is a Next.js dashboard for exploring OpenCode usage data from a T
 - Time analytics for turn wall time, assistant time, tool time, and project breakdowns.
 - Tool analytics for call volume, error rate, duration, and input/output bytes.
 - Date range filters on the dashboard, models, and time views.
+- Cursor mode (nav toggle): manually upload Cursor usage CSV exports to Turso, then view token usage, estimated API cost (Cursor published rates), realized value vs plan/pool, cloud-agent vs IDE breakdown, and model/agent tables.
 
 ## Tech Stack
 - Next.js 16 App Router

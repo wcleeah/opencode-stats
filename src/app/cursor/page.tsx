@@ -196,6 +196,10 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
     ? (stats.cloud_agent_count / stats.event_count) * 100
     : 0;
 
+  const cursorModelsIncludedUsd = settings.cursor_models_included_usd;
+  const cursorIncludedPct = cursorModelsIncludedUsd > 0
+    ? Math.min(100, (value.cursorPoolUsd / cursorModelsIncludedUsd) * 100)
+    : 0;
   const otherIncludedPct = settings.included_pool_usd > 0
     ? Math.min(100, (value.otherPoolUsd / settings.included_pool_usd) * 100)
     : 0;
@@ -206,7 +210,8 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
         <div className="space-y-1">
           <h1 className="text-lg font-bold">Cursor Dashboard</h1>
           <div className="text-xs text-muted">
-            Plan ${settings.plan_amount_usd}/mo · Other Models ≥$
+            Plan ${settings.plan_amount_usd}/mo · Cursor pool $
+            {settings.cursor_models_included_usd} · Other ≥$
             {settings.included_pool_usd} · cycle day {settings.billing_cycle_start_day}
           </div>
         </div>
@@ -232,7 +237,7 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
         <StatCard
           label="Cursor Models"
           value={formatCost(value.cursorPoolUsd, true)}
-          subValue={`${cursorEventCount.toLocaleString()} events · Grok / Composer`}
+          subValue={`${cursorIncludedPct.toFixed(0)}% of $${cursorModelsIncludedUsd} · ${cursorEventCount.toLocaleString()} events`}
           accent
         />
         <StatCard
@@ -272,30 +277,32 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
         <Card>
           <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             <div className="text-xs text-muted uppercase tracking-wider">
-              Cursor Models pool
+              Cursor Models vs pool
             </div>
             <div className="text-xs tabular-nums text-foreground">
-              {formatCost(value.cursorPoolUsd, true)}
+              {formatCost(value.cursorPoolUsd, true)} · ${cursorModelsIncludedUsd}
+              {value.cursorPoolUsd > cursorModelsIncludedUsd ? ' · over' : ''}
               {unknownPricingCount > 0 ? ' · some rates missing' : ''}
             </div>
           </div>
           <div className="h-2 overflow-hidden rounded-sm bg-surface-alt">
             <div
-              className="h-full bg-foreground/70 transition-all"
+              className={
+                value.cursorPoolUsd > cursorModelsIncludedUsd
+                  ? 'h-full bg-warning transition-all'
+                  : 'h-full bg-foreground/70 transition-all'
+              }
               style={{
-                width: `${
-                  value.estimatedCost > 0
-                    ? Math.max(2, (value.cursorPoolUsd / value.estimatedCost) * 100)
-                    : 0
-                }%`,
+                width: `${Math.min(
+                  100,
+                  Math.max(cursorIncludedPct, value.cursorPoolUsd > 0 ? 2 : 0),
+                )}%`,
               }}
             />
           </div>
           <div className="mt-2 text-xs text-muted">
-            Generous included usage · share of total est.{' '}
-            {value.estimatedCost > 0
-              ? `${((value.cursorPoolUsd / value.estimatedCost) * 100).toFixed(0)}%`
-              : '0%'}
+            {cursorIncludedPct.toFixed(0)}% of fixed pool ($
+            {cursorModelsIncludedUsd})
           </div>
         </Card>
         <Card>

@@ -1,6 +1,12 @@
 export interface CursorSettings {
   plan_amount_usd: number;
+  /** Other Models included floor (at least $) */
   included_pool_usd: number;
+  /**
+   * Fixed Cursor Models pool denominator for % used.
+   * Cursor does not publish this; default ~$2000 calibrated from Ultra usage.
+   */
+  cursor_models_included_usd: number;
   billing_cycle_start_day: number;
   updated_at: number;
 }

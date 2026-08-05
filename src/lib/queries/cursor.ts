@@ -17,6 +17,7 @@ import type {
 const DEFAULT_SETTINGS: CursorSettings = {
   plan_amount_usd: 200,
   included_pool_usd: 400,
+  cursor_models_included_usd: 2000,
   billing_cycle_start_day: 1,
   updated_at: 0,
 };
@@ -63,6 +64,7 @@ export async function getCursorSettings(): Promise<{
       SELECT
         plan_amount_usd,
         included_pool_usd,
+        COALESCE(cursor_models_included_usd, 2000) AS cursor_models_included_usd,
         billing_cycle_start_day,
         updated_at
       FROM cursor_settings
@@ -79,6 +81,7 @@ export async function getCursorSettings(): Promise<{
 export async function updateCursorSettings(input: {
   planAmountUsd: number;
   includedPoolUsd: number;
+  cursorModelsIncludedUsd: number;
   billingCycleStartDay: number;
 }): Promise<{ data: CursorSettings | null; error: string | null }> {
   return withSchema(async () => {
@@ -87,12 +90,14 @@ export async function updateCursorSettings(input: {
       `UPDATE cursor_settings
        SET plan_amount_usd = ?,
            included_pool_usd = ?,
+           cursor_models_included_usd = ?,
            billing_cycle_start_day = ?,
            updated_at = ?
        WHERE id = 1`,
       [
         input.planAmountUsd,
         input.includedPoolUsd,
+        input.cursorModelsIncludedUsd,
         input.billingCycleStartDay,
         updatedAt,
       ],

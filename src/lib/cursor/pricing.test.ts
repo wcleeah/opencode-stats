@@ -5,13 +5,30 @@ import {
   estimateCursorCost,
   hasCursorPricing,
   aggregateCursorCost,
+  resolvePricingKey,
+  SAMPLE_CSV_MODELS,
 } from './pricing';
 
-test('cursor pricing covers sample CSV models', () => {
-  assert.equal(hasCursorPricing('cursor-grok-4.5-high-fast'), true);
-  assert.equal(hasCursorPricing('cursor-grok-4.5-high'), true);
-  assert.equal(hasCursorPricing('composer-2.5-fast'), true);
-  assert.equal(hasCursorPricing('claude-4.5-sonnet'), true);
+test('cursor pricing covers every model in the sample CSV', () => {
+  for (const model of SAMPLE_CSV_MODELS) {
+    assert.equal(
+      hasCursorPricing(model),
+      true,
+      `missing pricing for CSV model: ${model}`,
+    );
+  }
+});
+
+test('resolvePricingKey maps CSV effort variants to base families', () => {
+  assert.equal(resolvePricingKey('gpt-5.6-sol-medium'), 'gpt-5.6-sol');
+  assert.equal(resolvePricingKey('gpt-5.6-terra-medium'), 'gpt-5.6-terra');
+  assert.equal(resolvePricingKey('claude-sonnet-5-thinking-xhigh'), 'claude-sonnet-5');
+  assert.equal(resolvePricingKey('claude-opus-4-8-thinking-medium'), 'claude-opus-4-8');
+  assert.equal(resolvePricingKey('claude-fable-5-thinking-high'), 'claude-fable-5');
+  assert.equal(resolvePricingKey('cursor-grok-4.5-high-fast'), 'cursor-grok-4.5-fast');
+  assert.equal(resolvePricingKey('cursor-grok-4.5-high'), 'cursor-grok-4.5');
+  assert.equal(resolvePricingKey('composer-2.5-fast'), 'composer-2.5-fast');
+  assert.equal(resolvePricingKey('claude-4.5-sonnet'), 'claude-4.5-sonnet');
 });
 
 test('estimateCursorCost uses published grok fast rates', () => {
@@ -27,6 +44,31 @@ test('estimateCursorCost uses published grok fast rates', () => {
   assert.equal(result.knownPricing, true);
   assert.equal(result.estimated, true);
   assert.equal(result.cost, 4 + 18);
+});
+
+test('estimateCursorCost uses gpt-5.6-sol rates for effort variants', () => {
+  const result = estimateCursorCost({
+    reportedCost: null,
+    modelId: 'gpt-5.6-sol-medium',
+    tokensInput: 1_000_000,
+    tokensInputCacheWrite: 0,
+    tokensCacheRead: 0,
+    tokensOutput: 0,
+  });
+  assert.equal(result.knownPricing, true);
+  assert.equal(result.cost, 5);
+});
+
+test('estimateCursorCost uses claude sonnet 5 promo rates', () => {
+  const result = estimateCursorCost({
+    reportedCost: null,
+    modelId: 'claude-sonnet-5-thinking-high',
+    tokensInput: 1_000_000,
+    tokensInputCacheWrite: 0,
+    tokensCacheRead: 0,
+    tokensOutput: 1_000_000,
+  });
+  assert.equal(result.cost, 2 + 10);
 });
 
 test('estimateCursorCost prefers numeric reported cost', () => {

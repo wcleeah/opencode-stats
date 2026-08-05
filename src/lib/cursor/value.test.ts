@@ -1,19 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  billingCycleElapsedRatio,
-  computeCursorValueMetrics,
-  formatMultiplier,
-} from './value';
+import { computeCursorValueMetrics, formatMultiplier } from './value';
 
-test('billingCycleElapsedRatio respects cycle start day', () => {
-  const now = new Date(2026, 7, 15, 12, 0, 0); // Aug 15
-  const ratio = billingCycleElapsedRatio(now, 1);
-  assert.ok(ratio > 0.4 && ratio < 0.6);
-});
-
-test('computeCursorValueMetrics reports both value ratios', () => {
+test('computeCursorValueMetrics compares actual pool to included floor', () => {
   const metrics = computeCursorValueMetrics({
     estimatedCost: 400,
     totalTokens: 100_000_000,
@@ -23,10 +13,26 @@ test('computeCursorValueMetrics reports both value ratios', () => {
     now: new Date(2026, 7, 16, 0, 0, 0),
   });
 
+  assert.equal(metrics.actualPoolUsd, 400);
   assert.equal(metrics.valueVsPlan, 2);
-  assert.equal(metrics.valueVsPool, 1);
+  assert.equal(metrics.actualVsIncluded, 1);
+  assert.equal(metrics.exceededIncluded, false);
   assert.equal(metrics.dollarsPerMillionTokens, 2);
   assert.equal(metrics.estimatedCostPerMillionTokens, 4);
+});
+
+test('computeCursorValueMetrics marks exceeded included floor', () => {
+  const metrics = computeCursorValueMetrics({
+    estimatedCost: 1200,
+    totalTokens: 10_000_000,
+    planAmountUsd: 200,
+    includedPoolUsd: 400,
+    billingCycleStartDay: 1,
+    now: new Date(2026, 7, 16, 0, 0, 0),
+  });
+
+  assert.equal(metrics.actualVsIncluded, 3);
+  assert.equal(metrics.exceededIncluded, true);
 });
 
 test('formatMultiplier formats values', () => {

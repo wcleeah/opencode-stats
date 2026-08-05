@@ -1,8 +1,14 @@
 /**
  * Cursor published model pricing (USD per token).
- * Source: https://cursor.com/docs/models-and-pricing
  *
- * Cache-write is billed at the input rate when Cursor docs omit a dedicated rate.
+ * Sources:
+ * - https://cursor.com/docs/models-and-pricing
+ * - https://cursor.com/docs/account/teams/pricing
+ * - https://cursor.com/docs/models/grok-4-5
+ * - https://cursor.com/docs/models/cursor-composer-2-5
+ *
+ * When docs omit cache-write (`-`), cache-write is billed at the input rate.
+ * Effort / thinking suffixes in CSV model IDs resolve to the base model rate.
  */
 
 export interface CursorModelPricing {
@@ -29,58 +35,174 @@ function rate(
 }
 
 /**
- * Keys match CSV `Model` values and common aliases.
+ * Base published rates keyed by normalized model family id.
+ * CSV effort variants (e.g. `gpt-5.6-sol-medium`) resolve via {@link resolvePricingKey}.
  */
 const CURSOR_MODEL_PRICING: Record<string, CursorModelPricing> = {
-  // Cursor first-party — Grok 4.5
-  'cursor-grok-4.5': rate(2, 6, 0.5),
-  'cursor-grok-4.5-low': rate(2, 6, 0.5),
-  'cursor-grok-4.5-medium': rate(2, 6, 0.5),
-  'cursor-grok-4.5-high': rate(2, 6, 0.5),
-  'cursor-grok-4.5-fast': rate(4, 18, 1),
-  'cursor-grok-4.5-low-fast': rate(4, 18, 1),
-  'cursor-grok-4.5-medium-fast': rate(4, 18, 1),
-  'cursor-grok-4.5-high-fast': rate(4, 18, 1),
-
-  // Cursor first-party — Composer 2.5
-  'composer-2.5': rate(0.5, 2.5, 0.2),
-  'composer-2.5-fast': rate(3, 15, 0.3),
-
-  // Auto Cost (flat rates)
+  // —— Cursor first-party ——
   auto: rate(1.25, 6, 0.25, 1.25),
   'auto-cost': rate(1.25, 6, 0.25, 1.25),
+  'composer-1': rate(1.25, 10, 0.125),
+  'composer-2.5': rate(0.5, 2.5, 0.2),
+  'composer-2.5-fast': rate(3, 15, 0.3),
+  'cursor-grok-4.5': rate(2, 6, 0.5),
+  'cursor-grok-4.5-fast': rate(4, 18, 1),
+  'grok-4.5': rate(2, 6, 0.5),
+  'grok-4.5-fast': rate(4, 18, 1),
 
-  // Common third-party aliases seen in Cursor CSV exports
-  'claude-4.5-sonnet': rate(3, 15, 0.3, 3.75),
+  // —— Anthropic ——
+  'claude-4-sonnet': rate(3, 15, 0.3, 3.75),
+  'claude-4-sonnet-1m': rate(6, 22.5, 0.6, 7.5),
   'claude-4.5-haiku': rate(1, 5, 0.1, 1.25),
   'claude-4.5-opus': rate(5, 25, 0.5, 6.25),
-  'claude-4.6-sonnet': rate(3, 15, 0.3, 3.75),
+  'claude-4.5-sonnet': rate(3, 15, 0.3, 3.75),
   'claude-4.6-opus': rate(5, 25, 0.5, 6.25),
+  'claude-4.6-sonnet': rate(3, 15, 0.3, 3.75),
+  'claude-4.7-opus': rate(5, 25, 0.5, 6.25),
+  // Claude Fable 5
+  'claude-fable-5': rate(10, 50, 1, 12.5),
+  // Claude Opus 4.7 fast mode (research preview)
+  'claude-opus-4.7-fast': rate(30, 150, 3, 37.5),
+  'claude-opus-4-7-fast': rate(30, 150, 3, 37.5),
+  // Claude Opus 4.8 (standard). Fast mode slug: claude-opus-4-8-fast
+  'claude-opus-4.8': rate(5, 25, 0.5, 6.25),
+  'claude-opus-4-8': rate(5, 25, 0.5, 6.25),
+  'claude-opus-4-8-fast': rate(5, 25, 0.5, 6.25), // docs: 3x lower than 4.7 fast; use std list
+  'claude-opus-5': rate(5, 25, 0.5, 6.25),
+  'claude-opus-5-fast': rate(5, 25, 0.5, 6.25),
+  // Claude Sonnet 5 — launch promo $2/$10 through 2026-08-31; using promo rates
+  'claude-sonnet-5': rate(2, 10, 0.3, 3.75),
   'claude-sonnet-4.5': rate(3, 15, 0.3, 3.75),
   'claude-opus-4.5': rate(5, 25, 0.5, 6.25),
+  'claude-opus-4.6': rate(5, 25, 0.5, 6.25),
+
+  // —— Google ——
+  'gemini-2.5-flash': rate(0.3, 2.5, 0.03),
+  'gemini-3-flash': rate(0.5, 3, 0.05),
+  'gemini-3-pro': rate(2, 12, 0.2),
+  'gemini-3-pro-image-preview': rate(2, 12, 0.2),
+  'gemini-3.1-pro': rate(2, 12, 0.2),
+  'gemini-3.5-flash': rate(1.5, 9, 0.15),
+  'gemini-3.6-flash': rate(1.5, 7.5, 0.15),
+
+  // —— Z.ai ——
+  'glm-5.2': rate(1.4, 4.4, 0.26),
+
+  // —— OpenAI ——
+  'gpt-5': rate(1.25, 10, 0.125),
+  'gpt-5-fast': rate(2.5, 20, 0.25),
+  'gpt-5-mini': rate(0.25, 2, 0.025),
+  'gpt-5-codex': rate(1.25, 10, 0.125),
+  'gpt-5.1-codex': rate(1.25, 10, 0.125),
+  'gpt-5.1-codex-max': rate(1.25, 10, 0.125),
+  'gpt-5.1-codex-mini': rate(0.25, 2, 0.025),
   'gpt-5.2': rate(1.75, 14, 0.175),
+  'gpt-5.2-codex': rate(1.75, 14, 0.175),
   'gpt-5.3-codex': rate(1.75, 14, 0.175),
   'gpt-5.4': rate(2.5, 15, 0.25),
-  'gemini-3-pro': rate(2, 12, 0.2),
-  'gemini-3.5-flash': rate(1.5, 9, 0.15),
+  'gpt-5.4-mini': rate(0.75, 4.5, 0.075),
+  'gpt-5.4-nano': rate(0.2, 1.25, 0.02),
+  'gpt-5.5': rate(5, 30, 0.5),
+  'gpt-5.6-luna': rate(0.2, 1.2, 0.02, 0.25),
+  'gpt-5.6-sol': rate(5, 30, 0.5, 6.25),
+  'gpt-5.6-terra': rate(2, 12, 0.2, 2.5),
+
+  // —— Moonshot ——
+  'kimi-k2.7-code': rate(0.95, 4, 0.19),
+  'kimi-k3': rate(3, 15, 0.3),
 };
 
-export interface CursorCostEstimate {
-  cost: number;
-  estimated: boolean;
-  knownPricing: boolean;
-}
+/** Explicit CSV / product slugs that differ from the docs table name. */
+const MODEL_ALIASES: Record<string, string> = {
+  // Grok effort variants → standard / fast families
+  'cursor-grok-4.5-low': 'cursor-grok-4.5',
+  'cursor-grok-4.5-medium': 'cursor-grok-4.5',
+  'cursor-grok-4.5-high': 'cursor-grok-4.5',
+  'cursor-grok-4.5-low-fast': 'cursor-grok-4.5-fast',
+  'cursor-grok-4.5-medium-fast': 'cursor-grok-4.5-fast',
+  'cursor-grok-4.5-high-fast': 'cursor-grok-4.5-fast',
+
+  // Claude Sonnet 5 thinking efforts (CSV)
+  'claude-sonnet-5-thinking-low': 'claude-sonnet-5',
+  'claude-sonnet-5-thinking-medium': 'claude-sonnet-5',
+  'claude-sonnet-5-thinking-high': 'claude-sonnet-5',
+  'claude-sonnet-5-thinking-xhigh': 'claude-sonnet-5',
+
+  // Claude Opus 4.8 thinking efforts (CSV)
+  'claude-opus-4-8-thinking-low': 'claude-opus-4-8',
+  'claude-opus-4-8-thinking-medium': 'claude-opus-4-8',
+  'claude-opus-4-8-thinking-high': 'claude-opus-4-8',
+  'claude-opus-4-8-thinking-xhigh': 'claude-opus-4-8',
+
+  // Claude Fable 5 thinking (CSV)
+  'claude-fable-5-thinking-low': 'claude-fable-5',
+  'claude-fable-5-thinking-medium': 'claude-fable-5',
+  'claude-fable-5-thinking-high': 'claude-fable-5',
+  'claude-fable-5-thinking-xhigh': 'claude-fable-5',
+
+  // GPT-5.6 effort variants (CSV)
+  'gpt-5.6-sol-low': 'gpt-5.6-sol',
+  'gpt-5.6-sol-medium': 'gpt-5.6-sol',
+  'gpt-5.6-sol-high': 'gpt-5.6-sol',
+  'gpt-5.6-sol-xhigh': 'gpt-5.6-sol',
+  'gpt-5.6-terra-low': 'gpt-5.6-terra',
+  'gpt-5.6-terra-medium': 'gpt-5.6-terra',
+  'gpt-5.6-terra-high': 'gpt-5.6-terra',
+  'gpt-5.6-terra-xhigh': 'gpt-5.6-terra',
+  'gpt-5.6-luna-low': 'gpt-5.6-luna',
+  'gpt-5.6-luna-medium': 'gpt-5.6-luna',
+  'gpt-5.6-luna-high': 'gpt-5.6-luna',
+  'gpt-5.6-luna-xhigh': 'gpt-5.6-luna',
+};
 
 export function normalizeCursorModelId(modelId: string): string {
   return modelId.trim().toLowerCase();
 }
 
+/**
+ * Resolve a CSV / product model id to a pricing table key.
+ */
+export function resolvePricingKey(modelId: string): string | null {
+  const id = normalizeCursorModelId(modelId);
+  if (!id) return null;
+  if (id in CURSOR_MODEL_PRICING) return id;
+  if (id in MODEL_ALIASES) return MODEL_ALIASES[id];
+
+  // Strip thinking + effort: foo-thinking-high → foo
+  const withoutThinking = id.replace(/-thinking-(xhigh|high|medium|low)$/, '');
+  if (withoutThinking in CURSOR_MODEL_PRICING) return withoutThinking;
+  if (withoutThinking in MODEL_ALIASES) return MODEL_ALIASES[withoutThinking];
+
+  // foo-high-fast → foo-fast
+  const effortFast = id.match(/^(.*)-(?:low|medium|high|xhigh)-fast$/);
+  if (effortFast) {
+    const fastKey = `${effortFast[1]}-fast`;
+    if (fastKey in CURSOR_MODEL_PRICING) return fastKey;
+    if (fastKey in MODEL_ALIASES) return MODEL_ALIASES[fastKey];
+  }
+
+  // foo-high → foo (non-fast effort)
+  const withoutEffort = id.replace(/-(xhigh|high|medium|low)$/, '');
+  if (withoutEffort in CURSOR_MODEL_PRICING) return withoutEffort;
+  if (withoutEffort in MODEL_ALIASES) return MODEL_ALIASES[withoutEffort];
+
+  return null;
+}
+
 export function getCursorPricing(modelId: string): CursorModelPricing | null {
-  return CURSOR_MODEL_PRICING[normalizeCursorModelId(modelId)] ?? null;
+  const key = resolvePricingKey(modelId);
+  if (!key) return null;
+  return CURSOR_MODEL_PRICING[key] ?? null;
 }
 
 export function hasCursorPricing(modelId: string): boolean {
   return getCursorPricing(modelId) !== null;
+}
+
+export interface CursorCostEstimate {
+  cost: number;
+  estimated: boolean;
+  knownPricing: boolean;
 }
 
 /**
@@ -136,3 +258,22 @@ export function aggregateCursorCost(
 
   return { total, hasEstimated, unknownModels };
 }
+
+/** Models present in the Aug 2026 sample CSV — used by tests. */
+export const SAMPLE_CSV_MODELS = [
+  'cursor-grok-4.5-high-fast',
+  'gpt-5.6-sol-medium',
+  'cursor-grok-4.5-high',
+  'claude-sonnet-5-thinking-high',
+  'claude-sonnet-5-thinking-medium',
+  'claude-opus-4-8-thinking-medium',
+  'gpt-5.6-sol-low',
+  'gpt-5.6-terra-medium',
+  'claude-sonnet-5-thinking-low',
+  'gpt-5.6-sol-high',
+  'claude-opus-4-8-thinking-high',
+  'claude-sonnet-5-thinking-xhigh',
+  'composer-2.5-fast',
+  'claude-4.5-sonnet',
+  'claude-fable-5-thinking-high',
+] as const;

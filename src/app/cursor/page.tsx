@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DateRangeControls } from '@/components/date-range-controls';
+import { BillingCycleControls } from '@/components/cursor/billing-cycle-controls';
 import { CursorTokenChart } from '@/components/cursor/token-chart';
 import { CursorCostChart } from '@/components/cursor/cost-chart';
 import { CursorSettingsForm } from '@/components/cursor/settings-form';
@@ -93,6 +94,19 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
       <div className="space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h1 className="text-lg font-bold">Cursor Dashboard</h1>
+          <Link
+            href="/cursor/upload"
+            className="rounded-md border border-border px-3 py-1.5 text-xs uppercase tracking-wide hover:bg-surface-alt"
+          >
+            Upload CSV
+          </Link>
+        </div>
+        <div className="flex flex-col gap-3">
+          <BillingCycleControls
+            billingCycleStartDay={settings.billing_cycle_start_day}
+            from={range.from}
+            to={range.to}
+          />
           <DateRangeControls from={range.from} to={range.to} />
         </div>
         <Card className="space-y-3">
@@ -101,12 +115,6 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
             Export usage from Cursor (CSV), then upload it here. Events are merged and
             deduplicated across uploads.
           </p>
-          <Link
-            href="/cursor/upload"
-            className="inline-flex rounded-md border border-border px-3 py-1.5 text-xs uppercase tracking-wide hover:bg-surface-alt"
-          >
-            Upload CSV
-          </Link>
         </Card>
         <Card>
           <div className="mb-3 text-xs text-muted uppercase tracking-wider">
@@ -169,48 +177,67 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
     ? (stats.cloud_agent_count / stats.event_count) * 100
     : 0;
 
+  const includedPct = settings.included_pool_usd > 0
+    ? Math.min(100, (value.actualPoolUsd / settings.included_pool_usd) * 100)
+    : 0;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <h1 className="text-lg font-bold">Cursor Dashboard</h1>
           <div className="text-xs text-muted">
-            Plan ${settings.plan_amount_usd}/mo · pool ${settings.included_pool_usd}/mo · cycle day{' '}
+            Plan ${settings.plan_amount_usd}/mo · included ≥${settings.included_pool_usd} · cycle day{' '}
             {settings.billing_cycle_start_day}
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link
-            href="/cursor/upload"
-            className="rounded-md border border-border px-3 py-1.5 text-xs uppercase tracking-wide hover:bg-surface-alt"
-          >
-            Upload CSV
-          </Link>
-          <DateRangeControls from={range.from} to={range.to} />
-        </div>
+        <Link
+          href="/cursor/upload"
+          className="rounded-md border border-border px-3 py-1.5 text-xs uppercase tracking-wide hover:bg-surface-alt"
+        >
+          Upload CSV
+        </Link>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <BillingCycleControls
+          billingCycleStartDay={settings.billing_cycle_start_day}
+          from={range.from}
+          to={range.to}
+        />
+        <DateRangeControls from={range.from} to={range.to} />
       </div>
 
       {/* Value strip */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <StatCard
-          label="Est. API cost"
-          value={formatCost(totalEstimatedCost, true)}
+          label="Actual pool"
+          value={formatCost(value.actualPoolUsd, true)}
           subValue={
             unknownPricingCount > 0
               ? `${unknownPricingCount} model(s) missing rates`
-              : 'Cursor published rates'
+              : 'Est. API-equivalent usage'
           }
           accent
         />
         <StatCard
-          label="Value vs plan"
-          value={formatMultiplier(value.valueVsPlan)}
-          subValue={`${formatCost(totalEstimatedCost, true)} / $${settings.plan_amount_usd}`}
+          label="Included (at least)"
+          value={`≥$${settings.included_pool_usd}`}
+          subValue={
+            value.exceededIncluded
+              ? `${formatMultiplier(value.actualVsIncluded)} of floor · over`
+              : `${includedPct.toFixed(0)}% of floor used`
+          }
         />
         <StatCard
-          label="Value vs pool"
-          value={formatMultiplier(value.valueVsPool)}
-          subValue={`${formatCost(totalEstimatedCost, true)} / $${settings.included_pool_usd}`}
+          label="Actual vs included"
+          value={formatMultiplier(value.actualVsIncluded)}
+          subValue={`${formatCost(value.actualPoolUsd, true)} / ≥$${settings.included_pool_usd}`}
+        />
+        <StatCard
+          label="Value vs plan"
+          value={formatMultiplier(value.valueVsPlan)}
+          subValue={`${formatCost(value.actualPoolUsd, true)} / $${settings.plan_amount_usd}`}
         />
         <StatCard
           label="$ / 1M tokens (plan)"
@@ -222,12 +249,35 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
           value={formatMultiplier(value.burnRatio)}
           subValue={`pro-rata ${formatCost(value.expectedProRataCost)} · ${(value.cycleElapsedRatio * 100).toFixed(0)}% elapsed`}
         />
-        <StatCard
-          label="Events"
-          value={stats.event_count.toLocaleString()}
-          subValue={`${stats.charged_count} included · ${stats.errored_count} errored`}
-        />
       </div>
+
+      {/* Included floor meter */}
+      <Card>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+          <div className="text-xs text-muted uppercase tracking-wider">
+            Pool vs included floor
+          </div>
+          <div className="text-xs tabular-nums text-foreground">
+            {formatCost(value.actualPoolUsd, true)} actual · ≥$
+            {settings.included_pool_usd} included
+            {value.exceededIncluded ? ' · exceeded' : ''}
+          </div>
+        </div>
+        <div className="h-2 overflow-hidden rounded-sm bg-surface-alt">
+          <div
+            className={
+              value.exceededIncluded
+                ? 'h-full bg-warning transition-all'
+                : 'h-full bg-foreground/70 transition-all'
+            }
+            style={{ width: `${Math.min(100, Math.max(includedPct, value.actualPoolUsd > 0 ? 2 : 0))}%` }}
+          />
+        </div>
+        <div className="mt-2 text-xs text-muted">
+          Events: {stats.event_count.toLocaleString()} · {stats.charged_count} included ·{' '}
+          {stats.errored_count} errored/free
+        </div>
+      </Card>
 
       {/* Token strip */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">

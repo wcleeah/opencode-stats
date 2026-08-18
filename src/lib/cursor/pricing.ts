@@ -1,10 +1,11 @@
 /**
  * Cursor published model pricing (USD per token).
  *
- * Sources:
+ * Sources (synced Aug 2026):
  * - https://cursor.com/docs/models-and-pricing
  * - https://cursor.com/docs/account/teams/pricing
  * - https://cursor.com/docs/models/grok-4-5
+ * - https://cursor.com/docs/models/grok-4-6
  * - https://cursor.com/docs/models/cursor-composer-2-5
  *
  * When docs omit cache-write (`-`), cache-write is billed at the input rate.
@@ -44,11 +45,16 @@ const CURSOR_MODEL_PRICING: Record<string, CursorModelPricing> = {
   'auto-cost': rate(1.25, 6, 0.25, 1.25),
   'composer-1': rate(1.25, 10, 0.125),
   'composer-2.5': rate(0.5, 2.5, 0.2),
-  'composer-2.5-fast': rate(3, 15, 0.3),
+  'composer-2.5-fast': rate(3, 15, 0.5),
+  // Grok 4.5 / 4.6 standard + fast (list rates; 4.6 launch discount not applied)
   'cursor-grok-4.5': rate(2, 6, 0.5),
-  'cursor-grok-4.5-fast': rate(4, 18, 1),
+  'cursor-grok-4.5-fast': rate(4, 12, 1),
   'grok-4.5': rate(2, 6, 0.5),
-  'grok-4.5-fast': rate(4, 18, 1),
+  'grok-4.5-fast': rate(4, 12, 1),
+  'cursor-grok-4.6': rate(2, 6, 0.5),
+  'cursor-grok-4.6-fast': rate(4, 12, 1),
+  'grok-4.6': rate(2, 6, 0.5),
+  'grok-4.6-fast': rate(4, 12, 1),
 
   // —— Anthropic ——
   'claude-4-sonnet': rate(3, 15, 0.3, 3.75),
@@ -59,19 +65,16 @@ const CURSOR_MODEL_PRICING: Record<string, CursorModelPricing> = {
   'claude-4.6-opus': rate(5, 25, 0.5, 6.25),
   'claude-4.6-sonnet': rate(3, 15, 0.3, 3.75),
   'claude-4.7-opus': rate(5, 25, 0.5, 6.25),
-  // Claude Fable 5
   'claude-fable-5': rate(10, 50, 1, 12.5),
-  // Claude Opus 4.7 fast mode (research preview)
   'claude-opus-4.7-fast': rate(30, 150, 3, 37.5),
   'claude-opus-4-7-fast': rate(30, 150, 3, 37.5),
-  // Claude Opus 4.8 (standard). Fast mode slug: claude-opus-4-8-fast
   'claude-opus-4.8': rate(5, 25, 0.5, 6.25),
   'claude-opus-4-8': rate(5, 25, 0.5, 6.25),
-  'claude-opus-4-8-fast': rate(5, 25, 0.5, 6.25), // docs: 3x lower than 4.7 fast; use std list
+  'claude-opus-4-8-fast': rate(5, 25, 0.5, 6.25),
   'claude-opus-5': rate(5, 25, 0.5, 6.25),
   'claude-opus-5-fast': rate(5, 25, 0.5, 6.25),
-  // Claude Sonnet 5 — launch promo $2/$10 through 2026-08-31; using promo rates
-  'claude-sonnet-5': rate(2, 10, 0.3, 3.75),
+  // Claude Sonnet 5 — list $2/$10 (cache write $2.5, cache read $0.2)
+  'claude-sonnet-5': rate(2, 10, 0.2, 2.5),
   'claude-sonnet-4.5': rate(3, 15, 0.3, 3.75),
   'claude-opus-4.5': rate(5, 25, 0.5, 6.25),
   'claude-opus-4.6': rate(5, 25, 0.5, 6.25),
@@ -84,6 +87,7 @@ const CURSOR_MODEL_PRICING: Record<string, CursorModelPricing> = {
   'gemini-3.1-pro': rate(2, 12, 0.2),
   'gemini-3.5-flash': rate(1.5, 9, 0.15),
   'gemini-3.6-flash': rate(1.5, 7.5, 0.15),
+  'gemini-3.7-flash': rate(0.75, 3.5, 0.075),
 
   // —— Z.ai ——
   'glm-5.2': rate(1.4, 4.4, 0.26),
@@ -121,6 +125,22 @@ const MODEL_ALIASES: Record<string, string> = {
   'cursor-grok-4.5-low-fast': 'cursor-grok-4.5-fast',
   'cursor-grok-4.5-medium-fast': 'cursor-grok-4.5-fast',
   'cursor-grok-4.5-high-fast': 'cursor-grok-4.5-fast',
+  'cursor-grok-4.6-low': 'cursor-grok-4.6',
+  'cursor-grok-4.6-medium': 'cursor-grok-4.6',
+  'cursor-grok-4.6-high': 'cursor-grok-4.6',
+  'cursor-grok-4.6-xhigh': 'cursor-grok-4.6',
+  'cursor-grok-4.6-low-fast': 'cursor-grok-4.6-fast',
+  'cursor-grok-4.6-medium-fast': 'cursor-grok-4.6-fast',
+  'cursor-grok-4.6-high-fast': 'cursor-grok-4.6-fast',
+  'cursor-grok-4.6-xhigh-fast': 'cursor-grok-4.6-fast',
+  'grok-4.6-low': 'grok-4.6',
+  'grok-4.6-medium': 'grok-4.6',
+  'grok-4.6-high': 'grok-4.6',
+  'grok-4.6-xhigh': 'grok-4.6',
+  'grok-4.6-low-fast': 'grok-4.6-fast',
+  'grok-4.6-medium-fast': 'grok-4.6-fast',
+  'grok-4.6-high-fast': 'grok-4.6-fast',
+  'grok-4.6-xhigh-fast': 'grok-4.6-fast',
 
   // Claude Sonnet 5 thinking efforts (CSV)
   'claude-sonnet-5-thinking-low': 'claude-sonnet-5',
@@ -201,7 +221,7 @@ export function hasCursorPricing(modelId: string): boolean {
 
 /**
  * Cursor's two usage pools:
- * - `cursor`: Cursor Models (Grok 4.5, Composer 2.5) + Auto Cost
+ * - `cursor`: Cursor Models (Grok 4.6 / 4.5, Composer 2.5) + Auto Cost
  * - `other`: third-party models (Claude, GPT, Gemini, …)
  *
  * Ultra's "$400 included" floor applies to the Other Models pool.

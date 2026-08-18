@@ -34,6 +34,7 @@ test('resolvePricingKey maps CSV effort variants to base families', () => {
 
 test('getCursorUsagePool classifies first-party vs third-party', () => {
   assert.equal(getCursorUsagePool('cursor-grok-4.5-high-fast'), 'cursor');
+  assert.equal(getCursorUsagePool('cursor-grok-4.6-high-fast'), 'cursor');
   assert.equal(getCursorUsagePool('composer-2.5-fast'), 'cursor');
   assert.equal(getCursorUsagePool('auto-cost'), 'cursor');
   assert.equal(getCursorUsagePool('gpt-5.6-sol-medium'), 'other');
@@ -53,7 +54,7 @@ test('estimateCursorCost uses published grok fast rates', () => {
 
   assert.equal(result.knownPricing, true);
   assert.equal(result.estimated, true);
-  assert.equal(result.cost, 4 + 18);
+  assert.equal(result.cost, 4 + 12);
 });
 
 test('estimateCursorCost uses gpt-5.6-sol rates for effort variants', () => {
@@ -69,7 +70,7 @@ test('estimateCursorCost uses gpt-5.6-sol rates for effort variants', () => {
   assert.equal(result.cost, 5);
 });
 
-test('estimateCursorCost uses claude sonnet 5 promo rates', () => {
+test('estimateCursorCost uses claude sonnet 5 list rates', () => {
   const result = estimateCursorCost({
     reportedCost: null,
     modelId: 'claude-sonnet-5-thinking-high',
@@ -79,6 +80,31 @@ test('estimateCursorCost uses claude sonnet 5 promo rates', () => {
     tokensOutput: 1_000_000,
   });
   assert.equal(result.cost, 2 + 10);
+});
+
+test('estimateCursorCost uses grok 4.6 and composer fast cache-read rates', () => {
+  assert.equal(
+    estimateCursorCost({
+      reportedCost: null,
+      modelId: 'cursor-grok-4.6-xhigh-fast',
+      tokensInput: 0,
+      tokensInputCacheWrite: 0,
+      tokensCacheRead: 1_000_000,
+      tokensOutput: 0,
+    }).cost,
+    1,
+  );
+  assert.equal(
+    estimateCursorCost({
+      reportedCost: null,
+      modelId: 'composer-2.5-fast',
+      tokensInput: 0,
+      tokensInputCacheWrite: 0,
+      tokensCacheRead: 1_000_000,
+      tokensOutput: 0,
+    }).cost,
+    0.5,
+  );
 });
 
 test('estimateCursorCost prefers numeric reported cost', () => {

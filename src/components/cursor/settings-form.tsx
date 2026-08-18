@@ -106,6 +106,9 @@ export function CursorSettingsForm({ settings }: CursorSettingsFormProps) {
             onChange={(e) => setBillingCycleStartDay(e.target.value)}
             className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
           />
+          <span className="block text-[10px] text-muted">
+            Cutoff is 16:00 HKT on this day (Asia/Hong_Kong).
+          </span>
         </label>
         <label className="block space-y-1">
           <span className="text-[10px] uppercase tracking-wide text-muted">

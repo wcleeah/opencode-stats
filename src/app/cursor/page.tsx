@@ -3,7 +3,10 @@ export const dynamic = 'force-dynamic';
 import Link from 'next/link';
 
 import { parseDateRange } from '@/lib/date-range';
-import { resolveSelectedCycle } from '@/lib/cursor/billing-cycle';
+import {
+  matchBillingCycleOffset,
+  resolveSelectedCycle,
+} from '@/lib/cursor/billing-cycle';
 import {
   estimateCursorCost,
   getCursorUsagePool,
@@ -54,54 +57,72 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
   const params = await searchParams;
   const range = parseDateRange({ from: params.from, to: params.to });
 
+  const settingsResult = await getCursorSettings();
+  if (settingsResult.error || !settingsResult.data) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="text-center px-4">
+          <div className="text-error text-sm mb-2">Failed to load Cursor dashboard</div>
+          <div className="text-muted text-xs">{settingsResult.error}</div>
+        </div>
+      </div>
+    );
+  }
+
+  const settings = settingsResult.data;
+  const selectedCycle = resolveSelectedCycle(
+    settings.billing_cycle_start_day,
+    range.from,
+    range.to,
+  );
+  const cycleOffset = matchBillingCycleOffset(
+    settings.billing_cycle_start_day,
+    range.from,
+    range.to,
+  );
+  // Billing-cycle navigation uses HKT 16:00 cutoffs; custom ranges keep calendar days.
+  const queryStartMs =
+    cycleOffset !== null ? selectedCycle.startMs : range.startMs;
+  const queryEndMs = cycleOffset !== null ? selectedCycle.endMs : range.endMs;
+
   const [
-    settingsResult,
     statsResult,
     dailyResult,
     modelsResult,
     agentsResult,
     dailyModelResult,
     importsResult,
+    cyclePoolResult,
   ] = await Promise.all([
-    getCursorSettings(),
-    getCursorGlobalStats(range.startMs, range.endMs),
-    getCursorDailyUsage(range.startMs, range.endMs),
-    getCursorModelUsage(range.startMs, range.endMs),
-    getCursorAgentUsage(range.startMs, range.endMs),
-    getCursorDailyModelUsage(range.startMs, range.endMs),
+    getCursorGlobalStats(queryStartMs, queryEndMs),
+    getCursorDailyUsage(queryStartMs, queryEndMs),
+    getCursorModelUsage(queryStartMs, queryEndMs),
+    getCursorAgentUsage(queryStartMs, queryEndMs),
+    getCursorDailyModelUsage(queryStartMs, queryEndMs),
     listCursorImports(5),
+    resolveCursorModelsPoolUsd({
+      cycleStart: selectedCycle.from,
+      defaultUsd: settings.cursor_models_included_usd,
+    }),
   ]);
 
-  if (settingsResult.error || statsResult.error) {
+  if (statsResult.error) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="text-center px-4">
           <div className="text-error text-sm mb-2">Failed to load Cursor dashboard</div>
-          <div className="text-muted text-xs">
-            {settingsResult.error ?? statsResult.error}
-          </div>
+          <div className="text-muted text-xs">{statsResult.error}</div>
         </div>
       </div>
     );
   }
 
-  const settings = settingsResult.data!;
   const stats = statsResult.data;
   const daily = dailyResult.data ?? [];
   const models = modelsResult.data ?? [];
   const agents = agentsResult.data ?? [];
   const dailyModels = dailyModelResult.data ?? [];
   const imports = importsResult.data ?? [];
-
-  const selectedCycle = resolveSelectedCycle(
-    settings.billing_cycle_start_day,
-    range.from,
-    range.to,
-  );
-  const cyclePoolResult = await resolveCursorModelsPoolUsd({
-    cycleStart: selectedCycle.from,
-    defaultUsd: settings.cursor_models_included_usd,
-  });
   const cursorModelsIncludedUsd =
     cyclePoolResult.data?.amountUsd ?? settings.cursor_models_included_usd;
   const fromCycleOverride = cyclePoolResult.data?.fromCycleOverride ?? false;
@@ -235,7 +256,8 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
             Plan ${settings.plan_amount_usd}/mo · this cycle pool $
             {cursorModelsIncludedUsd}
             {fromCycleOverride ? '' : ' (default)'} · Other ≥$
-            {settings.included_pool_usd} · cycle day {settings.billing_cycle_start_day}
+            {settings.included_pool_usd} · cycle day {settings.billing_cycle_start_day}{' '}
+            @ 16:00 HKT
           </div>
         </div>
         <Link

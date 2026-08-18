@@ -52,7 +52,7 @@ export function BillingCycleControls({
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
       <span className="text-[10px] uppercase tracking-wide text-muted">
-        Billing cycle
+        Billing cycle · 16:00 HKT
       </span>
       <div className="inline-flex items-center rounded-md border border-border">
         <button

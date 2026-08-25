@@ -10,6 +10,11 @@
  *
  * When docs omit cache-write (`-`), cache-write is billed at the input rate.
  * Effort / thinking suffixes in CSV model IDs resolve to the base model rate.
+ *
+ * Dated list-rate changes (UTC midnight of the calendar date):
+ * - GPT-5.6 Sol: launch $5/$30 until 2026-08-21, then OpenAI promo $4/$20
+ *   at least through 2026-11-21. Cursor Other Models tracks API list rates.
+ * - Grok 4.5 Fast: $4/$18 from launch 2026-07-08 (no later list-rate change).
  */
 
 export interface CursorModelPricing {
@@ -46,7 +51,8 @@ const CURSOR_MODEL_PRICING: Record<string, CursorModelPricing> = {
   'composer-1': rate(1.25, 10, 0.125),
   'composer-2.5': rate(0.5, 2.5, 0.2),
   'composer-2.5-fast': rate(3, 15, 0.5),
-  // Grok 4.5 / 4.6 standard + fast (list rates; 4.6 launch discount not applied)
+  // Grok 4.5 / 4.6. Fast 4.5 output is $18 at launch (2026-07-08), not $12
+  // (that $12 is Grok 4.6 Fast). No list-rate change since launch.
   'cursor-grok-4.5': rate(2, 6, 0.5),
   'cursor-grok-4.5-fast': rate(4, 18, 1),
   'grok-4.5': rate(2, 6, 0.5),
@@ -108,6 +114,7 @@ const CURSOR_MODEL_PRICING: Record<string, CursorModelPricing> = {
   'gpt-5.4-nano': rate(0.2, 1.25, 0.02),
   'gpt-5.5': rate(5, 30, 0.5),
   'gpt-5.6-luna': rate(0.2, 1.2, 0.02, 0.25),
+  // Default = current promo. Pre-21 Aug 2026 launch rates via {@link pricingForKeyAt}.
   'gpt-5.6-sol': rate(4, 20, 0.4, 5),
   'gpt-5.6-terra': rate(2, 12, 0.2, 2.5),
 
@@ -209,10 +216,42 @@ export function resolvePricingKey(modelId: string): string | null {
   return null;
 }
 
-export function getCursorPricing(modelId: string): CursorModelPricing | null {
+/** GPT-5.6 Sol launch list ($5 / $30) before OpenAI's 21 Aug 2026 promo. */
+const GPT_56_SOL_LAUNCH = rate(5, 30, 0.5, 6.25);
+
+/**
+ * OpenAI cut Sol API prices on 2026-08-21 (Reuters / OpenAI model page / Bedrock).
+ * Cursor Other Models usage tracks those API list rates.
+ * Instants are UTC midnight of the calendar date.
+ */
+export const GPT_56_SOL_PROMO_START_MS = Date.UTC(2026, 7, 21);
+
+/**
+ * Exclusive end of the published "at least through 21 Nov 2026" floor.
+ * After this instant we still use promo rates until Cursor republishes.
+ */
+export const GPT_56_SOL_PROMO_END_MS = Date.UTC(2026, 10, 22);
+
+function pricingForKeyAt(key: string, eventAtMs: number): CursorModelPricing | null {
+  if (key === 'gpt-5.6-sol' && eventAtMs < GPT_56_SOL_PROMO_START_MS) {
+    return GPT_56_SOL_LAUNCH;
+  }
+  return CURSOR_MODEL_PRICING[key] ?? null;
+}
+
+/** UTC noon for a `YYYY-MM-DD` day — used when costing daily aggregates. */
+export function utcNoonMs(day: string): number {
+  const ms = Date.parse(`${day}T12:00:00.000Z`);
+  return Number.isFinite(ms) ? ms : Date.now();
+}
+
+export function getCursorPricing(
+  modelId: string,
+  eventAtMs: number = Date.now(),
+): CursorModelPricing | null {
   const key = resolvePricingKey(modelId);
   if (!key) return null;
-  return CURSOR_MODEL_PRICING[key] ?? null;
+  return pricingForKeyAt(key, eventAtMs);
 }
 
 export function hasCursorPricing(modelId: string): boolean {
@@ -261,12 +300,13 @@ export function estimateCursorCost(params: {
   tokensInputCacheWrite: number;
   tokensCacheRead: number;
   tokensOutput: number;
+  eventAt?: number;
 }): CursorCostEstimate {
   if (params.reportedCost !== null && params.reportedCost > 0) {
     return { cost: params.reportedCost, estimated: false, knownPricing: true };
   }
 
-  const pricing = getCursorPricing(params.modelId);
+  const pricing = getCursorPricing(params.modelId, params.eventAt);
   if (!pricing) {
     return { cost: 0, estimated: true, knownPricing: false };
   }
@@ -293,6 +333,7 @@ export function aggregateCursorCost(
     tokensInputCacheWrite: number;
     tokensCacheRead: number;
     tokensOutput: number;
+    eventAt?: number;
   }>,
 ): { total: number; hasEstimated: boolean; unknownModels: number } {
   let total = 0;

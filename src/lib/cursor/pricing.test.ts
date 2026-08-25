@@ -57,7 +57,7 @@ test('estimateCursorCost uses published grok fast rates', () => {
   assert.equal(result.cost, 4 + 18);
 });
 
-test('estimateCursorCost uses gpt-5.6-sol rates for effort variants', () => {
+test('estimateCursorCost uses gpt-5.6-sol promo rates after 21 Aug 2026', () => {
   const result = estimateCursorCost({
     reportedCost: null,
     modelId: 'gpt-5.6-sol-medium',
@@ -65,9 +65,47 @@ test('estimateCursorCost uses gpt-5.6-sol rates for effort variants', () => {
     tokensInputCacheWrite: 0,
     tokensCacheRead: 0,
     tokensOutput: 0,
+    eventAt: Date.UTC(2026, 7, 21),
   });
   assert.equal(result.knownPricing, true);
   assert.equal(result.cost, 4);
+});
+
+test('estimateCursorCost uses gpt-5.6-sol launch rates before 21 Aug 2026', () => {
+  const before = estimateCursorCost({
+    reportedCost: null,
+    modelId: 'gpt-5.6-sol-medium',
+    tokensInput: 1_000_000,
+    tokensInputCacheWrite: 0,
+    tokensCacheRead: 0,
+    tokensOutput: 1_000_000,
+    eventAt: Date.UTC(2026, 7, 20, 23, 59, 59, 999),
+  });
+  assert.equal(before.cost, 5 + 30);
+
+  const onCutoff = estimateCursorCost({
+    reportedCost: null,
+    modelId: 'gpt-5.6-sol-medium',
+    tokensInput: 1_000_000,
+    tokensInputCacheWrite: 0,
+    tokensCacheRead: 0,
+    tokensOutput: 1_000_000,
+    eventAt: Date.UTC(2026, 7, 21),
+  });
+  assert.equal(onCutoff.cost, 4 + 20);
+});
+
+test('estimateCursorCost keeps gpt-5.6-sol promo through 21 Nov 2026', () => {
+  const lastPromoDay = estimateCursorCost({
+    reportedCost: null,
+    modelId: 'gpt-5.6-sol',
+    tokensInput: 1_000_000,
+    tokensInputCacheWrite: 0,
+    tokensCacheRead: 0,
+    tokensOutput: 0,
+    eventAt: Date.UTC(2026, 10, 21, 12),
+  });
+  assert.equal(lastPromoDay.cost, 4);
 });
 
 test('estimateCursorCost uses claude sonnet 5 list rates', () => {

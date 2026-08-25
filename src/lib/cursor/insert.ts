@@ -1,6 +1,9 @@
-import type { InStatement } from '@libsql/client/web';
-
 import type { CursorCsvEvent } from '@/lib/cursor/csv';
+
+export interface CursorInsertStatement {
+  sql: string;
+  args: Array<string | number | null>;
+}
 
 const INSERT_SQL = `INSERT OR IGNORE INTO cursor_usage_events (
         event_hash,
@@ -66,7 +69,7 @@ export function buildCursorEventInsertStatement(
   events: CursorCsvEvent[],
   importId: number,
   importedAt: number,
-): InStatement {
+): CursorInsertStatement {
   if (events.length === 0) {
     throw new Error('buildCursorEventInsertStatement requires at least one event');
   }
@@ -89,15 +92,15 @@ export function buildCursorEventInsertBatches(
   events: CursorCsvEvent[],
   importId: number,
   importedAt: number,
-): InStatement[][] {
-  const statements: InStatement[] = [];
+): CursorInsertStatement[][] {
+  const statements: CursorInsertStatement[] = [];
 
   for (let i = 0; i < events.length; i += CURSOR_IMPORT_ROWS_PER_STATEMENT) {
     const rows = events.slice(i, i + CURSOR_IMPORT_ROWS_PER_STATEMENT);
     statements.push(buildCursorEventInsertStatement(rows, importId, importedAt));
   }
 
-  const batches: InStatement[][] = [];
+  const batches: CursorInsertStatement[][] = [];
   for (let i = 0; i < statements.length; i += CURSOR_IMPORT_STATEMENTS_PER_BATCH) {
     batches.push(statements.slice(i, i + CURSOR_IMPORT_STATEMENTS_PER_BATCH));
   }

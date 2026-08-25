@@ -46,7 +46,7 @@ test('buildCursorEventInsertStatement uses one VALUES tuple per row', () => {
   const stmt = buildCursorEventInsertStatement([event(0), event(1)], 1, 2);
   assert.equal(typeof stmt.sql, 'string');
   assert.match(
-    String(stmt.sql),
+    stmt.sql,
     /VALUES \(\?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?\), \(\?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?\)$/,
   );
   assert.ok(Array.isArray(stmt.args));

@@ -9,6 +9,9 @@ from the OpenCode AI assistant. It reads from a local SQLite database at
 See `USAGE-DB-GUIDE.md` for the complete database schema, entity relationships,
 and recommended SQL query patterns.
 
+See `CURSOR-PRICING.md` before changing Cursor list rates, model aliases, or
+price cutoffs (`src/lib/cursor/pricing.ts`).
+
 ## Tech Stack
 
 - **Framework**: Next.js (App Router)

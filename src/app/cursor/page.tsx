@@ -2,15 +2,12 @@ export const dynamic = 'force-dynamic';
 
 import Link from 'next/link';
 
-import { parseDateRange } from '@/lib/date-range';
-import {
-  matchBillingCycleOffset,
-  resolveSelectedCycle,
-} from '@/lib/cursor/billing-cycle';
+import { resolveCursorDashboardQuery } from '@/lib/cursor/billing-cycle';
 import {
   estimateCursorCost,
   getCursorUsagePool,
   hasCursorPricing,
+  utcNoonMs,
 } from '@/lib/cursor/pricing';
 import {
   computeCursorValueMetrics,
@@ -55,7 +52,6 @@ interface CursorPageProps {
 
 export default async function CursorDashboardPage({ searchParams }: CursorPageProps) {
   const params = await searchParams;
-  const range = parseDateRange({ from: params.from, to: params.to });
 
   const settingsResult = await getCursorSettings();
   if (settingsResult.error || !settingsResult.data) {
@@ -70,20 +66,14 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
   }
 
   const settings = settingsResult.data;
-  const selectedCycle = resolveSelectedCycle(
-    settings.billing_cycle_start_day,
-    range.from,
-    range.to,
-  );
-  const cycleOffset = matchBillingCycleOffset(
-    settings.billing_cycle_start_day,
-    range.from,
-    range.to,
-  );
-  // Billing-cycle navigation uses HKT 16:00 cutoffs; custom ranges keep calendar days.
-  const queryStartMs =
-    cycleOffset !== null ? selectedCycle.startMs : range.startMs;
-  const queryEndMs = cycleOffset !== null ? selectedCycle.endMs : range.endMs;
+  const dashboardRange = resolveCursorDashboardQuery({
+    billingCycleStartDay: settings.billing_cycle_start_day,
+    from: params.from,
+    to: params.to,
+  });
+  const selectedCycle = dashboardRange.selectedCycle;
+  const queryStartMs = dashboardRange.startMs;
+  const queryEndMs = dashboardRange.endMs;
 
   const [
     statsResult,
@@ -142,10 +132,10 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
         <div className="flex flex-col gap-3">
           <BillingCycleControls
             billingCycleStartDay={settings.billing_cycle_start_day}
-            from={range.from}
-            to={range.to}
+            from={dashboardRange.from}
+            to={dashboardRange.to}
           />
-          <DateRangeControls from={range.from} to={range.to} />
+          <DateRangeControls from={dashboardRange.from} to={dashboardRange.to} />
           <CyclePoolForm
             cycleStart={selectedCycle.from}
             cycleLabel={selectedCycle.label}
@@ -155,10 +145,15 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
           />
         </div>
         <Card className="space-y-3">
-          <div className="text-sm text-foreground">No Cursor usage imported yet</div>
+          <div className="text-sm text-foreground">
+            {imports.length > 0
+              ? 'No Cursor usage in this billing cycle'
+              : 'No Cursor usage imported yet'}
+          </div>
           <p className="text-xs text-muted max-w-xl">
-            Export usage from Cursor (CSV), then upload it here. Events are merged and
-            deduplicated across uploads.
+            {imports.length > 0
+              ? 'Try another cycle, or upload a CSV that covers this window. Events are merged and deduplicated across uploads.'
+              : 'Export usage from Cursor (CSV), then upload it here. Events are merged and deduplicated across uploads.'}
           </p>
         </Card>
         <Card>
@@ -171,19 +166,41 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
     );
   }
 
-  const modelCosts = models.map((model) => {
+  const dailyCostMap = new Map<string, number>();
+  const costByModel = new Map<string, { cost: number; knownPricing: boolean }>();
+  for (const row of dailyModels) {
     const est = estimateCursorCost({
+      reportedCost: null,
+      modelId: row.model,
+      tokensInput: row.tokens_input,
+      tokensInputCacheWrite: row.tokens_input_cache_write,
+      tokensCacheRead: row.tokens_cache_read,
+      tokensOutput: row.tokens_output,
+      eventAt: utcNoonMs(row.day),
+    });
+    dailyCostMap.set(row.day, (dailyCostMap.get(row.day) ?? 0) + est.cost);
+    const prev = costByModel.get(row.model);
+    costByModel.set(row.model, {
+      cost: (prev?.cost ?? 0) + est.cost,
+      knownPricing: (prev?.knownPricing ?? true) && est.knownPricing,
+    });
+  }
+
+  const modelCosts = models.map((model) => {
+    const fromDays = costByModel.get(model.model);
+    const fallback = estimateCursorCost({
       reportedCost: null,
       modelId: model.model,
       tokensInput: model.tokens_input,
       tokensInputCacheWrite: model.tokens_input_cache_write,
       tokensCacheRead: model.tokens_cache_read,
       tokensOutput: model.tokens_output,
+      eventAt: queryStartMs,
     });
     return {
       ...model,
-      estimatedCost: est.cost,
-      knownPricing: est.knownPricing,
+      estimatedCost: fromDays?.cost ?? fallback.cost,
+      knownPricing: fromDays?.knownPricing ?? fallback.knownPricing,
       pool: getCursorUsagePool(model.model),
     };
   });
@@ -203,18 +220,6 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
     .filter((row) => row.pool === 'other')
     .reduce((sum, row) => sum + row.event_count, 0);
 
-  const dailyCostMap = new Map<string, number>();
-  for (const row of dailyModels) {
-    const est = estimateCursorCost({
-      reportedCost: row.reported_cost > 0 ? row.reported_cost : null,
-      modelId: row.model,
-      tokensInput: row.tokens_input,
-      tokensInputCacheWrite: row.tokens_input_cache_write,
-      tokensCacheRead: row.tokens_cache_read,
-      tokensOutput: row.tokens_output,
-    });
-    dailyCostMap.set(row.day, (dailyCostMap.get(row.day) ?? 0) + est.cost);
-  }
   const dailyCosts = daily.map((d) => ({
     day: d.day,
     estimated_cost: dailyCostMap.get(d.day) ?? 0,
@@ -234,6 +239,8 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
     planAmountUsd: settings.plan_amount_usd,
     includedPoolUsd: settings.included_pool_usd,
     billingCycleStartDay: settings.billing_cycle_start_day,
+    rangeStartMs: queryStartMs,
+    rangeEndMs: queryEndMs,
   });
 
   const cloudShare = stats.event_count > 0
@@ -271,10 +278,10 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
       <div className="flex flex-col gap-3">
         <BillingCycleControls
           billingCycleStartDay={settings.billing_cycle_start_day}
-          from={range.from}
-          to={range.to}
+          from={dashboardRange.from}
+          to={dashboardRange.to}
         />
-        <DateRangeControls from={range.from} to={range.to} />
+        <DateRangeControls from={dashboardRange.from} to={dashboardRange.to} />
         <CyclePoolForm
           cycleStart={selectedCycle.from}
           cycleLabel={selectedCycle.label}
@@ -429,6 +436,9 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
         <Card>
           <div className="mb-3 text-xs text-muted uppercase tracking-wider">
             Daily est. cost
+            <span className="ml-2 normal-case tracking-normal">
+              · list rates in effect that UTC day
+            </span>
           </div>
           <CursorCostChart data={dailyCosts} />
         </Card>

@@ -52,6 +52,24 @@ test('computeCursorValueMetrics marks exceeded other-models floor', () => {
   assert.equal(metrics.exceededIncluded, true);
 });
 
+test('computeCursorValueMetrics uses the selected window for cycle burn', () => {
+  const metrics = computeCursorValueMetrics({
+    cursorPoolUsd: 100,
+    otherPoolUsd: 100,
+    totalTokens: 1_000_000,
+    planAmountUsd: 200,
+    includedPoolUsd: 400,
+    billingCycleStartDay: 1,
+    rangeStartMs: Date.UTC(2026, 6, 1, 8),
+    rangeEndMs: Date.UTC(2026, 7, 1, 8) - 1,
+    now: new Date(Date.UTC(2026, 7, 15, 4)),
+  });
+
+  assert.equal(metrics.cycleElapsedRatio, 1);
+  assert.equal(metrics.expectedProRataCost, 200);
+  assert.equal(metrics.burnRatio, 1);
+});
+
 test('formatMultiplier formats values', () => {
   assert.equal(formatMultiplier(2.45), '2.5×');
   assert.equal(formatMultiplier(0), '0.0×');

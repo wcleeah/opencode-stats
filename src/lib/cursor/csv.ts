@@ -92,6 +92,12 @@ function parseTokenCount(value: string): number {
   return Math.round(n);
 }
 
+export function isUnbilledCursorEvent(kind: string, costRaw: string): boolean {
+  const k = kind.trim().toLowerCase();
+  const c = costRaw.trim().toLowerCase();
+  return k.includes('error') || k === 'free' || c === 'free';
+}
+
 function parseReportedCost(costRaw: string): number | null {
   const trimmed = costRaw.trim();
   if (!trimmed) return null;
@@ -204,6 +210,19 @@ export function parseCursorUsageCsv(text: string): CursorCsvParseResult {
       if (!kind) throw new Error('Missing Kind');
       if (!model) throw new Error('Missing Model');
 
+      const tokensInputCacheWrite = parseTokenCount(tokensInputCacheWriteRaw);
+      const tokensInput = parseTokenCount(tokensInputRaw);
+      const tokensCacheRead = parseTokenCount(tokensCacheReadRaw);
+      const tokensOutput = parseTokenCount(tokensOutputRaw);
+      const csvTotal = parseTokenCount(tokensTotalRaw);
+      const componentTotal =
+        tokensInputCacheWrite + tokensInput + tokensCacheRead + tokensOutput;
+      if (csvTotal !== componentTotal && tokensTotalRaw.trim()) {
+        errors.push(
+          `Row ${rowNum}: Total Tokens ${csvTotal} != component sum ${componentTotal}; using components`,
+        );
+      }
+
       const event: CursorCsvEvent = {
         eventAt,
         cloudAgentId: emptyToNull(cloudAgentIdRaw),
@@ -211,11 +230,11 @@ export function parseCursorUsageCsv(text: string): CursorCsvParseResult {
         kind,
         model,
         maxMode: maxModeRaw.toLowerCase() === 'yes',
-        tokensInputCacheWrite: parseTokenCount(tokensInputCacheWriteRaw),
-        tokensInput: parseTokenCount(tokensInputRaw),
-        tokensCacheRead: parseTokenCount(tokensCacheReadRaw),
-        tokensOutput: parseTokenCount(tokensOutputRaw),
-        tokensTotal: parseTokenCount(tokensTotalRaw),
+        tokensInputCacheWrite,
+        tokensInput,
+        tokensCacheRead,
+        tokensOutput,
+        tokensTotal: componentTotal,
         costRaw: costRaw || 'Included',
         reportedCost: parseReportedCost(costRaw),
         eventHash: hashCursorEvent({

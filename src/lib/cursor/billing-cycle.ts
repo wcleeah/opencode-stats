@@ -5,6 +5,8 @@
  * Example: start day 1 → cycle runs Aug 1 16:00 HKT – Sep 1 16:00 HKT (exclusive end).
  */
 
+import { parseDateRange } from '@/lib/date-range';
+
 /** IANA timezone for Cursor billing-cycle cutoffs. */
 export const BILLING_CYCLE_TIMEZONE = 'Asia/Hong_Kong';
 
@@ -204,18 +206,23 @@ export function matchBillingCycleOffset(
   return null;
 }
 
+export function windowElapsedRatio(
+  now: Date,
+  startMs: number,
+  endMs: number,
+): number {
+  const totalMs = endMs - startMs;
+  if (totalMs <= 0) return 0;
+  const elapsedMs = Math.min(Math.max(now.getTime() - startMs, 0), totalMs);
+  return elapsedMs / totalMs;
+}
+
 export function billingCycleElapsedRatio(
   now: Date,
   billingCycleStartDay: number,
 ): number {
   const cycle = getBillingCycleBounds(billingCycleStartDay, now, 0);
-  const totalMs = cycle.endMs - cycle.startMs;
-  if (totalMs <= 0) return 0;
-  const elapsedMs = Math.min(
-    Math.max(now.getTime() - cycle.startMs, 0),
-    totalMs,
-  );
-  return elapsedMs / totalMs;
+  return windowElapsedRatio(now, cycle.startMs, cycle.endMs);
 }
 
 /**
@@ -248,4 +255,76 @@ export function resolveSelectedCycle(
   }
 
   return getBillingCycleBounds(billingCycleStartDay, now, 0);
+}
+
+export interface CursorDashboardQueryRange {
+  from: string;
+  to: string;
+  startMs: number;
+  endMs: number;
+  cycleOffset: number | null;
+  selectedCycle: BillingCycleBounds;
+  isBillingCycle: boolean;
+}
+
+/**
+ * Resolve the Cursor dashboard query window.
+ * With no from/to, default to the current billing cycle — not all-time.
+ * All-time vs a monthly plan/pool is what made usage look unrealistically high.
+ */
+export function resolveCursorDashboardQuery(params: {
+  billingCycleStartDay: number;
+  from?: string;
+  to?: string;
+  now?: Date;
+}): CursorDashboardQueryRange {
+  const now = params.now ?? new Date();
+  const parsed = parseDateRange({ from: params.from, to: params.to });
+  const selectedCycle = resolveSelectedCycle(
+    params.billingCycleStartDay,
+    parsed.from,
+    parsed.to,
+    now,
+  );
+  const hasExplicitRange = Boolean(parsed.from || parsed.to);
+
+  if (!hasExplicitRange) {
+    return {
+      from: selectedCycle.from,
+      to: selectedCycle.to,
+      startMs: selectedCycle.startMs,
+      endMs: selectedCycle.endMs,
+      cycleOffset: 0,
+      selectedCycle,
+      isBillingCycle: true,
+    };
+  }
+
+  const cycleOffset = matchBillingCycleOffset(
+    params.billingCycleStartDay,
+    parsed.from,
+    parsed.to,
+    now,
+  );
+  if (cycleOffset !== null) {
+    return {
+      from: selectedCycle.from,
+      to: selectedCycle.to,
+      startMs: selectedCycle.startMs,
+      endMs: selectedCycle.endMs,
+      cycleOffset,
+      selectedCycle,
+      isBillingCycle: true,
+    };
+  }
+
+  return {
+    from: parsed.from ?? selectedCycle.from,
+    to: parsed.to ?? selectedCycle.to,
+    startMs: parsed.startMs ?? selectedCycle.startMs,
+    endMs: parsed.endMs ?? selectedCycle.endMs,
+    cycleOffset: null,
+    selectedCycle,
+    isBillingCycle: false,
+  };
 }

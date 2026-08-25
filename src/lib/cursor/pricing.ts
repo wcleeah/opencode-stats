@@ -15,6 +15,8 @@
  * - GPT-5.6 Sol: launch $5/$30 until 2026-08-21, then OpenAI promo $4/$20
  *   at least through 2026-11-21. Cursor Other Models tracks API list rates.
  * - Grok 4.5 Fast: $4/$18 from launch 2026-07-08 (no later list-rate change).
+ *
+ * How to update rates and cutoffs: `CURSOR-PRICING.md`.
  */
 
 export interface CursorModelPricing {

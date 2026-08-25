@@ -1,8 +1,9 @@
 import 'server-only';
 
 import { execute, executeBatch, queryAll, queryOne } from '@/lib/db';
-import { ensureCursorSchema } from '@/lib/cursor/schema';
 import type { CursorCsvEvent } from '@/lib/cursor/csv';
+import { buildCursorEventInsertBatches } from '@/lib/cursor/insert';
+import { ensureCursorSchema } from '@/lib/cursor/schema';
 import type {
   CursorAgentUsageRow,
   CursorCyclePool,
@@ -401,49 +402,11 @@ export async function importCursorEvents(params: {
 
   const importId = Number(createImport.data.lastInsertRowid);
   let insertedCount = 0;
-  const chunkSize = 50;
 
-  for (let i = 0; i < params.events.length; i += chunkSize) {
-    const chunk = params.events.slice(i, i + chunkSize);
-    const statements = chunk.map((event) => ({
-      sql: `INSERT OR IGNORE INTO cursor_usage_events (
-        event_hash,
-        event_at,
-        cloud_agent_id,
-        automation_id,
-        kind,
-        model,
-        max_mode,
-        tokens_input_cache_write,
-        tokens_input,
-        tokens_cache_read,
-        tokens_output,
-        tokens_total,
-        cost_raw,
-        reported_cost,
-        import_id,
-        created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      args: [
-        event.eventHash,
-        event.eventAt,
-        event.cloudAgentId,
-        event.automationId,
-        event.kind,
-        event.model,
-        event.maxMode ? 1 : 0,
-        event.tokensInputCacheWrite,
-        event.tokensInput,
-        event.tokensCacheRead,
-        event.tokensOutput,
-        event.tokensTotal,
-        event.costRaw,
-        event.reportedCost,
-        importId,
-        importedAt,
-      ],
-    }));
-
+  // Sequential libsql batch() calls: each is one Turso HTTP subrequest.
+  // Multi-row INSERTs keep a large CSV to tens of calls instead of one per 50 rows.
+  const batches = buildCursorEventInsertBatches(params.events, importId, importedAt);
+  for (const statements of batches) {
     const batch = await executeBatch(statements);
     if (batch.error || !batch.data) {
       return { data: null, error: batch.error ?? 'Failed to insert events' };

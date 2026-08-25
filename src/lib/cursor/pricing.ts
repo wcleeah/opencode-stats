@@ -48,9 +48,9 @@ const CURSOR_MODEL_PRICING: Record<string, CursorModelPricing> = {
   'composer-2.5-fast': rate(3, 15, 0.5),
   // Grok 4.5 / 4.6 standard + fast (list rates; 4.6 launch discount not applied)
   'cursor-grok-4.5': rate(2, 6, 0.5),
-  'cursor-grok-4.5-fast': rate(4, 12, 1),
+  'cursor-grok-4.5-fast': rate(4, 18, 1),
   'grok-4.5': rate(2, 6, 0.5),
-  'grok-4.5-fast': rate(4, 12, 1),
+  'grok-4.5-fast': rate(4, 18, 1),
   'cursor-grok-4.6': rate(2, 6, 0.5),
   'cursor-grok-4.6-fast': rate(4, 12, 1),
   'grok-4.6': rate(2, 6, 0.5),
@@ -108,7 +108,7 @@ const CURSOR_MODEL_PRICING: Record<string, CursorModelPricing> = {
   'gpt-5.4-nano': rate(0.2, 1.25, 0.02),
   'gpt-5.5': rate(5, 30, 0.5),
   'gpt-5.6-luna': rate(0.2, 1.2, 0.02, 0.25),
-  'gpt-5.6-sol': rate(5, 30, 0.5, 6.25),
+  'gpt-5.6-sol': rate(4, 20, 0.4, 5),
   'gpt-5.6-terra': rate(2, 12, 0.2, 2.5),
 
   // —— Moonshot ——
@@ -271,11 +271,16 @@ export function estimateCursorCost(params: {
     return { cost: 0, estimated: true, knownPricing: false };
   }
 
+  const tokensInput = Number(params.tokensInput) || 0;
+  const tokensInputCacheWrite = Number(params.tokensInputCacheWrite) || 0;
+  const tokensCacheRead = Number(params.tokensCacheRead) || 0;
+  const tokensOutput = Number(params.tokensOutput) || 0;
+
   const cost =
-    params.tokensInput * pricing.input +
-    params.tokensInputCacheWrite * pricing.cacheWrite +
-    params.tokensCacheRead * pricing.cacheRead +
-    params.tokensOutput * pricing.output;
+    tokensInput * pricing.input +
+    tokensInputCacheWrite * pricing.cacheWrite +
+    tokensCacheRead * pricing.cacheRead +
+    tokensOutput * pricing.output;
 
   return { cost, estimated: true, knownPricing: true };
 }

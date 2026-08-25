@@ -47,6 +47,26 @@ function rangeWhere(
   };
 }
 
+/** Cursor does not bill these rows against usage pools. */
+const UNBILLED_PREDICATE =
+  `(lower(kind) LIKE '%error%' OR lower(ifnull(cost_raw, '')) = 'free' OR lower(kind) = 'free')`;
+
+const BILLABLE_PREDICATE = `NOT ${UNBILLED_PREDICATE}`;
+
+function andWhere(
+  range: { clause: string; args: number[] },
+  extraSql: string,
+): { clause: string; args: number[] } {
+  if (range.clause) {
+    return { clause: `${range.clause} AND ${extraSql}`, args: range.args };
+  }
+  return { clause: `WHERE ${extraSql}`, args: [] };
+}
+
+function billableTokenSum(column: string): string {
+  return `COALESCE(SUM(CASE WHEN ${UNBILLED_PREDICATE} THEN 0 ELSE ${column} END), 0)`;
+}
+
 async function withSchema<T>(
   fn: () => Promise<{ data: T | null; error: string | null }>,
 ): Promise<{ data: T | null; error: string | null }> {
@@ -217,11 +237,11 @@ export async function getCursorGlobalStats(
          COALESCE(SUM(CASE WHEN cloud_agent_id IS NULL OR cloud_agent_id = '' THEN 1 ELSE 0 END), 0)
            AS ide_count,
          COUNT(DISTINCT model) AS model_count,
-         COALESCE(SUM(tokens_input_cache_write), 0) AS tokens_input_cache_write,
-         COALESCE(SUM(tokens_input), 0) AS tokens_input,
-         COALESCE(SUM(tokens_cache_read), 0) AS tokens_cache_read,
-         COALESCE(SUM(tokens_output), 0) AS tokens_output,
-         COALESCE(SUM(tokens_total), 0) AS tokens_total,
+         ${billableTokenSum('tokens_input_cache_write')} AS tokens_input_cache_write,
+         ${billableTokenSum('tokens_input')} AS tokens_input,
+         ${billableTokenSum('tokens_cache_read')} AS tokens_cache_read,
+         ${billableTokenSum('tokens_output')} AS tokens_output,
+         ${billableTokenSum('tokens_total')} AS tokens_total,
          MIN(event_at) AS min_event_at,
          MAX(event_at) AS max_event_at
        FROM cursor_usage_events
@@ -236,7 +256,7 @@ export async function getCursorDailyUsage(
   endMs?: number,
 ): Promise<{ data: CursorDailyUsage[] | null; error: string | null }> {
   return withSchema(() => {
-    const range = rangeWhere('event_at', startMs, endMs);
+    const range = andWhere(rangeWhere('event_at', startMs, endMs), BILLABLE_PREDICATE);
     return queryAll<CursorDailyUsage>(
       `SELECT
          strftime('%Y-%m-%d', event_at / 1000, 'unixepoch') AS day,
@@ -264,7 +284,7 @@ export async function getCursorModelUsage(
   endMs?: number,
 ): Promise<{ data: CursorModelUsageRow[] | null; error: string | null }> {
   return withSchema(() => {
-    const range = rangeWhere('event_at', startMs, endMs);
+    const range = andWhere(rangeWhere('event_at', startMs, endMs), BILLABLE_PREDICATE);
     return queryAll<CursorModelUsageRow>(
       `SELECT
          model,
@@ -289,7 +309,7 @@ export async function getCursorAgentUsage(
   limit: number = 25,
 ): Promise<{ data: CursorAgentUsageRow[] | null; error: string | null }> {
   return withSchema(() => {
-    const range = rangeWhere('event_at', startMs, endMs);
+    const range = andWhere(rangeWhere('event_at', startMs, endMs), BILLABLE_PREDICATE);
     const where = range.clause
       ? `${range.clause} AND cloud_agent_id IS NOT NULL AND cloud_agent_id != ''`
       : `WHERE cloud_agent_id IS NOT NULL AND cloud_agent_id != ''`;
@@ -318,7 +338,7 @@ export async function getCursorEventCostRows(
   endMs?: number,
 ): Promise<{ data: CursorEventCostRow[] | null; error: string | null }> {
   return withSchema(() => {
-    const range = rangeWhere('event_at', startMs, endMs);
+    const range = andWhere(rangeWhere('event_at', startMs, endMs), BILLABLE_PREDICATE);
     return queryAll<CursorEventCostRow>(
       `SELECT
          model,
@@ -339,7 +359,7 @@ export async function getCursorDailyModelUsage(
   endMs?: number,
 ): Promise<{ data: CursorDailyModelUsageRow[] | null; error: string | null }> {
   return withSchema(() => {
-    const range = rangeWhere('event_at', startMs, endMs);
+    const range = andWhere(rangeWhere('event_at', startMs, endMs), BILLABLE_PREDICATE);
     return queryAll<CursorDailyModelUsageRow>(
       `SELECT
          strftime('%Y-%m-%d', event_at / 1000, 'unixepoch') AS day,

@@ -6,6 +6,7 @@ import {
   matchBillingCycleOffset,
   billingCycleElapsedRatio,
   resolveSelectedCycle,
+  resolveCursorDashboardQuery,
   cycleCutoffUtcMs,
   getHktParts,
   BILLING_CYCLE_CUTOFF_HOUR,
@@ -89,4 +90,18 @@ test('resolveSelectedCycle falls back to cycle containing from', () => {
   const cycle = resolveSelectedCycle(1, '2026-06-10', '2026-06-20', now);
   assert.equal(cycle.from, '2026-06-01');
   assert.equal(cycle.to, '2026-07-01');
+});
+
+test('resolveCursorDashboardQuery defaults missing dates to the current cycle', () => {
+  const now = new Date(Date.UTC(2026, 7, 15, 4, 0, 0));
+  const range = resolveCursorDashboardQuery({
+    billingCycleStartDay: 1,
+    now,
+  });
+  assert.equal(range.from, '2026-08-01');
+  assert.equal(range.to, '2026-09-01');
+  assert.equal(range.cycleOffset, 0);
+  assert.equal(range.isBillingCycle, true);
+  assert.equal(range.startMs, cycleCutoffUtcMs(2026, 8, 1));
+  assert.equal(range.endMs, cycleCutoffUtcMs(2026, 9, 1) - 1);
 });

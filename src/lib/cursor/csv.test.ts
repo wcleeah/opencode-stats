@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { hashCursorEvent, parseCursorUsageCsv } from './csv';
+import { hashCursorEvent, isUnbilledCursorEvent, parseCursorUsageCsv } from './csv';
 
 const SAMPLE_CSV = `Date,Cloud Agent ID,Automation ID,Kind,Model,Max Mode,Input (w/ Cache Write),Input (w/o Cache Write),Cache Read,Output Tokens,Total Tokens,Cost
 "2026-08-05T06:44:42.863Z","bc-019fc2ca-4ef7-7e58-86dd-610781f37064","","Included","cursor-grok-4.5-high-fast","No","9541","117382","1383578","13232","1523733","Included"
@@ -20,6 +20,7 @@ test('parseCursorUsageCsv parses included and errored rows', () => {
   assert.equal(included.cloudAgentId, 'bc-019fc2ca-4ef7-7e58-86dd-610781f37064');
   assert.equal(included.tokensInput, 117382);
   assert.equal(included.tokensInputCacheWrite, 9541);
+  assert.equal(included.tokensTotal, 1_523_733);
   assert.equal(included.reportedCost, null);
   assert.equal(included.maxMode, false);
 
@@ -66,6 +67,24 @@ test('hashCursorEvent is stable for identical rows', () => {
   });
   assert.equal(a, b);
   assert.equal(a.length, 64);
+});
+
+test('isUnbilledCursorEvent treats errored and free rows as unbilled', () => {
+  assert.equal(isUnbilledCursorEvent('Included', 'Included'), false);
+  assert.equal(isUnbilledCursorEvent('Errored, No Charge', 'Free'), true);
+  assert.equal(isUnbilledCursorEvent('free', '0.71'), true);
+  assert.equal(isUnbilledCursorEvent('Included', 'Free'), true);
+});
+
+test('parseCursorUsageCsv stores component sum when Total Tokens disagrees', () => {
+  const csv = `Date,Cloud Agent ID,Automation ID,Kind,Model,Max Mode,Input (w/ Cache Write),Input (w/o Cache Write),Cache Read,Output Tokens,Total Tokens,Cost
+"2026-08-05T06:44:42.863Z","","","Included","composer-2.5","No","10","20","30","40","999","Included"
+`;
+  const result = parseCursorUsageCsv(csv);
+  assert.equal(result.events.length, 1);
+  assert.equal(result.events[0]?.tokensTotal, 100);
+  assert.equal(result.errors.length, 1);
+  assert.match(result.errors[0] ?? '', /component sum 100/);
 });
 
 test('parseCursorUsageCsv handles attached sample export', () => {

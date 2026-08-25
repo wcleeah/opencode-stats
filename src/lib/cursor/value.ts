@@ -2,7 +2,10 @@
  * Realized-value helpers for Cursor subscription vs estimated API usage.
  */
 
-import { billingCycleElapsedRatio } from '@/lib/cursor/billing-cycle';
+import {
+  billingCycleElapsedRatio,
+  windowElapsedRatio,
+} from '@/lib/cursor/billing-cycle';
 
 export interface CursorValueMetrics {
   /** Combined est. cost (Cursor Models + Other Models) */
@@ -37,14 +40,16 @@ export function computeCursorValueMetrics(params: {
   planAmountUsd: number;
   includedPoolUsd: number;
   billingCycleStartDay: number;
+  rangeStartMs?: number;
+  rangeEndMs?: number;
   now?: Date;
 }): CursorValueMetrics {
   const now = params.now ?? new Date();
   const estimatedCost = params.cursorPoolUsd + params.otherPoolUsd;
-  const cycleElapsedRatio = billingCycleElapsedRatio(
-    now,
-    params.billingCycleStartDay,
-  );
+  const cycleElapsedRatio =
+    params.rangeStartMs !== undefined && params.rangeEndMs !== undefined
+      ? windowElapsedRatio(now, params.rangeStartMs, params.rangeEndMs)
+      : billingCycleElapsedRatio(now, params.billingCycleStartDay);
   const expectedProRataCost = params.planAmountUsd * cycleElapsedRatio;
   const otherVsIncluded = safeRatio(
     params.otherPoolUsd,

@@ -54,7 +54,7 @@ test('estimateCursorCost uses published grok fast rates', () => {
 
   assert.equal(result.knownPricing, true);
   assert.equal(result.estimated, true);
-  assert.equal(result.cost, 4 + 12);
+  assert.equal(result.cost, 4 + 18);
 });
 
 test('estimateCursorCost uses gpt-5.6-sol rates for effort variants', () => {
@@ -67,7 +67,7 @@ test('estimateCursorCost uses gpt-5.6-sol rates for effort variants', () => {
     tokensOutput: 0,
   });
   assert.equal(result.knownPricing, true);
-  assert.equal(result.cost, 5);
+  assert.equal(result.cost, 4);
 });
 
 test('estimateCursorCost uses claude sonnet 5 list rates', () => {

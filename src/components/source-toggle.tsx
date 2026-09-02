@@ -3,11 +3,17 @@
 import { useRouter } from 'next/navigation';
 
 import { cn } from '@/lib/utils';
-import { STATS_SOURCE_COOKIE, type StatsSource } from '@/lib/source-mode';
+import { sourceHome, STATS_SOURCE_COOKIE, type StatsSource } from '@/lib/source-mode';
 
 interface SourceToggleProps {
   source: StatsSource;
 }
+
+const OPTIONS: Array<{ id: StatsSource; label: string }> = [
+  { id: 'opencode', label: 'OpenCode' },
+  { id: 'cursor', label: 'Cursor' },
+  { id: 'mcp', label: 'MCP' },
+];
 
 function setSourceCookie(source: StatsSource): void {
   const maxAge = 60 * 60 * 24 * 365;
@@ -20,7 +26,7 @@ export function SourceToggle({ source }: SourceToggleProps) {
   function switchTo(next: StatsSource): void {
     if (next === source) return;
     setSourceCookie(next);
-    router.push(next === 'cursor' ? '/cursor' : '/');
+    router.push(sourceHome(next));
     router.refresh();
   }
 
@@ -30,30 +36,21 @@ export function SourceToggle({ source }: SourceToggleProps) {
       role="group"
       aria-label="Stats source"
     >
-      <button
-        type="button"
-        onClick={() => switchTo('opencode')}
-        className={cn(
-          'rounded px-2 py-1 text-[10px] uppercase tracking-wide transition-colors',
-          source === 'opencode'
-            ? 'bg-foreground text-background'
-            : 'text-muted hover:text-foreground',
-        )}
-      >
-        OpenCode
-      </button>
-      <button
-        type="button"
-        onClick={() => switchTo('cursor')}
-        className={cn(
-          'rounded px-2 py-1 text-[10px] uppercase tracking-wide transition-colors',
-          source === 'cursor'
-            ? 'bg-foreground text-background'
-            : 'text-muted hover:text-foreground',
-        )}
-      >
-        Cursor
-      </button>
+      {OPTIONS.map((option) => (
+        <button
+          key={option.id}
+          type="button"
+          onClick={() => switchTo(option.id)}
+          className={cn(
+            'rounded px-2 py-1 text-[10px] uppercase tracking-wide transition-colors',
+            source === option.id
+              ? 'bg-foreground text-background'
+              : 'text-muted hover:text-foreground',
+          )}
+        >
+          {option.label}
+        </button>
+      ))}
     </div>
   );
 }

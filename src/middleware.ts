@@ -15,6 +15,15 @@ export function middleware(request: NextRequest): NextResponse {
     return response;
   }
 
+  if (pathname === '/mcp' || pathname.startsWith('/mcp/')) {
+    response.cookies.set(STATS_SOURCE_COOKIE, 'mcp', {
+      path: '/',
+      maxAge: 60 * 60 * 24 * 365,
+      sameSite: 'lax',
+    });
+    return response;
+  }
+
   const opencodeRoots = ['/', '/projects', '/time', '/tools', '/models', '/sessions'];
   const isOpenCodeRoute = opencodeRoots.some(
     (root) => pathname === root || pathname.startsWith(`${root}/`),
@@ -39,6 +48,9 @@ export const config = {
     '/tools/:path*',
     '/models/:path*',
     '/sessions/:path*',
+    '/cursor',
     '/cursor/:path*',
+    '/mcp',
+    '/mcp/:path*',
   ],
 };

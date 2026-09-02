@@ -11,6 +11,7 @@ OpenCode Stats is a Next.js dashboard for exploring OpenCode usage data from a T
 - Tool analytics for call volume, error rate, duration, and input/output bytes.
 - Date range filters on the dashboard, models, and time views.
 - Cursor mode (nav toggle): manually upload Cursor usage CSV exports to Turso, then view token usage, estimated API cost (Cursor published rates), realized value vs plan/pool, cloud-agent vs IDE breakdown, and model/agent tables. Rate updates: `CURSOR-PRICING.md`.
+- MCP mode (nav toggle): live Tavily remaining credits and estimated Exa remaining USD vs a monthly allotment, plus OpenCode tool-call overlay for `exa_*` / `tavily_*` tools. Snapshots are cached in Turso (Tavily `/usage` is rate-limited).
 
 ## Tech Stack
 - Next.js 16 App Router
@@ -32,8 +33,14 @@ Set the database connection in `.env.local`:
 ```bash
 TURSO_DATABASE_URL=libsql://opencode-usage-<org>.turso.io
 TURSO_AUTH_TOKEN=<token>
+TAVILY_API_KEY=<tavily api key>
+EXA_API_KEY=<exa api key>
+# Optional if the Exa team has more than one key:
+# EXA_API_KEY_ID=<uuid from Exa dashboard>
 ```
 The repo also includes `.env.example` with the same placeholders.
+
+MCP keys are read from process env (Railway secrets / `.env.local`). They are never stored in Turso. Exa does not expose remaining balance; the dashboard estimates it from Settings → monthly allotment (default $10 Free Tier) minus this month's API spend.
 
 ## Local Development
 Install dependencies:

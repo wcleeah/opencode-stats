@@ -34,13 +34,15 @@ Set the database connection in `.env.local`:
 TURSO_DATABASE_URL=libsql://opencode-usage-<org>.turso.io
 TURSO_AUTH_TOKEN=<token>
 TAVILY_API_KEY=<tavily api key>
-EXA_API_KEY=<exa api key>
+# Exa Team Management *service* key — dashboard.exa.ai → API Keys → Service keys.
+# Search keys from the API Keys tab 401 on admin-api.exa.ai.
+EXA_API_KEY=<exa service key>
 # Optional if the Exa team has more than one key:
 # EXA_API_KEY_ID=<uuid from Exa dashboard>
 ```
 The repo also includes `.env.example` with the same placeholders.
 
-MCP keys are read from process env (Railway secrets / `.env.local`). They are never stored in Turso. Exa does not expose remaining balance; the dashboard estimates it from Settings → monthly allotment (default $10 Free Tier) minus this month's API spend.
+MCP keys are read from process env (Railway secrets / `.env.local`). They are never stored in Turso. Restart the process after changing secrets. Exa does not expose remaining balance; the dashboard estimates it from Settings → monthly allotment (default $10 Free Tier) minus this month's API spend. Hosted Exa MCP OAuth tokens are not valid for `EXA_API_KEY`.
 
 ## Local Development
 Install dependencies:

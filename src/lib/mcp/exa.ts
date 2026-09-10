@@ -1,4 +1,4 @@
-import { EXA_ADMIN_API_BASE } from '@/lib/mcp/constants';
+import { EXA_ADMIN_API_BASE, EXA_SEARCH_API_URL } from '@/lib/mcp/constants';
 import { asNumber, asRecord, asString } from '@/lib/mcp/parse';
 
 export interface ExaCostBreakdown {
@@ -22,6 +22,21 @@ export interface ExaApiKeyMeta {
   name: string | null;
   budgetCents: number | null;
   isOverBudget: boolean | null;
+}
+
+export const EXA_SEARCH_KEY_HINT =
+  'Unauthorized. Team Management needs a Service key from dashboard.exa.ai → ' +
+  'API Keys → Service keys — not a search API key. Hosted Exa MCP OAuth is not this env var.';
+
+export const EXA_INVALID_KEY_HINT =
+  'Unauthorized. Exa rejected EXA_API_KEY. Remove quotes, restart after changing ' +
+  'secrets, and paste a Service key (dashboard.exa.ai → API Keys → Service keys).';
+
+export function exaAuthHeaderVariants(key: string): Record<string, string>[] {
+  return [
+    { 'x-api-key': key },
+    { Authorization: `Bearer ${key}` },
+  ];
 }
 
 function parseBreakdownItem(value: unknown): ExaCostBreakdown | null {
@@ -119,6 +134,82 @@ export function parseExaApiKeyList(payload: unknown): ExaApiKeyMeta[] | { error:
   return { error: 'Exa API key list missing apiKeys.' };
 }
 
+function adminErrorMessage(payload: unknown, fallback: string): string {
+  const root = asRecord(payload);
+  return (root ? asString(root.error) : null) ?? fallback;
+}
+
+function isAuthFailure(status: number): boolean {
+  return status === 401 || status === 403;
+}
+
+async function fetchExaAdminJson(params: {
+  url: string;
+  serviceKey: string;
+  fetchFn: typeof fetch;
+}): Promise<{ response: Response; payload: unknown }> {
+  let last: { response: Response; payload: unknown } | null = null;
+  for (const headers of exaAuthHeaderVariants(params.serviceKey)) {
+    const response = await params.fetchFn(params.url, {
+      method: 'GET',
+      headers,
+      cache: 'no-store',
+    });
+    const payload: unknown = await response.json().catch(() => null);
+    last = { response, payload };
+    if (response.ok || !isAuthFailure(response.status)) {
+      return last;
+    }
+  }
+  return last as { response: Response; payload: unknown };
+}
+
+/**
+ * Distinguishes a valid search API key (works on api.exa.ai, 401 on team-management)
+ * from a key Exa rejects entirely. Probe uses an empty POST so it should not bill.
+ */
+export async function classifyExaUnauthorized(params: {
+  serviceKey: string;
+  fetchFn?: typeof fetch;
+}): Promise<string> {
+  const fetchFn = params.fetchFn ?? fetch;
+  try {
+    for (const headers of exaAuthHeaderVariants(params.serviceKey)) {
+      const response = await fetchFn(EXA_SEARCH_API_URL, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: '{}',
+        cache: 'no-store',
+      });
+      await response.arrayBuffer().catch(() => undefined);
+      if (!isAuthFailure(response.status)) {
+        return EXA_SEARCH_KEY_HINT;
+      }
+    }
+    return EXA_INVALID_KEY_HINT;
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[classifyExaUnauthorized]', message);
+    return EXA_INVALID_KEY_HINT;
+  }
+}
+
+async function resolveAdminAuthError(params: {
+  payload: unknown;
+  status: number;
+  fallback: string;
+  serviceKey: string;
+  fetchFn: typeof fetch;
+}): Promise<string> {
+  if (!isAuthFailure(params.status)) {
+    return adminErrorMessage(params.payload, params.fallback);
+  }
+  return classifyExaUnauthorized({
+    serviceKey: params.serviceKey,
+    fetchFn: params.fetchFn,
+  });
+}
+
 export async function resolveExaApiKeyId(params: {
   serviceKey: string;
   configuredId: string | null;
@@ -138,17 +229,19 @@ export async function resolveExaApiKeyId(params: {
   }
 
   try {
-    const response = await fetchFn(`${EXA_ADMIN_API_BASE}/api-keys`, {
-      method: 'GET',
-      headers: { 'x-api-key': params.serviceKey },
-      cache: 'no-store',
+    const { response, payload } = await fetchExaAdminJson({
+      url: `${EXA_ADMIN_API_BASE}/api-keys`,
+      serviceKey: params.serviceKey,
+      fetchFn,
     });
-    const payload: unknown = await response.json().catch(() => null);
     if (!response.ok) {
-      const root = asRecord(payload);
-      const message =
-        (root ? asString(root.error) : null) ??
-        `Exa list API keys returned HTTP ${response.status}`;
+      const message = await resolveAdminAuthError({
+        payload,
+        status: response.status,
+        fallback: `Exa list API keys returned HTTP ${response.status}`,
+        serviceKey: params.serviceKey,
+        fetchFn,
+      });
       return { data: null, error: message };
     }
     const parsed = parseExaApiKeyList(payload);
@@ -179,17 +272,19 @@ export async function fetchExaUsage(params: {
     url.searchParams.set('start_date', params.startIso);
     url.searchParams.set('end_date', params.endIso);
 
-    const response = await fetchFn(url.toString(), {
-      method: 'GET',
-      headers: { 'x-api-key': params.serviceKey },
-      cache: 'no-store',
+    const { response, payload } = await fetchExaAdminJson({
+      url: url.toString(),
+      serviceKey: params.serviceKey,
+      fetchFn,
     });
-    const payload: unknown = await response.json().catch(() => null);
     if (!response.ok) {
-      const root = asRecord(payload);
-      const message =
-        (root ? asString(root.error) : null) ??
-        `Exa usage returned HTTP ${response.status}`;
+      const message = await resolveAdminAuthError({
+        payload,
+        status: response.status,
+        fallback: `Exa usage returned HTTP ${response.status}`,
+        serviceKey: params.serviceKey,
+        fetchFn,
+      });
       return { data: null, error: message };
     }
     const parsed = parseExaUsage(payload);

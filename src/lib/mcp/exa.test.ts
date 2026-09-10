@@ -7,6 +7,7 @@ import {
   EXA_SEARCH_KEY_HINT,
   classifyExaUnauthorized,
   fetchExaUsage,
+  isGenericExaAuthError,
   resolveExaApiKeyId,
 } from '@/lib/mcp/exa';
 
@@ -72,4 +73,11 @@ test('classifyExaUnauthorized treats search 401 as an invalid key', async () => 
     fetchFn: async () => jsonResponse({ error: 'Unauthorized' }, 401),
   });
   assert.equal(message, EXA_INVALID_KEY_HINT);
+});
+
+test('isGenericExaAuthError matches bare Unauthorized but not classified hints', () => {
+  assert.equal(isGenericExaAuthError('Unauthorized'), true);
+  assert.equal(isGenericExaAuthError('Exa list API keys returned HTTP 401'), true);
+  assert.equal(isGenericExaAuthError(EXA_SEARCH_KEY_HINT), false);
+  assert.equal(isGenericExaAuthError(EXA_INVALID_KEY_HINT), false);
 });

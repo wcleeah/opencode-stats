@@ -32,6 +32,15 @@ export const EXA_INVALID_KEY_HINT =
   'Unauthorized. Exa rejected EXA_API_KEY. Remove quotes, restart after changing ' +
   'secrets, and paste a Service key (dashboard.exa.ai → API Keys → Service keys).';
 
+/** Bare vendor 401s cached before we classified search-key vs service-key. */
+export function isGenericExaAuthError(message: string | null): boolean {
+  if (!message) return false;
+  const normalized = message.trim().toLowerCase();
+  if (normalized === 'unauthorized' || normalized === 'forbidden') return true;
+  if (/^unauthorized[:.]?\s*$/.test(normalized)) return true;
+  return /\bhttp 401\b/.test(normalized) || /\bhttp 403\b/.test(normalized);
+}
+
 export function exaAuthHeaderVariants(key: string): Record<string, string>[] {
   return [
     { 'x-api-key': key },

@@ -82,13 +82,27 @@ export default async function McpDashboardPage() {
             )}
             {!d.exaConfigured && (
               <li>
-                <code className="text-foreground">EXA_API_KEY</code> — Exa spend
-                this month. Optional{' '}
+                <code className="text-foreground">EXA_API_KEY</code> — Exa Team
+                Management service key from dashboard.exa.ai → API Keys → Service
+                keys (not the search API Keys tab). Optional{' '}
                 <code className="text-foreground">EXA_API_KEY_ID</code> if you have
                 several keys.
               </li>
             )}
           </ul>
+        </Card>
+      )}
+
+      {((d.tavilyConfigured && snapshot?.tavily_error) ||
+        (d.exaConfigured && snapshot?.exa_error)) && (
+        <Card className="space-y-2">
+          <div className="text-sm text-foreground">Provider fetch errors</div>
+          {d.tavilyConfigured && snapshot?.tavily_error && (
+            <p className="max-w-3xl text-xs text-error">{snapshot.tavily_error}</p>
+          )}
+          {d.exaConfigured && snapshot?.exa_error && (
+            <p className="max-w-3xl text-xs text-error">{snapshot.exa_error}</p>
+          )}
         </Card>
       )}
 

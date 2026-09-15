@@ -15,3 +15,4 @@ export const DEFAULT_EXA_WARN_USD = 2;
 
 export const TAVILY_USAGE_URL = 'https://api.tavily.com/usage';
 export const EXA_ADMIN_API_BASE = 'https://admin-api.exa.ai/team-management';
+export const EXA_SEARCH_API_URL = 'https://api.exa.ai/search';

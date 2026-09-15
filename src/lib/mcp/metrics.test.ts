@@ -321,4 +321,11 @@ test('readMcpEnvConfig accepts EXA_API_KEY or EXA_SERVICE_KEY', () => {
   assert.equal(b.exaConfigured, true);
   assert.equal(b.exaServiceKey, 'svc');
   assert.equal(b.tavilyConfigured, false);
+
+  const quoted = readMcpEnvConfig({
+    EXA_API_KEY: '"Bearer exa-quoted"',
+    TAVILY_API_KEY: "'tvly-quoted'",
+  });
+  assert.equal(quoted.exaServiceKey, 'exa-quoted');
+  assert.equal(quoted.tavilyApiKey, 'tvly-quoted');
 });

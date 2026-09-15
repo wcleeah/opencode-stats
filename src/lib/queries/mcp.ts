@@ -12,6 +12,7 @@ import {
 import { readMcpEnvConfig } from '@/lib/mcp/env';
 import {
   fetchExaUsage,
+  isGenericExaAuthError,
   parseExaBreakdownJson,
   resolveExaApiKeyId,
   type ExaCostBreakdown,
@@ -177,6 +178,7 @@ function snapshotIsFresh(
 ): boolean {
   if (!snapshot) return false;
   if (snapshot.cycle_month !== cycleMonth) return false;
+  if (isGenericExaAuthError(snapshot.exa_error)) return false;
   return nowMs - snapshot.fetched_at < ttlMs;
 }
 

@@ -1,6 +1,6 @@
 'use client';
 
-export default function McpError({
+export default function SaasError({
   error,
   reset,
 }: {
@@ -9,7 +9,7 @@ export default function McpError({
 }) {
   return (
     <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 px-4 text-center">
-      <div className="text-sm text-error">Failed to load MCP credits</div>
+      <div className="text-sm text-error">Failed to load SaaS stats</div>
       <div className="max-w-md text-xs text-muted">{error.message}</div>
       <button
         type="button"

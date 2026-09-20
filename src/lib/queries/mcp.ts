@@ -503,7 +503,7 @@ export async function getMcpDashboard(params?: {
 
   const settingsResult = await getMcpSettings();
   if (settingsResult.error || !settingsResult.data) {
-    return { data: null, error: settingsResult.error ?? 'Failed to load MCP settings.' };
+    return { data: null, error: settingsResult.error ?? 'Failed to load SaaS settings.' };
   }
   const settings = settingsResult.data;
 

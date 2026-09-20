@@ -9,7 +9,7 @@ export async function POST(): Promise<NextResponse> {
     const result = await refreshMcpSnapshot({ force: true });
     if (result.error && !result.data) {
       return NextResponse.json(
-        { error: 'Failed to refresh MCP usage.', details: result.error },
+        { error: 'Failed to refresh Tavily usage.', details: result.error },
         { status: 500 },
       );
     }

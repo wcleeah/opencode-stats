@@ -12,7 +12,7 @@ interface SourceToggleProps {
 const OPTIONS: Array<{ id: StatsSource; label: string }> = [
   { id: 'opencode', label: 'OpenCode' },
   { id: 'cursor', label: 'Cursor' },
-  { id: 'mcp', label: 'MCP' },
+  { id: 'saas', label: 'SaaS' },
 ];
 
 function setSourceCookie(source: StatsSource): void {

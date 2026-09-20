@@ -1,6 +1,6 @@
 import { StatCardSkeleton, Skeleton } from '@/components/ui/skeleton';
 
-export default function McpLoading() {
+export default function SaasLoading() {
   return (
     <div className="space-y-8">
       <Skeleton className="h-7 w-40" />

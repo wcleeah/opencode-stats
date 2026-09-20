@@ -4,16 +4,9 @@ import { getMcpSettings, updateMcpSettings } from '@/lib/queries/mcp';
 
 export const runtime = 'nodejs';
 
-function parseNonNegative(value: unknown): number | null {
-  const n = typeof value === 'number' ? value : Number(value);
-  if (!Number.isFinite(n) || n < 0) return null;
-  return n;
-}
-
 function parsePercent(value: unknown): number | null {
-  const n = parseNonNegative(value);
-  if (n === null) return null;
-  if (n < 1 || n > 100) return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(n) || n < 1 || n > 100) return null;
   return n;
 }
 
@@ -36,33 +29,16 @@ export async function PUT(request: Request): Promise<NextResponse> {
     }
 
     const record = body as Record<string, unknown>;
-    const exaAllotmentUsd = parseNonNegative(record.exaAllotmentUsd);
-    const exaPurchasedExtraUsd = parseNonNegative(record.exaPurchasedExtraUsd);
     const tavilyWarnPct = parsePercent(record.tavilyWarnPct);
-    const exaWarnUsd = parseNonNegative(record.exaWarnUsd);
 
-    if (
-      exaAllotmentUsd === null ||
-      exaPurchasedExtraUsd === null ||
-      tavilyWarnPct === null ||
-      exaWarnUsd === null
-    ) {
+    if (tavilyWarnPct === null) {
       return NextResponse.json(
-        {
-          error:
-            'Invalid settings. Expect exaAllotmentUsd >= 0, exaPurchasedExtraUsd >= 0, ' +
-            'tavilyWarnPct between 1 and 100, exaWarnUsd >= 0.',
-        },
+        { error: 'Invalid settings. Expect tavilyWarnPct between 1 and 100.' },
         { status: 400 },
       );
     }
 
-    const result = await updateMcpSettings({
-      exaAllotmentUsd,
-      exaPurchasedExtraUsd,
-      tavilyWarnPct,
-      exaWarnUsd,
-    });
+    const result = await updateMcpSettings({ tavilyWarnPct });
 
     if (result.error || !result.data) {
       return NextResponse.json(

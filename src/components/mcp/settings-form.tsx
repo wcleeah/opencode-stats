@@ -13,14 +13,7 @@ interface McpSettingsFormProps {
 export function McpSettingsForm({ settings }: McpSettingsFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
-  const [exaAllotmentUsd, setExaAllotmentUsd] = useState(
-    String(settings.exa_allotment_usd),
-  );
-  const [exaPurchasedExtraUsd, setExaPurchasedExtraUsd] = useState(
-    String(settings.exa_purchased_extra_usd),
-  );
   const [tavilyWarnPct, setTavilyWarnPct] = useState(String(settings.tavily_warn_pct));
-  const [exaWarnUsd, setExaWarnUsd] = useState(String(settings.exa_warn_usd));
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
 
@@ -36,10 +29,7 @@ export function McpSettingsForm({ settings }: McpSettingsFormProps) {
     setStatus('saving');
 
     const body = {
-      exaAllotmentUsd: Number(exaAllotmentUsd),
-      exaPurchasedExtraUsd: Number(exaPurchasedExtraUsd),
       tavilyWarnPct: Number(tavilyWarnPct),
-      exaWarnUsd: Number(exaWarnUsd),
     };
 
     try {
@@ -76,67 +66,20 @@ export function McpSettingsForm({ settings }: McpSettingsFormProps) {
 
   return (
     <form onSubmit={onSubmit} className="space-y-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="block space-y-1">
-          <span className="text-[10px] uppercase tracking-wide text-muted">
-            Exa monthly allotment ($)
-          </span>
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            value={exaAllotmentUsd}
-            onChange={(e) => setExaAllotmentUsd(e.target.value)}
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-          />
-          <span className="block text-[10px] text-muted">
-            Free Tier is $10/mo. Remaining is estimated: allotment − used.
-          </span>
-        </label>
-        <label className="block space-y-1">
-          <span className="text-[10px] uppercase tracking-wide text-muted">
-            Exa purchased extra ($)
-          </span>
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            value={exaPurchasedExtraUsd}
-            onChange={(e) => setExaPurchasedExtraUsd(e.target.value)}
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-          />
-          <span className="block text-[10px] text-muted">
-            Credits bought beyond the free allotment this month.
-          </span>
-        </label>
-        <label className="block space-y-1">
-          <span className="text-[10px] uppercase tracking-wide text-muted">
-            Tavily warn at (% used)
-          </span>
-          <input
-            type="number"
-            min={1}
-            max={100}
-            step="1"
-            value={tavilyWarnPct}
-            onChange={(e) => setTavilyWarnPct(e.target.value)}
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-          />
-        </label>
-        <label className="block space-y-1">
-          <span className="text-[10px] uppercase tracking-wide text-muted">
-            Exa warn at ($ remaining)
-          </span>
-          <input
-            type="number"
-            min={0}
-            step="0.01"
-            value={exaWarnUsd}
-            onChange={(e) => setExaWarnUsd(e.target.value)}
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-          />
-        </label>
-      </div>
+      <label className="block max-w-xs space-y-1">
+        <span className="text-[10px] uppercase tracking-wide text-muted">
+          Tavily warn at (% used)
+        </span>
+        <input
+          type="number"
+          min={1}
+          max={100}
+          step="1"
+          value={tavilyWarnPct}
+          onChange={(e) => setTavilyWarnPct(e.target.value)}
+          className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+        />
+      </label>
 
       <div className="flex flex-wrap items-center gap-3">
         <button

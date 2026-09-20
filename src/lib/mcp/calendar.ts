@@ -31,9 +31,8 @@ const MONTH_NAMES = [
 ] as const;
 
 /**
- * UTC calendar month. Tavily credits reset on the 1st; Exa free-tier top-up
- * is also monthly. Railway/Node servers have no user TZ, so UTC is the
- * honest cycle boundary.
+ * UTC calendar month. Tavily credits reset on the 1st. Railway/Node servers
+ * have no user TZ, so UTC is the honest cycle boundary.
  */
 export function getUtcCalendarMonth(now: Date = new Date()): CalendarMonthWindow {
   const year = now.getUTCFullYear();

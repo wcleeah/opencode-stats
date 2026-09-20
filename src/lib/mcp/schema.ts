@@ -1,11 +1,7 @@
 import 'server-only';
 
 import { execute, executeBatch } from '@/lib/db';
-import {
-  DEFAULT_EXA_ALLOTMENT_USD,
-  DEFAULT_EXA_WARN_USD,
-  DEFAULT_TAVILY_WARN_PCT,
-} from '@/lib/mcp/constants';
+import { DEFAULT_TAVILY_WARN_PCT } from '@/lib/mcp/constants';
 
 let schemaReady: Promise<void> | null = null;
 
@@ -47,6 +43,16 @@ const SCHEMA_STATEMENTS = [
     ON mcp_usage_snapshots(fetched_at DESC)`,
   `CREATE INDEX IF NOT EXISTS idx_mcp_usage_snapshots_month
     ON mcp_usage_snapshots(cycle_month, fetched_at)`,
+  `CREATE TABLE IF NOT EXISTS mcp_links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    url TEXT NOT NULL,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_mcp_links_sort
+    ON mcp_links(sort_order, id)`,
 ] as const;
 
 export async function ensureMcpSchema(): Promise<{ error: string | null }> {
@@ -62,15 +68,9 @@ export async function ensureMcpSchema(): Promise<{ error: string | null }> {
 
       const seed = await execute(
         `INSERT OR IGNORE INTO mcp_settings
-          (id, exa_allotment_usd, exa_purchased_extra_usd, tavily_warn_pct,
-           exa_warn_usd, updated_at)
-         VALUES (1, ?, 0, ?, ?, ?)`,
-        [
-          DEFAULT_EXA_ALLOTMENT_USD,
-          DEFAULT_TAVILY_WARN_PCT,
-          DEFAULT_EXA_WARN_USD,
-          Date.now(),
-        ],
+          (id, tavily_warn_pct, updated_at)
+         VALUES (1, ?, ?)`,
+        [DEFAULT_TAVILY_WARN_PCT, Date.now()],
       );
       if (seed.error) {
         schemaReady = null;

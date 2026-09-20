@@ -11,7 +11,7 @@ OpenCode Stats is a Next.js dashboard for exploring OpenCode usage data from a T
 - Tool analytics for call volume, error rate, duration, and input/output bytes.
 - Date range filters on the dashboard, models, and time views.
 - Cursor mode (nav toggle): manually upload Cursor usage CSV exports to Turso, then view token usage, estimated API cost (Cursor published rates), realized value vs plan/pool, cloud-agent vs IDE breakdown, and model/agent tables. Rate updates: `CURSOR-PRICING.md`.
-- MCP mode (nav toggle): live Tavily remaining credits, an editable collection of named dashboard links (for providers without a usage API, such as Exa personal), plus OpenCode tool-call overlay for `exa_*` / `tavily_*` tools. Snapshots are cached in Turso (Tavily `/usage` is rate-limited).
+- SaaS mode (nav toggle): live Tavily remaining credits, an editable collection of named dashboard links (for providers without a usage API, such as Exa personal), plus OpenCode tool-call overlay for `exa_*` / `tavily_*` tools. Snapshots are cached in Turso (Tavily `/usage` is rate-limited).
 
 ## Tech Stack
 - Next.js 16 App Router
@@ -37,7 +37,7 @@ TAVILY_API_KEY=<tavily api key>
 ```
 The repo also includes `.env.example` with the same placeholders.
 
-MCP keys are read from process env (Railway secrets / `.env.local`). They are never stored in Turso. Restart the process after changing secrets. Exa personal plans have no billing API, so remaining USD is not fetched; add a named Quick link on the MCP page to open the Exa dashboard instead.
+SaaS provider keys are read from process env (Railway secrets / `.env.local`). They are never stored in Turso. Restart the process after changing secrets. Exa personal plans have no billing API, so remaining USD is not fetched; add a named Quick link on the SaaS page to open the Exa dashboard instead.
 
 ## Local Development
 Install dependencies:

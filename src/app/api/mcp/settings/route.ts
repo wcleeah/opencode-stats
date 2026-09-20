@@ -14,7 +14,7 @@ export async function GET(): Promise<NextResponse> {
   const result = await getMcpSettings();
   if (result.error || !result.data) {
     return NextResponse.json(
-      { error: 'Failed to load MCP settings.', details: result.error ?? undefined },
+      { error: 'Failed to load SaaS settings.', details: result.error ?? undefined },
       { status: 500 },
     );
   }

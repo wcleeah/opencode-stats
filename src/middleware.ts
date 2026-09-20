@@ -2,26 +2,30 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { STATS_SOURCE_COOKIE } from '@/lib/source-mode';
 
+function setSourceCookie(response: NextResponse, source: string): NextResponse {
+  response.cookies.set(STATS_SOURCE_COOKIE, source, {
+    path: '/',
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: 'lax',
+  });
+  return response;
+}
+
 export function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
-  const response = NextResponse.next();
 
   if (pathname === '/cursor' || pathname.startsWith('/cursor/')) {
-    response.cookies.set(STATS_SOURCE_COOKIE, 'cursor', {
-      path: '/',
-      maxAge: 60 * 60 * 24 * 365,
-      sameSite: 'lax',
-    });
-    return response;
+    return setSourceCookie(NextResponse.next(), 'cursor');
   }
 
   if (pathname === '/mcp' || pathname.startsWith('/mcp/')) {
-    response.cookies.set(STATS_SOURCE_COOKIE, 'mcp', {
-      path: '/',
-      maxAge: 60 * 60 * 24 * 365,
-      sameSite: 'lax',
-    });
-    return response;
+    const url = request.nextUrl.clone();
+    url.pathname = pathname === '/mcp' ? '/saas' : `/saas${pathname.slice('/mcp'.length)}`;
+    return setSourceCookie(NextResponse.redirect(url), 'saas');
+  }
+
+  if (pathname === '/saas' || pathname.startsWith('/saas/')) {
+    return setSourceCookie(NextResponse.next(), 'saas');
   }
 
   const opencodeRoots = ['/', '/projects', '/time', '/tools', '/models', '/sessions'];
@@ -30,14 +34,10 @@ export function middleware(request: NextRequest): NextResponse {
   );
 
   if (isOpenCodeRoute) {
-    response.cookies.set(STATS_SOURCE_COOKIE, 'opencode', {
-      path: '/',
-      maxAge: 60 * 60 * 24 * 365,
-      sameSite: 'lax',
-    });
+    return setSourceCookie(NextResponse.next(), 'opencode');
   }
 
-  return response;
+  return NextResponse.next();
 }
 
 export const config = {
@@ -50,6 +50,8 @@ export const config = {
     '/sessions/:path*',
     '/cursor',
     '/cursor/:path*',
+    '/saas',
+    '/saas/:path*',
     '/mcp',
     '/mcp/:path*',
   ],

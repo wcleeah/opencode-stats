@@ -29,7 +29,7 @@ export default async function McpDashboardPage() {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
         <div className="px-4 text-center">
-          <div className="mb-2 text-sm text-error">Failed to load MCP dashboard</div>
+          <div className="mb-2 text-sm text-error">Failed to load SaaS dashboard</div>
           <div className="text-xs text-muted">{result.error}</div>
         </div>
       </div>
@@ -52,7 +52,7 @@ export default async function McpDashboardPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="text-lg font-bold">MCP Credits</h1>
+      <h1 className="text-lg font-bold">SaaS Stats</h1>
 
       <Card>
         <McpLinks links={d.links} />
@@ -231,7 +231,7 @@ export default async function McpDashboardPage() {
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border pb-3">
           <div className="space-y-1">
             <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">
-              OpenCode MCP calls
+              OpenCode tool calls
             </h2>
             <div className="text-xs text-muted">
               {d.localToolSource === 'daily'

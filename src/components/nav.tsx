@@ -23,15 +23,15 @@ const CURSOR_NAV = [
   { href: '/cursor/upload', label: 'Upload' },
 ] as const;
 
-const MCP_NAV = [
-  { href: '/mcp', label: 'Dashboard' },
+const SAAS_NAV = [
+  { href: '/saas', label: 'Dashboard' },
 ] as const;
 
 export async function Nav() {
   const cookieStore = await cookies();
   const source = parseStatsSource(cookieStore.get(STATS_SOURCE_COOKIE)?.value);
   const items =
-    source === 'cursor' ? CURSOR_NAV : source === 'mcp' ? MCP_NAV : OPENCODE_NAV;
+    source === 'cursor' ? CURSOR_NAV : source === 'saas' ? SAAS_NAV : OPENCODE_NAV;
 
   return (
     <header className="border-b border-border bg-background">

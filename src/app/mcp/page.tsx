@@ -51,93 +51,87 @@ export default async function McpDashboardPage() {
     : [];
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-lg font-bold">MCP Credits</h1>
-          <div className="text-xs text-muted">
-            {d.monthLabel} UTC · {d.daysUntilReset}d until reset ·{' '}
-            {(d.elapsedRatio * 100).toFixed(0)}% of month elapsed
+    <div className="space-y-8">
+      <h1 className="text-lg font-bold">MCP Credits</h1>
+
+      <Card>
+        <McpLinks links={d.links} />
+      </Card>
+
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border pb-3">
+          <div className="space-y-1">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">
+              Tavily
+            </h2>
+            <div className="text-xs text-muted">
+              {d.monthLabel} UTC · {d.daysUntilReset}d until reset ·{' '}
+              {(d.elapsedRatio * 100).toFixed(0)}% of month elapsed
+            </div>
           </div>
+          <McpRefreshButton
+            lastFetchedAt={d.lastFetchedAt}
+            nextRefreshAt={d.nextRefreshAt}
+          />
         </div>
-        <McpRefreshButton
-          lastFetchedAt={d.lastFetchedAt}
-          nextRefreshAt={d.nextRefreshAt}
-        />
-      </div>
 
-      {!d.tavilyConfigured && (
-        <Card className="space-y-2">
-          <div className="text-sm text-foreground">Configure provider keys</div>
-          <p className="max-w-2xl text-xs text-muted">
-            Set Railway (or local) environment variables, then refresh.
-            Keys stay in process env — they are never written to Turso.
-          </p>
-          <ul className="space-y-1 text-xs text-muted">
-            <li>
-              <code className="text-foreground">TAVILY_API_KEY</code> — Tavily
-              remaining credits
-            </li>
-          </ul>
-        </Card>
-      )}
+        {!d.tavilyConfigured && (
+          <Card className="space-y-2">
+            <div className="text-sm text-foreground">Configure Tavily</div>
+            <p className="max-w-2xl text-xs text-muted">
+              Set Railway (or local) environment variables, then refresh.
+              Keys stay in process env — they are never written to Turso.
+            </p>
+            <p className="text-xs text-muted">
+              <code className="text-foreground">TAVILY_API_KEY</code> — remaining credits
+            </p>
+          </Card>
+        )}
 
-      {d.tavilyConfigured && snapshot?.tavily_error && (
-        <Card className="space-y-2">
-          <div className="text-sm text-foreground">Provider fetch errors</div>
-          <p className="max-w-3xl text-xs text-error">{snapshot.tavily_error}</p>
-        </Card>
-      )}
+        {d.tavilyConfigured && snapshot?.tavily_error && (
+          <Card className="space-y-2">
+            <div className="text-sm text-foreground">Tavily fetch error</div>
+            <p className="max-w-3xl text-xs text-error">{snapshot.tavily_error}</p>
+          </Card>
+        )}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard
-          label="Tavily remaining"
-          value={
-            d.tavily?.unlimited
-              ? 'Unlimited'
-              : d.tavily?.remaining !== null && d.tavily?.remaining !== undefined
-                ? formatCredits(d.tavily.remaining)
-                : '—'
-          }
-          subValue={
-            d.tavily
-              ? `${formatCredits(d.tavily.used)} / ${
-                  d.tavily.limit === null ? '∞' : formatCredits(d.tavily.limit)
-                } · ${d.tavily.plan ?? 'unknown plan'}`
-              : snapshot?.tavily_error ?? 'Not fetched'
-          }
-          accent
-        />
-        <StatCard
-          label="Tavily burn"
-          value={formatBurnRatio(d.tavily?.burnRatio ?? null)}
-          subValue={
-            d.tavily?.paygoActive
-              ? `PAYGO ${formatCredits(d.tavily.paygoUsage)} · ${formatCost(d.tavily.estimatedPaygoUsd, true)}`
-              : 'vs month elapsed'
-          }
-        />
-        <StatCard
-          label="Reset"
-          value={`${d.daysUntilReset}d`}
-          subValue="1st of next UTC month"
-        />
-        <StatCard
-          label="Local MCP calls"
-          value={d.localTools.reduce((sum, row) => sum + row.call_count, 0).toLocaleString()}
-          subValue={
-            d.localToolSource === 'daily'
-              ? 'this month in OpenCode'
-              : d.localToolSource === 'all_time'
-                ? 'all-time OpenCode rollup'
-                : 'no matching tool rows'
-          }
-        />
-      </div>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+          <StatCard
+            label="Remaining"
+            value={
+              d.tavily?.unlimited
+                ? 'Unlimited'
+                : d.tavily?.remaining !== null && d.tavily?.remaining !== undefined
+                  ? formatCredits(d.tavily.remaining)
+                  : '—'
+            }
+            subValue={
+              d.tavily
+                ? `${formatCredits(d.tavily.used)} / ${
+                    d.tavily.limit === null ? '∞' : formatCredits(d.tavily.limit)
+                  } · ${d.tavily.plan ?? 'unknown plan'}`
+                : snapshot?.tavily_error ?? 'Not fetched'
+            }
+            accent
+          />
+          <StatCard
+            label="Burn"
+            value={formatBurnRatio(d.tavily?.burnRatio ?? null)}
+            subValue={
+              d.tavily?.paygoActive
+                ? `PAYGO ${formatCredits(d.tavily.paygoUsage)} · ${formatCost(d.tavily.estimatedPaygoUsd, true)}`
+                : 'vs month elapsed'
+            }
+          />
+          <StatCard
+            label="Reset"
+            value={`${d.daysUntilReset}d`}
+            subValue="1st of next UTC month"
+          />
+        </div>
 
-      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
         <PoolMeter
-          label="Tavily plan credits"
+          label="Plan credits"
           usedLabel={
             d.tavily
               ? d.tavily.unlimited
@@ -157,61 +151,102 @@ export default async function McpDashboardPage() {
                   : `${(d.elapsedRatio * 100).toFixed(0)}% of month elapsed`
           }
         />
+
+        <div className="flex flex-wrap gap-2">
+          {d.tavily?.exhausted && <Badge variant="error">Exhausted</Badge>}
+          {d.tavily?.paygoActive && <Badge variant="warning">PAYGO</Badge>}
+          {d.tavily?.warn && !d.tavily.exhausted && (
+            <Badge variant="warning">Low</Badge>
+          )}
+          {d.tavily && !d.tavily.warn && (
+            <Badge variant="success">OK</Badge>
+          )}
+        </div>
+
         <Card>
-          <McpLinks links={d.links} />
+          <div className="mb-3 text-xs uppercase tracking-wider text-muted">
+            Credits (snapshot)
+          </div>
+          <McpHistoryChart data={d.history} />
         </Card>
-      </div>
 
-      <div className="flex flex-wrap gap-2">
-        {d.tavily?.exhausted && <Badge variant="error">Tavily exhausted</Badge>}
-        {d.tavily?.paygoActive && <Badge variant="warning">Tavily PAYGO</Badge>}
-        {d.tavily?.warn && !d.tavily.exhausted && (
-          <Badge variant="warning">Tavily low</Badge>
-        )}
-        {d.tavily && !d.tavily.warn && (
-          <Badge variant="success">Tavily OK</Badge>
-        )}
-      </div>
-
-      <Card>
-        <div className="mb-3 text-xs uppercase tracking-wider text-muted">
-          Tavily credits (snapshot)
-        </div>
-        <McpHistoryChart data={d.history} />
-      </Card>
-
-      {tavilyEndpoints.length > 0 && snapshot?.tavily_ok === 1 && (
-        <div>
-          <div className="mb-2 text-xs uppercase tracking-wider text-muted">
-            Tavily by endpoint
-          </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableCell header>Endpoint</TableCell>
-                <TableCell header align="right">Credits</TableCell>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tavilyEndpoints.map((row) => (
-                <TableRow key={row.name}>
-                  <TableCell className="font-medium text-foreground">{row.name}</TableCell>
-                  <TableCell align="right">
-                    {formatCredits(row.credits ?? 0)}
-                  </TableCell>
+        {tavilyEndpoints.length > 0 && snapshot?.tavily_ok === 1 && (
+          <div>
+            <div className="mb-2 text-xs uppercase tracking-wider text-muted">
+              By endpoint
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableCell header>Endpoint</TableCell>
+                  <TableCell header align="right">Credits</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-
-      {d.localTools.length > 0 && (
-        <div>
-          <div className="mb-2 text-xs uppercase tracking-wider text-muted">
-            OpenCode MCP tool calls
-            {d.localToolSource === 'all_time' ? ' · all-time (no daily rollup)' : ''}
+              </TableHeader>
+              <TableBody>
+                {tavilyEndpoints.map((row) => (
+                  <TableRow key={row.name}>
+                    <TableCell className="font-medium text-foreground">{row.name}</TableCell>
+                    <TableCell align="right">
+                      {formatCredits(row.credits ?? 0)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
+        )}
+
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <Card>
+            <div className="mb-3 text-xs uppercase tracking-wider text-muted">
+              Warning settings
+            </div>
+            <McpSettingsForm settings={d.settings} />
+          </Card>
+          <Card className="space-y-2">
+            <div className="mb-3 text-xs uppercase tracking-wider text-muted">
+              Status
+            </div>
+            <div className="text-xs text-foreground">
+              {d.tavilyConfigured ? (
+                snapshot?.tavily_ok ? (
+                  <span className="text-success">live</span>
+                ) : (
+                  <span className="text-error">{snapshot?.tavily_error ?? 'error'}</span>
+                )
+              ) : (
+                <span className="text-muted">key missing</span>
+              )}
+            </div>
+            <p className="pt-2 text-[10px] text-muted">
+              Tavily /usage is limited to 10 requests / 10 minutes, so this section
+              caches snapshots for 6 minutes. History only grows when the dashboard
+              is opened.
+            </p>
+          </Card>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <div className="flex flex-wrap items-end justify-between gap-3 border-b border-border pb-3">
+          <div className="space-y-1">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-foreground">
+              OpenCode MCP calls
+            </h2>
+            <div className="text-xs text-muted">
+              {d.localToolSource === 'daily'
+                ? 'This month in OpenCode'
+                : d.localToolSource === 'all_time'
+                  ? 'All-time OpenCode rollup (no daily rows)'
+                  : 'No matching tool rows'}
+            </div>
+          </div>
+          <div className="text-2xl font-bold tabular-nums font-mono">
+            {d.localTools.reduce((sum, row) => sum + row.call_count, 0).toLocaleString()}
+          </div>
+        </div>
+
+        {d.localTools.length > 0 ? (
           <Table>
             <TableHeader>
               <TableRow>
@@ -240,40 +275,13 @@ export default async function McpDashboardPage() {
               ))}
             </TableBody>
           </Table>
-        </div>
-      )}
-
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card>
-          <div className="mb-3 text-xs uppercase tracking-wider text-muted">
-            Warning settings
-          </div>
-          <McpSettingsForm settings={d.settings} />
-        </Card>
-        <Card className="space-y-2">
-          <div className="mb-3 text-xs uppercase tracking-wider text-muted">
-            Provider status
-          </div>
-          <div className="text-xs text-foreground">
-            Tavily:{' '}
-            {d.tavilyConfigured ? (
-              snapshot?.tavily_ok ? (
-                <span className="text-success">live</span>
-              ) : (
-                <span className="text-error">{snapshot?.tavily_error ?? 'error'}</span>
-              )
-            ) : (
-              <span className="text-muted">key missing</span>
-            )}
-          </div>
-          <p className="pt-2 text-[10px] text-muted">
-            Tavily /usage is limited to 10 requests / 10 minutes, so this page caches
-            snapshots for 6 minutes. History only grows when the dashboard is opened.
-            Exa personal plans have no billing API — add a named button under Quick
-            links to open the dashboard instead.
+        ) : (
+          <p className="text-xs text-muted">
+            No local <code className="text-foreground">exa_*</code> or{' '}
+            <code className="text-foreground">tavily_*</code> tool rows in this window.
           </p>
-        </Card>
-      </div>
+        )}
+      </section>
     </div>
   );
 }

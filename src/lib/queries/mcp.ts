@@ -3,43 +3,30 @@ import 'server-only';
 import { execute, queryAll, queryOne } from '@/lib/db';
 import { getUtcCalendarMonth, utcDayKey } from '@/lib/mcp/calendar';
 import {
-  DEFAULT_EXA_ALLOTMENT_USD,
-  DEFAULT_EXA_WARN_USD,
   DEFAULT_TAVILY_WARN_PCT,
   MCP_MIN_REFRESH_MS,
   MCP_SNAPSHOT_TTL_MS,
 } from '@/lib/mcp/constants';
 import { readMcpEnvConfig } from '@/lib/mcp/env';
-import {
-  fetchExaUsage,
-  isGenericExaAuthError,
-  parseExaBreakdownJson,
-  resolveExaApiKeyId,
-  type ExaCostBreakdown,
-} from '@/lib/mcp/exa';
 import { lastSnapshotPerUtcDay } from '@/lib/mcp/history';
 import {
-  computeExaMetrics,
   computeTavilyMetrics,
   isMcpProviderTool,
   mcpToolProvider,
-  type ExaPoolMetrics,
   type TavilyPoolMetrics,
 } from '@/lib/mcp/metrics';
 import { ensureMcpSchema } from '@/lib/mcp/schema';
 import { fetchTavilyUsage } from '@/lib/mcp/tavily';
 import type {
   McpDailySnapshotPoint,
+  McpLink,
   McpSettings,
   McpToolUsageRow,
   McpUsageSnapshot,
 } from '@/types/mcp';
 
 const DEFAULT_SETTINGS: McpSettings = {
-  exa_allotment_usd: DEFAULT_EXA_ALLOTMENT_USD,
-  exa_purchased_extra_usd: 0,
   tavily_warn_pct: DEFAULT_TAVILY_WARN_PCT,
-  exa_warn_usd: DEFAULT_EXA_WARN_USD,
   updated_at: 0,
 };
 
@@ -60,13 +47,16 @@ const SNAPSHOT_SELECT = `
   tavily_map_usage,
   tavily_research_usage,
   tavily_key_usage,
-  tavily_key_limit,
-  exa_ok,
-  exa_error,
-  exa_api_key_id,
-  exa_api_key_name,
-  exa_total_cost_usd,
-  exa_breakdown_json
+  tavily_key_limit
+`;
+
+const LINK_SELECT = `
+  id,
+  name,
+  url,
+  sort_order,
+  created_at,
+  updated_at
 `;
 
 let inflightRefresh: Promise<{
@@ -92,10 +82,7 @@ export async function getMcpSettings(): Promise<{
   return withSchema(async () => {
     const result = await queryOne<McpSettings>(`
       SELECT
-        exa_allotment_usd,
-        exa_purchased_extra_usd,
         tavily_warn_pct,
-        exa_warn_usd,
         updated_at
       FROM mcp_settings
       WHERE id = 1
@@ -109,33 +96,125 @@ export async function getMcpSettings(): Promise<{
 }
 
 export async function updateMcpSettings(input: {
-  exaAllotmentUsd: number;
-  exaPurchasedExtraUsd: number;
   tavilyWarnPct: number;
-  exaWarnUsd: number;
 }): Promise<{ data: McpSettings | null; error: string | null }> {
   return withSchema(async () => {
     const updatedAt = Date.now();
     const write = await execute(
       `UPDATE mcp_settings
-       SET exa_allotment_usd = ?,
-           exa_purchased_extra_usd = ?,
-           tavily_warn_pct = ?,
-           exa_warn_usd = ?,
+       SET tavily_warn_pct = ?,
            updated_at = ?
        WHERE id = 1`,
-      [
-        input.exaAllotmentUsd,
-        input.exaPurchasedExtraUsd,
-        input.tavilyWarnPct,
-        input.exaWarnUsd,
-        updatedAt,
-      ],
+      [input.tavilyWarnPct, updatedAt],
     );
     if (write.error) {
       return { data: null, error: write.error };
     }
     return getMcpSettings();
+  });
+}
+
+export async function listMcpLinks(): Promise<{
+  data: McpLink[] | null;
+  error: string | null;
+}> {
+  return withSchema(() =>
+    queryAll<McpLink>(
+      `SELECT ${LINK_SELECT}
+       FROM mcp_links
+       ORDER BY sort_order ASC, id ASC`,
+    ),
+  );
+}
+
+export async function getMcpLink(id: number): Promise<{
+  data: McpLink | null;
+  error: string | null;
+}> {
+  return withSchema(() =>
+    queryOne<McpLink>(
+      `SELECT ${LINK_SELECT}
+       FROM mcp_links
+       WHERE id = ?`,
+      [id],
+    ),
+  );
+}
+
+async function nextLinkSortOrder(): Promise<number> {
+  const result = await queryOne<{ max_sort: number | null }>(
+    'SELECT MAX(sort_order) AS max_sort FROM mcp_links',
+  );
+  return (result.data?.max_sort ?? -1) + 1;
+}
+
+export async function createMcpLink(input: {
+  name: string;
+  url: string;
+  sortOrder?: number | null;
+}): Promise<{ data: McpLink | null; error: string | null }> {
+  return withSchema(async () => {
+    const now = Date.now();
+    const sortOrder = input.sortOrder ?? (await nextLinkSortOrder());
+    const write = await execute(
+      `INSERT INTO mcp_links (name, url, sort_order, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?)`,
+      [input.name, input.url, sortOrder, now, now],
+    );
+    if (write.error || !write.data) {
+      return { data: null, error: write.error ?? 'Failed to create link.' };
+    }
+    return getMcpLink(Number(write.data.lastInsertRowid));
+  });
+}
+
+export async function updateMcpLink(input: {
+  id: number;
+  name: string;
+  url: string;
+  sortOrder: number;
+}): Promise<{ data: McpLink | null; error: string | null }> {
+  return withSchema(async () => {
+    const existing = await getMcpLink(input.id);
+    if (existing.error) return existing;
+    if (!existing.data) {
+      return { data: null, error: 'Link not found.' };
+    }
+
+    const write = await execute(
+      `UPDATE mcp_links
+       SET name = ?,
+           url = ?,
+           sort_order = ?,
+           updated_at = ?
+       WHERE id = ?`,
+      [input.name, input.url, input.sortOrder, Date.now(), input.id],
+    );
+    if (write.error) {
+      return { data: null, error: write.error };
+    }
+    return getMcpLink(input.id);
+  });
+}
+
+export async function deleteMcpLink(id: number): Promise<{
+  data: { deleted: true } | null;
+  error: string | null;
+}> {
+  return withSchema(async () => {
+    const existing = await getMcpLink(id);
+    if (existing.error) {
+      return { data: null, error: existing.error };
+    }
+    if (!existing.data) {
+      return { data: null, error: 'Link not found.' };
+    }
+
+    const write = await execute('DELETE FROM mcp_links WHERE id = ?', [id]);
+    if (write.error) {
+      return { data: null, error: write.error };
+    }
+    return { data: { deleted: true }, error: null };
   });
 }
 
@@ -178,7 +257,6 @@ function snapshotIsFresh(
 ): boolean {
   if (!snapshot) return false;
   if (snapshot.cycle_month !== cycleMonth) return false;
-  if (isGenericExaAuthError(snapshot.exa_error)) return false;
   return nowMs - snapshot.fetched_at < ttlMs;
 }
 
@@ -188,73 +266,23 @@ async function fetchAndStoreSnapshot(now: Date): Promise<{
 }> {
   const env = readMcpEnvConfig();
   const month = getUtcCalendarMonth(now);
-  const startIso = new Date(month.startMs).toISOString();
-  const endIso = now.toISOString();
 
   let tavilyOk = 0;
   let tavilyError: string | null = null;
   let tavily = null as Awaited<ReturnType<typeof fetchTavilyUsage>>['data'];
-  let exaOk = 0;
-  let exaError: string | null = null;
-  let exa = null as Awaited<ReturnType<typeof fetchExaUsage>>['data'];
-  let exaKeyName: string | null = null;
-  let exaKeyId: string | null = env.exaApiKeyId;
-
-  const jobs: Promise<void>[] = [];
 
   if (env.tavilyApiKey) {
-    jobs.push(
-      (async () => {
-        const result = await fetchTavilyUsage(env.tavilyApiKey as string);
-        if (result.error || !result.data) {
-          tavilyError = result.error ?? 'Tavily usage fetch failed.';
-          return;
-        }
-        tavily = result.data;
-        tavilyOk = 1;
-      })(),
-    );
+    const result = await fetchTavilyUsage(env.tavilyApiKey);
+    if (result.error || !result.data) {
+      tavilyError = result.error ?? 'Tavily usage fetch failed.';
+    } else {
+      tavily = result.data;
+      tavilyOk = 1;
+    }
   } else {
     tavilyError = 'TAVILY_API_KEY is not set.';
   }
 
-  if (env.exaServiceKey) {
-    jobs.push(
-      (async () => {
-        const resolved = await resolveExaApiKeyId({
-          serviceKey: env.exaServiceKey as string,
-          configuredId: env.exaApiKeyId,
-        });
-        if (resolved.error || !resolved.data) {
-          exaError = resolved.error ?? 'Could not resolve Exa API key id.';
-          return;
-        }
-        exaKeyId = resolved.data.id;
-        exaKeyName = resolved.data.name;
-        const result = await fetchExaUsage({
-          serviceKey: env.exaServiceKey as string,
-          apiKeyId: resolved.data.id,
-          startIso,
-          endIso,
-        });
-        if (result.error || !result.data) {
-          exaError = result.error ?? 'Exa usage fetch failed.';
-          return;
-        }
-        exa = result.data;
-        exaOk = 1;
-        if (result.data.apiKeyName) {
-          exaKeyName = result.data.apiKeyName;
-        }
-      })(),
-    );
-  } else {
-    exaError = 'EXA_API_KEY is not set.';
-  }
-
-  await Promise.all(jobs);
-
-  const breakdownJson = exa ? JSON.stringify(exa.breakdown) : null;
   const fetchedAt = now.getTime();
   const insert = await execute(
     `INSERT INTO mcp_usage_snapshots (
@@ -262,10 +290,8 @@ async function fetchAndStoreSnapshot(now: Date): Promise<{
        tavily_ok, tavily_error, tavily_plan, tavily_plan_usage, tavily_plan_limit,
        tavily_paygo_usage, tavily_paygo_limit, tavily_search_usage, tavily_extract_usage,
        tavily_crawl_usage, tavily_map_usage, tavily_research_usage, tavily_key_usage,
-       tavily_key_limit,
-       exa_ok, exa_error, exa_api_key_id, exa_api_key_name, exa_total_cost_usd,
-       exa_breakdown_json
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       tavily_key_limit
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       fetchedAt,
       month.key,
@@ -283,12 +309,6 @@ async function fetchAndStoreSnapshot(now: Date): Promise<{
       tavily?.researchUsage ?? null,
       tavily?.keyUsage ?? null,
       tavily?.keyLimit ?? null,
-      exaOk,
-      exaError,
-      exa?.apiKeyId ?? exaKeyId,
-      exa?.apiKeyName ?? exaKeyName,
-      exa?.totalCostUsd ?? null,
-      breakdownJson,
     ],
   );
   if (insert.error) {
@@ -460,9 +480,7 @@ export interface McpDashboardData {
   snapshot: McpUsageSnapshot | null;
   skippedRefresh: boolean;
   tavily: TavilyPoolMetrics | null;
-  exa: ExaPoolMetrics | null;
   tavilyConfigured: boolean;
-  exaConfigured: boolean;
   monthKey: string;
   monthLabel: string;
   elapsedRatio: number;
@@ -472,7 +490,7 @@ export interface McpDashboardData {
   history: McpDailySnapshotPoint[];
   localTools: McpToolUsageRow[];
   localToolSource: 'daily' | 'all_time' | 'none';
-  exaBreakdown: ExaCostBreakdown[];
+  links: McpLink[];
 }
 
 export async function getMcpDashboard(params?: {
@@ -489,7 +507,7 @@ export async function getMcpDashboard(params?: {
   }
   const settings = settingsResult.data;
 
-  const refreshed = (env.tavilyConfigured || env.exaConfigured)
+  const refreshed = env.tavilyConfigured
     ? await refreshMcpSnapshot({ force: params?.forceRefresh, now })
     : { data: (await getLatestMcpSnapshot()).data ?? null, error: null, skipped: true };
 
@@ -504,6 +522,10 @@ export async function getMcpDashboard(params?: {
   const startDay = utcDayKey(month.startMs);
   const endDay = utcDayKey(month.endMs);
   const localToolsResult = await getMcpLocalToolUsage({ startDay, endDay });
+  const linksResult = await listMcpLinks();
+  if (linksResult.error) {
+    return { data: null, error: linksResult.error };
+  }
 
   const tavily = snapshot?.tavily_ok
     ? computeTavilyMetrics({
@@ -514,16 +536,6 @@ export async function getMcpDashboard(params?: {
       paygoLimit: snapshot.tavily_paygo_limit,
       elapsedRatio: month.elapsedRatio,
       warnPct: settings.tavily_warn_pct,
-    })
-    : null;
-
-  const exa = snapshot?.exa_ok
-    ? computeExaMetrics({
-      usedUsd: snapshot.exa_total_cost_usd ?? 0,
-      allotmentUsd: settings.exa_allotment_usd,
-      purchasedExtraUsd: settings.exa_purchased_extra_usd,
-      elapsedRatio: month.elapsedRatio,
-      warnRemainingUsd: settings.exa_warn_usd,
     })
     : null;
 
@@ -538,9 +550,7 @@ export async function getMcpDashboard(params?: {
       snapshot,
       skippedRefresh: refreshed.skipped,
       tavily,
-      exa,
       tavilyConfigured: env.tavilyConfigured,
-      exaConfigured: env.exaConfigured,
       monthKey: month.key,
       monthLabel: month.label,
       elapsedRatio: month.elapsedRatio,
@@ -550,7 +560,7 @@ export async function getMcpDashboard(params?: {
       history,
       localTools: localToolsResult.data ?? [],
       localToolSource: localToolsResult.source,
-      exaBreakdown: parseExaBreakdownJson(snapshot?.exa_breakdown_json ?? null),
+      links: linksResult.data ?? [],
     },
     error: null,
   };

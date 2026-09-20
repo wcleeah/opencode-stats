@@ -1,8 +1,14 @@
 export interface McpSettings {
-  exa_allotment_usd: number;
-  exa_purchased_extra_usd: number;
   tavily_warn_pct: number;
-  exa_warn_usd: number;
+  updated_at: number;
+}
+
+export interface McpLink {
+  id: number;
+  name: string;
+  url: string;
+  sort_order: number;
+  created_at: number;
   updated_at: number;
 }
 
@@ -24,12 +30,6 @@ export interface McpUsageSnapshot {
   tavily_research_usage: number | null;
   tavily_key_usage: number | null;
   tavily_key_limit: number | null;
-  exa_ok: number;
-  exa_error: string | null;
-  exa_api_key_id: string | null;
-  exa_api_key_name: string | null;
-  exa_total_cost_usd: number | null;
-  exa_breakdown_json: string | null;
 }
 
 export interface McpToolUsageRow {
@@ -45,5 +45,4 @@ export interface McpToolUsageRow {
 export interface McpDailySnapshotPoint {
   day: string;
   tavily_plan_usage: number | null;
-  exa_total_cost_usd: number | null;
 }

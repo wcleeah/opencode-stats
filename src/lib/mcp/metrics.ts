@@ -16,19 +16,6 @@ export interface TavilyPoolMetrics {
   warn: boolean;
 }
 
-export interface ExaPoolMetrics {
-  usedUsd: number;
-  allotmentUsd: number;
-  purchasedExtraUsd: number;
-  poolUsd: number;
-  remainingUsd: number;
-  usedPct: number;
-  exhausted: boolean;
-  estimated: true;
-  burnRatio: number | null;
-  warn: boolean;
-}
-
 export function computeTavilyMetrics(params: {
   plan: string | null;
   planUsage: number;
@@ -68,34 +55,6 @@ export function computeTavilyMetrics(params: {
     warn:
       exhausted ||
       (usedPct !== null && usedPct >= params.warnPct),
-  };
-}
-
-export function computeExaMetrics(params: {
-  usedUsd: number;
-  allotmentUsd: number;
-  purchasedExtraUsd: number;
-  elapsedRatio: number;
-  warnRemainingUsd: number;
-}): ExaPoolMetrics {
-  const poolUsd = Math.max(0, params.allotmentUsd + params.purchasedExtraUsd);
-  const remainingUsd = poolUsd - params.usedUsd;
-  const usedPct = poolUsd > 0 ? Math.min(100, (params.usedUsd / poolUsd) * 100) : 0;
-  const usedFraction = poolUsd > 0 ? params.usedUsd / poolUsd : 0;
-  const burnRatio =
-    params.elapsedRatio <= 0 ? null : usedFraction / params.elapsedRatio;
-
-  return {
-    usedUsd: params.usedUsd,
-    allotmentUsd: params.allotmentUsd,
-    purchasedExtraUsd: params.purchasedExtraUsd,
-    poolUsd,
-    remainingUsd,
-    usedPct,
-    exhausted: remainingUsd <= 0,
-    estimated: true,
-    burnRatio,
-    warn: remainingUsd <= params.warnRemainingUsd,
   };
 }
 

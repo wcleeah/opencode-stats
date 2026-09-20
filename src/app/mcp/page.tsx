@@ -17,6 +17,7 @@ import { PoolMeter } from '@/components/mcp/pool-meter';
 import { McpRefreshButton } from '@/components/mcp/refresh-button';
 import { McpSettingsForm } from '@/components/mcp/settings-form';
 import { McpHistoryChart } from '@/components/mcp/history-chart';
+import { McpLinks } from '@/components/mcp/links';
 
 function formatCredits(value: number): string {
   return value.toLocaleString();
@@ -38,7 +39,6 @@ export default async function McpDashboardPage() {
   const d = result.data;
   const snapshot = d.snapshot;
   const tavilyPct = d.tavily?.usedPct ?? 0;
-  const exaPct = d.exa?.usedPct ?? 0;
 
   const tavilyEndpoints = snapshot
     ? [
@@ -66,7 +66,7 @@ export default async function McpDashboardPage() {
         />
       </div>
 
-      {(!d.tavilyConfigured || !d.exaConfigured) && (
+      {!d.tavilyConfigured && (
         <Card className="space-y-2">
           <div className="text-sm text-foreground">Configure provider keys</div>
           <p className="max-w-2xl text-xs text-muted">
@@ -74,39 +74,22 @@ export default async function McpDashboardPage() {
             Keys stay in process env — they are never written to Turso.
           </p>
           <ul className="space-y-1 text-xs text-muted">
-            {!d.tavilyConfigured && (
-              <li>
-                <code className="text-foreground">TAVILY_API_KEY</code> — Tavily
-                remaining credits
-              </li>
-            )}
-            {!d.exaConfigured && (
-              <li>
-                <code className="text-foreground">EXA_API_KEY</code> — Exa Team
-                Management service key from dashboard.exa.ai → API Keys → Service
-                keys (not the search API Keys tab). Optional{' '}
-                <code className="text-foreground">EXA_API_KEY_ID</code> if you have
-                several keys.
-              </li>
-            )}
+            <li>
+              <code className="text-foreground">TAVILY_API_KEY</code> — Tavily
+              remaining credits
+            </li>
           </ul>
         </Card>
       )}
 
-      {((d.tavilyConfigured && snapshot?.tavily_error) ||
-        (d.exaConfigured && snapshot?.exa_error)) && (
+      {d.tavilyConfigured && snapshot?.tavily_error && (
         <Card className="space-y-2">
           <div className="text-sm text-foreground">Provider fetch errors</div>
-          {d.tavilyConfigured && snapshot?.tavily_error && (
-            <p className="max-w-3xl text-xs text-error">{snapshot.tavily_error}</p>
-          )}
-          {d.exaConfigured && snapshot?.exa_error && (
-            <p className="max-w-3xl text-xs text-error">{snapshot.exa_error}</p>
-          )}
+          <p className="max-w-3xl text-xs text-error">{snapshot.tavily_error}</p>
         </Card>
       )}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard
           label="Tavily remaining"
           value={
@@ -126,16 +109,6 @@ export default async function McpDashboardPage() {
           accent
         />
         <StatCard
-          label="Exa remaining"
-          value={d.exa ? formatCost(Math.max(0, d.exa.remainingUsd), true) : '—'}
-          subValue={
-            d.exa
-              ? `${formatCost(d.exa.usedUsd)} used / ${formatCost(d.exa.poolUsd)} pool`
-              : snapshot?.exa_error ?? 'Not fetched'
-          }
-          accent
-        />
-        <StatCard
           label="Tavily burn"
           value={formatBurnRatio(d.tavily?.burnRatio ?? null)}
           subValue={
@@ -143,11 +116,6 @@ export default async function McpDashboardPage() {
               ? `PAYGO ${formatCredits(d.tavily.paygoUsage)} · ${formatCost(d.tavily.estimatedPaygoUsd, true)}`
               : 'vs month elapsed'
           }
-        />
-        <StatCard
-          label="Exa burn"
-          value={formatBurnRatio(d.exa?.burnRatio ?? null)}
-          subValue="est. vs month elapsed"
         />
         <StatCard
           label="Reset"
@@ -189,23 +157,9 @@ export default async function McpDashboardPage() {
                   : `${(d.elapsedRatio * 100).toFixed(0)}% of month elapsed`
           }
         />
-        <PoolMeter
-          label="Exa vs allotment (estimated)"
-          usedLabel={
-            d.exa
-              ? `${formatCost(d.exa.usedUsd)} / ${formatCost(d.exa.poolUsd)}`
-              : 'No data'
-          }
-          percent={exaPct}
-          warn={Boolean(d.exa?.warn)}
-          detail={
-            d.exa?.exhausted
-              ? 'Estimated remaining is $0 — top up or wait for the monthly $10.'
-              : d.exa
-                ? `Exa does not publish remaining balance. Pool = allotment + extra.`
-                : snapshot?.exa_error ?? 'Set EXA_API_KEY to fetch spend.'
-          }
-        />
+        <Card>
+          <McpLinks links={d.links} />
+        </Card>
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -214,28 +168,17 @@ export default async function McpDashboardPage() {
         {d.tavily?.warn && !d.tavily.exhausted && (
           <Badge variant="warning">Tavily low</Badge>
         )}
-        {d.exa?.exhausted && <Badge variant="error">Exa allotment used</Badge>}
-        {d.exa?.warn && !d.exa.exhausted && <Badge variant="warning">Exa low</Badge>}
         {d.tavily && !d.tavily.warn && (
           <Badge variant="success">Tavily OK</Badge>
         )}
-        {d.exa && !d.exa.warn && <Badge variant="info">Exa est. OK</Badge>}
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Card>
-          <div className="mb-3 text-xs uppercase tracking-wider text-muted">
-            Tavily credits (snapshot)
-          </div>
-          <McpHistoryChart data={d.history} metric="tavily" />
-        </Card>
-        <Card>
-          <div className="mb-3 text-xs uppercase tracking-wider text-muted">
-            Exa used USD (snapshot)
-          </div>
-          <McpHistoryChart data={d.history} metric="exa" />
-        </Card>
-      </div>
+      <Card>
+        <div className="mb-3 text-xs uppercase tracking-wider text-muted">
+          Tavily credits (snapshot)
+        </div>
+        <McpHistoryChart data={d.history} />
+      </Card>
 
       {tavilyEndpoints.length > 0 && snapshot?.tavily_ok === 1 && (
         <div>
@@ -256,34 +199,6 @@ export default async function McpDashboardPage() {
                   <TableCell align="right">
                     {formatCredits(row.credits ?? 0)}
                   </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
-
-      {d.exaBreakdown.length > 0 && (
-        <div>
-          <div className="mb-2 text-xs uppercase tracking-wider text-muted">
-            Exa cost breakdown
-          </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableCell header>Price</TableCell>
-                <TableCell header align="right">Quantity</TableCell>
-                <TableCell header align="right">USD</TableCell>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {d.exaBreakdown.map((row) => (
-                <TableRow key={row.priceId ?? row.priceName}>
-                  <TableCell className="font-medium text-foreground">
-                    {row.priceName}
-                  </TableCell>
-                  <TableCell align="right">{row.quantity.toLocaleString()}</TableCell>
-                  <TableCell align="right">{formatCost(row.amountUsd)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -331,7 +246,7 @@ export default async function McpDashboardPage() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Card>
           <div className="mb-3 text-xs uppercase tracking-wider text-muted">
-            Allotment settings
+            Warning settings
           </div>
           <McpSettingsForm settings={d.settings} />
         </Card>
@@ -351,23 +266,11 @@ export default async function McpDashboardPage() {
               <span className="text-muted">key missing</span>
             )}
           </div>
-          <div className="text-xs text-foreground">
-            Exa:{' '}
-            {d.exaConfigured ? (
-              snapshot?.exa_ok ? (
-                <span className="text-success">
-                  live{snapshot.exa_api_key_name ? ` · ${snapshot.exa_api_key_name}` : ''}
-                </span>
-              ) : (
-                <span className="text-error">{snapshot?.exa_error ?? 'error'}</span>
-              )
-            ) : (
-              <span className="text-muted">key missing</span>
-            )}
-          </div>
           <p className="pt-2 text-[10px] text-muted">
             Tavily /usage is limited to 10 requests / 10 minutes, so this page caches
             snapshots for 6 minutes. History only grows when the dashboard is opened.
+            Exa personal plans have no billing API — add a named button under Quick
+            links to open the dashboard instead.
           </p>
         </Card>
       </div>

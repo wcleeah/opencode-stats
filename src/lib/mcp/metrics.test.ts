@@ -2,15 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { getUtcCalendarMonth, utcDayKey } from './calendar';
-import {
-  fetchExaUsage,
-  parseExaApiKeyList,
-  parseExaBreakdownJson,
-  parseExaUsage,
-} from './exa';
 import { lastSnapshotPerUtcDay } from './history';
 import {
-  computeExaMetrics,
   computeTavilyMetrics,
   formatBurnRatio,
   isExaToolName,
@@ -92,43 +85,6 @@ test('computeTavilyMetrics treats null limit as unlimited', () => {
   assert.equal(metrics.warn, false);
 });
 
-test('computeExaMetrics estimates remaining from allotment', () => {
-  const metrics = computeExaMetrics({
-    usedUsd: 7.5,
-    allotmentUsd: 10,
-    purchasedExtraUsd: 5,
-    elapsedRatio: 0.5,
-    warnRemainingUsd: 2,
-  });
-  assert.equal(metrics.poolUsd, 15);
-  assert.equal(metrics.remainingUsd, 7.5);
-  assert.equal(metrics.estimated, true);
-  assert.equal(metrics.warn, false);
-  assert.equal(metrics.exhausted, false);
-
-  const low = computeExaMetrics({
-    usedUsd: 9.5,
-    allotmentUsd: 10,
-    purchasedExtraUsd: 0,
-    elapsedRatio: 0.4,
-    warnRemainingUsd: 2,
-  });
-  assert.equal(low.remainingUsd, 0.5);
-  assert.equal(low.warn, true);
-  assert.equal(low.exhausted, false);
-
-  const over = computeExaMetrics({
-    usedUsd: 12,
-    allotmentUsd: 10,
-    purchasedExtraUsd: 0,
-    elapsedRatio: 1,
-    warnRemainingUsd: 2,
-  });
-  assert.equal(over.remainingUsd, -2);
-  assert.equal(over.exhausted, true);
-  assert.equal(over.usedPct, 100);
-});
-
 test('formatBurnRatio', () => {
   assert.equal(formatBurnRatio(null), '—');
   assert.equal(formatBurnRatio(0), '0.0×');
@@ -179,38 +135,7 @@ test('parseTavilyUsage surfaces API errors', () => {
   assert.ok('error' in parsed);
 });
 
-test('parseExaUsage and key list', () => {
-  const usage = parseExaUsage({
-    api_key_id: '550e8400-e29b-41d4-a716-446655440000',
-    api_key_name: 'MCP',
-    total_cost_usd: 4.2,
-    cost_breakdown: [
-      { price_id: 'search', price_name: 'Neural Search', quantity: 100, amount_usd: 3 },
-      { price_id: 'contents', price_name: 'Content Retrieval', quantity: 20, amount_usd: 1.2 },
-    ],
-    period: { start: '2026-09-01T00:00:00Z', end: '2026-09-15T00:00:00Z' },
-  });
-  assert.ok(!('error' in usage));
-  if ('error' in usage) return;
-  assert.equal(usage.totalCostUsd, 4.2);
-  assert.equal(usage.breakdown.length, 2);
-  assert.equal(usage.breakdown[0].priceName, 'Neural Search');
-
-  const keys = parseExaApiKeyList({
-    apiKeys: [{ id: 'abc', name: 'prod', budgetCents: 500, isOverBudget: false }],
-  });
-  assert.ok(!('error' in keys));
-  if ('error' in keys) return;
-  assert.equal(keys[0].id, 'abc');
-  assert.equal(keys[0].budgetCents, 500);
-});
-
-test('parseExaBreakdownJson and lastSnapshotPerUtcDay', () => {
-  const breakdown = parseExaBreakdownJson(
-    JSON.stringify([{ priceName: 'Search', quantity: 1, amountUsd: 0.007 }]),
-  );
-  assert.equal(breakdown[0].amountUsd, 0.007);
-
+test('lastSnapshotPerUtcDay keeps the last poll of each UTC day', () => {
   const empty: McpUsageSnapshot = {
     id: 1,
     fetched_at: Date.UTC(2026, 8, 2, 10),
@@ -229,26 +154,18 @@ test('parseExaBreakdownJson and lastSnapshotPerUtcDay', () => {
     tavily_research_usage: 0,
     tavily_key_usage: 10,
     tavily_key_limit: null,
-    exa_ok: 1,
-    exa_error: null,
-    exa_api_key_id: 'k',
-    exa_api_key_name: null,
-    exa_total_cost_usd: 1,
-    exa_breakdown_json: null,
   };
   const later: McpUsageSnapshot = {
     ...empty,
     id: 2,
     fetched_at: Date.UTC(2026, 8, 2, 18),
     tavily_plan_usage: 40,
-    exa_total_cost_usd: 2.5,
   };
   const nextDay: McpUsageSnapshot = {
     ...empty,
     id: 3,
     fetched_at: Date.UTC(2026, 8, 3, 1),
     tavily_plan_usage: 41,
-    exa_total_cost_usd: 2.6,
   };
   const points = lastSnapshotPerUtcDay([empty, later, nextDay]);
   assert.equal(points.length, 2);
@@ -279,53 +196,22 @@ test('fetchTavilyUsage sends bearer auth', async () => {
   assert.equal(calls[0], 'https://api.tavily.com/usage');
 });
 
-test('fetchExaUsage encodes date range', async () => {
-  const result = await fetchExaUsage({
-    serviceKey: 'exa-test',
-    apiKeyId: 'key-1',
-    startIso: '2026-09-01T00:00:00.000Z',
-    endIso: '2026-09-15T00:00:00.000Z',
-    fetchFn: async (input, init) => {
-      const url = String(input);
-      assert.match(url, /api-keys\/key-1\/usage/);
-      assert.match(url, /start_date=2026-09-01/);
-      assert.equal((init?.headers as { 'x-api-key'?: string })['x-api-key'], 'exa-test');
-      return new Response(
-        JSON.stringify({
-          api_key_id: 'key-1',
-          total_cost_usd: 1.5,
-          cost_breakdown: [],
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
-      );
-    },
-  });
-  assert.equal(result.error, null);
-  assert.equal(result.data?.totalCostUsd, 1.5);
-});
-
-test('readMcpEnvConfig accepts EXA_API_KEY or EXA_SERVICE_KEY', () => {
+test('readMcpEnvConfig reads Tavily and ignores Exa keys', () => {
   const a = readMcpEnvConfig({
     TAVILY_API_KEY: ' tvly-x ',
     EXA_API_KEY: 'exa-secret',
-    EXA_API_KEY_ID: 'uuid',
   });
   assert.equal(a.tavilyConfigured, true);
-  assert.equal(a.exaConfigured, true);
   assert.equal(a.tavilyApiKey, 'tvly-x');
-  assert.equal(a.exaApiKeyId, 'uuid');
+  assert.equal('exaConfigured' in a, false);
 
   const b = readMcpEnvConfig({
     EXA_SERVICE_KEY: 'svc',
   });
-  assert.equal(b.exaConfigured, true);
-  assert.equal(b.exaServiceKey, 'svc');
   assert.equal(b.tavilyConfigured, false);
 
   const quoted = readMcpEnvConfig({
-    EXA_API_KEY: '"Bearer exa-quoted"',
     TAVILY_API_KEY: "'tvly-quoted'",
   });
-  assert.equal(quoted.exaServiceKey, 'exa-quoted');
   assert.equal(quoted.tavilyApiKey, 'tvly-quoted');
 });

@@ -6,13 +6,14 @@ export function parseStatsSource(value: string | undefined | null): StatsSource 
   if (value === 'cursor') return 'cursor';
   // `mcp` is the previous cookie value for this mode.
   if (value === 'saas' || value === 'mcp') return 'saas';
-  return 'opencode';
+  if (value === 'opencode') return 'opencode';
+  return 'saas';
 }
 
 export function sourceHome(source: StatsSource): string {
   if (source === 'cursor') return '/cursor';
-  if (source === 'saas') return '/saas';
-  return '/';
+  if (source === 'opencode') return '/opencode';
+  return '/saas';
 }
 
 export function sourceBrandLabel(source: StatsSource): string {

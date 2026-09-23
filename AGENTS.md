@@ -47,7 +47,8 @@ Use `bun:test` (Bun's built-in test runner) with `describe`, `it`, `expect`.
 src/
   app/                   # Next.js App Router pages and layouts
     layout.tsx           # root layout
-    page.tsx             # dashboard home
+    page.tsx             # redirects / to /saas
+    opencode/page.tsx    # OpenCode dashboard
     api/                 # API route handlers
   components/            # shared React components
     ui/                  # primitive UI components (buttons, cards, etc.)

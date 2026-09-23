@@ -14,6 +14,12 @@ function setSourceCookie(response: NextResponse, source: string): NextResponse {
 export function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
 
+  if (pathname === '/') {
+    const url = request.nextUrl.clone();
+    url.pathname = '/saas';
+    return setSourceCookie(NextResponse.redirect(url), 'saas');
+  }
+
   if (pathname === '/cursor' || pathname.startsWith('/cursor/')) {
     return setSourceCookie(NextResponse.next(), 'cursor');
   }
@@ -28,7 +34,14 @@ export function middleware(request: NextRequest): NextResponse {
     return setSourceCookie(NextResponse.next(), 'saas');
   }
 
-  const opencodeRoots = ['/', '/projects', '/time', '/tools', '/models', '/sessions'];
+  const opencodeRoots = [
+    '/opencode',
+    '/projects',
+    '/time',
+    '/tools',
+    '/models',
+    '/sessions',
+  ];
   const isOpenCodeRoute = opencodeRoots.some(
     (root) => pathname === root || pathname.startsWith(`${root}/`),
   );
@@ -43,6 +56,8 @@ export function middleware(request: NextRequest): NextResponse {
 export const config = {
   matcher: [
     '/',
+    '/opencode',
+    '/opencode/:path*',
     '/projects/:path*',
     '/time/:path*',
     '/tools/:path*',

@@ -11,7 +11,7 @@ import {
 } from '@/lib/source-mode';
 
 const OPENCODE_NAV = [
-  { href: '/', label: 'Dashboard' },
+  { href: '/opencode', label: 'Dashboard' },
   { href: '/projects', label: 'Projects' },
   { href: '/time', label: 'Time' },
   { href: '/tools', label: 'Tools' },

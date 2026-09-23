@@ -153,7 +153,10 @@ These affect how you query and display data:
 
 | Variable            | Description                                   | Default                              |
 |---------------------|-----------------------------------------------|--------------------------------------|
-| `OPENCODE_USAGE_DB` | Path to the SQLite database file              | `~/.local/share/opencode/usage.db`   |
+| `OPENCODE_USAGE_DB` | Path to the SQLite database file | `~/.local/share/opencode/usage.db` |
+| `CURSOR_API_KEY` | Cursor Cloud Agents API key (Dashboard → API Keys). Required for the Cursor page **Update pricing** button. | unset |
+| `CURSOR_AGENT_REPO_URL` | GitHub repo the pricing agent should work in | `https://github.com/wcleeah/opencode-stats` |
+| `CURSOR_AGENT_STARTING_REF` | Branch the pricing agent starts from | `main` |
 
 ## Dependencies to Use
 

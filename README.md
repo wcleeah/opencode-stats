@@ -48,7 +48,8 @@ Start the dev server:
 ```bash
 pnpm dev
 ```
-Open `http://localhost:3000`.
+Open `http://localhost:3000` (redirects to the SaaS dashboard at `/saas`).
+OpenCode usage is at `/opencode`; Cursor usage is at `/cursor`.
 
 Pages are server-rendered and query the database directly from server code; the
 app does not add a separate internal API layer for the main analytics screens.

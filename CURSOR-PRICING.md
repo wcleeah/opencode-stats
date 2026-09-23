@@ -30,7 +30,12 @@ Use this order. Stop when a row is unambiguous.
 2. **Per-model Cursor docs** (launch posts and “Pricing” sections)
    - https://cursor.com/docs/models/grok-4-5
    - https://cursor.com/docs/models/grok-4-6
+   - https://cursor.com/docs/models/grok-4-7
    - https://cursor.com/docs/models/cursor-composer-2-5
+   - https://cursor.com/docs/models/claude-opus-5-5
+   - https://cursor.com/docs/models/claude-fable-5-1
+   - https://cursor.com/docs/models/gemini-3-8-flash
+   - https://cursor.com/docs/models/muse-spark-1-3
    - https://cursor.com/blog (e.g. “Introducing Grok 4.5”)
 3. **Cursor changelog / forum** for first-party pool rules and launch-week promos
    https://cursor.com/changelog
@@ -126,8 +131,10 @@ uses `Date.now()` (current card).
 2. If CSV ids differ (`gpt-5.6-sol-medium`, `cursor-grok-4.5-high-fast`),
    either:
    - add `MODEL_ALIASES` entries, or
-   - rely on `resolvePricingKey` stripping `-thinking-(low|medium|high|xhigh)`,
-     `-(low|medium|high|xhigh)-fast`, and `-(low|medium|high|xhigh)`.
+   - rely on `resolvePricingKey` stripping `-thinking-(low|medium|high|xhigh|max|minimal|none)`,
+     `-(low|medium|high|xhigh|max|minimal|none)-fast`, and
+     `-(low|medium|high|xhigh|max|minimal|none)`.
+     Exact table keys win first (`gpt-5.1-codex-max` is a family, not an effort).
 3. Set the usage **pool** in `getCursorUsagePool`:
    - `cursor` — Auto, Composer\*, Cursor Grok / Grok\*
    - `other` — everything else (Claude, GPT, Gemini, …)
@@ -146,13 +153,18 @@ uses `Date.now()` (current card).
 - [ ] `SAMPLE_CSV_MODELS` updated if the CSV grew.
 - [ ] `pnpm test` and `pnpm run typecheck`.
 
-## Known dated cards (as of 2026-08-25)
+## Known dated cards (as of 2026-09-23)
 
 | Model | Card | When |
 | --- | --- | --- |
 | GPT-5.6 Sol | $5 in / $30 out (launch) | Until **2026-08-21** 00:00 UTC |
 | GPT-5.6 Sol | $4 in / $20 out (promo) | From **2026-08-21**; at least through **2026-11-21** |
 | Grok 4.5 Fast | $4 in / $18 out | Launch **2026-07-08**; no later list-rate change |
+| Grok 4.7 | $2 in / $6 out; Fast $4 / $12 | Launch **2026-09-21**; 500k is 2x / Fast-500k 3x of standard |
+| Claude Fable 5.1 | $10 in / $50 out; cache read $0.25 | Launch **2026-09-01** (same I/O as Fable 5) |
+| Claude Opus 5.5 | $4 in / $20 out; Fast $8 / $40 | Launch **2026-09-22** |
+| Gemini 3.8 Flash | $0.75 in / $3.50 out | Cursor list from **2026-09-02**; Google API intro $3.75 out expires 2026-12-31 — do not assume Cursor moves then |
+| Muse Spark 1.3 | $1.25 in / $4.25 out; cache read $0.15 | Meta **2026-09-02**; Cursor **2026-09-09** |
 
 After 2026-11-21, re-check OpenAI + Cursor docs before assuming Sol stays
 at $4/$20.

@@ -14,10 +14,15 @@ Cursor’s invoice.
 | --- | --- |
 | `src/lib/cursor/pricing.ts` | Rate table, aliases, pool (`cursor` vs `other`), dated overrides, `estimateCursorCost` |
 | `src/lib/cursor/pricing.test.ts` | Rate, alias, cutoff, and sample-CSV coverage tests |
-| `src/app/cursor/page.tsx` | Costs **per UTC day** via `utcNoonMs(day)`, then rolls days up to model / pool totals |
+| `src/lib/cursor/agent.ts` | Launch a Cloud Agent (`POST /v1/agents`) that runs this checklist |
+| `src/app/cursor/page.tsx` | Costs **per UTC day** via `utcNoonMs(day)`, then rolls days up to model / pool totals; **Update pricing** button |
 | `src/lib/cursor/csv.ts` | Parses Cursor usage CSV; `Model` slugs must resolve in pricing |
 
 No database migration. Rates are applied at query time from stored tokens.
+
+The Cursor dashboard **Update pricing** button calls `POST /api/cursor/update-pricing`,
+which launches a Cloud Agent against this repo with a fixed prompt (the client
+cannot supply a custom task). Requires `CURSOR_API_KEY`.
 
 ## Where to look for new prices
 

@@ -1,7 +1,6 @@
 export const dynamic = 'force-dynamic';
 
-import Link from 'next/link';
-
+import { readCursorAgentEnv } from '@/lib/cursor/agent';
 import { resolveCursorDashboardQuery } from '@/lib/cursor/billing-cycle';
 import {
   estimateCursorCost,
@@ -41,6 +40,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { DateRangeControls } from '@/components/date-range-controls';
 import { BillingCycleControls } from '@/components/cursor/billing-cycle-controls';
+import { CursorDashboardHeader } from '@/components/cursor/dashboard-header';
 import { CursorTokenChart } from '@/components/cursor/token-chart';
 import { CursorCostChart } from '@/components/cursor/cost-chart';
 import { CursorSettingsForm } from '@/components/cursor/settings-form';
@@ -52,14 +52,18 @@ interface CursorPageProps {
 
 export default async function CursorDashboardPage({ searchParams }: CursorPageProps) {
   const params = await searchParams;
+  const canLaunchPricingAgent = readCursorAgentEnv().configured;
 
   const settingsResult = await getCursorSettings();
   if (settingsResult.error || !settingsResult.data) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="text-center px-4">
-          <div className="text-error text-sm mb-2">Failed to load Cursor dashboard</div>
-          <div className="text-muted text-xs">{settingsResult.error}</div>
+      <div className="space-y-6">
+        <CursorDashboardHeader canLaunchPricingAgent={canLaunchPricingAgent} />
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <div className="text-center px-4">
+            <div className="text-error text-sm mb-2">Failed to load Cursor dashboard</div>
+            <div className="text-muted text-xs">{settingsResult.error}</div>
+          </div>
         </div>
       </div>
     );
@@ -98,10 +102,13 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
 
   if (statsResult.error) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
-        <div className="text-center px-4">
-          <div className="text-error text-sm mb-2">Failed to load Cursor dashboard</div>
-          <div className="text-muted text-xs">{statsResult.error}</div>
+      <div className="space-y-6">
+        <CursorDashboardHeader canLaunchPricingAgent={canLaunchPricingAgent} />
+        <div className="flex min-h-[40vh] items-center justify-center">
+          <div className="text-center px-4">
+            <div className="text-error text-sm mb-2">Failed to load Cursor dashboard</div>
+            <div className="text-muted text-xs">{statsResult.error}</div>
+          </div>
         </div>
       </div>
     );
@@ -120,15 +127,7 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
   if (!stats || stats.event_count === 0) {
     return (
       <div className="space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-lg font-bold">Cursor Dashboard</h1>
-          <Link
-            href="/cursor/upload"
-            className="rounded-md border border-border px-3 py-1.5 text-xs uppercase tracking-wide hover:bg-surface-alt"
-          >
-            Upload CSV
-          </Link>
-        </div>
+        <CursorDashboardHeader canLaunchPricingAgent={canLaunchPricingAgent} />
         <div className="flex flex-col gap-3">
           <BillingCycleControls
             billingCycleStartDay={settings.billing_cycle_start_day}
@@ -256,24 +255,16 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="space-y-1">
-          <h1 className="text-lg font-bold">Cursor Dashboard</h1>
-          <div className="text-xs text-muted">
-            Plan ${settings.plan_amount_usd}/mo · this cycle pool $
-            {cursorModelsIncludedUsd}
-            {fromCycleOverride ? '' : ' (default)'} · Other ≥$
-            {settings.included_pool_usd} · cycle day {settings.billing_cycle_start_day}{' '}
-            @ 16:00 HKT
-          </div>
-        </div>
-        <Link
-          href="/cursor/upload"
-          className="rounded-md border border-border px-3 py-1.5 text-xs uppercase tracking-wide hover:bg-surface-alt"
-        >
-          Upload CSV
-        </Link>
-      </div>
+      <CursorDashboardHeader
+        canLaunchPricingAgent={canLaunchPricingAgent}
+        planSummary={
+          `Plan $${settings.plan_amount_usd}/mo · this cycle pool $` +
+          `${cursorModelsIncludedUsd}` +
+          `${fromCycleOverride ? '' : ' (default)'} · Other ≥$` +
+          `${settings.included_pool_usd} · cycle day ${settings.billing_cycle_start_day} ` +
+          '@ 16:00 HKT'
+        }
+      />
 
       <div className="flex flex-col gap-3">
         <BillingCycleControls

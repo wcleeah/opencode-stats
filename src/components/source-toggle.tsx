@@ -10,7 +10,6 @@ interface SourceToggleProps {
 }
 
 const OPTIONS: Array<{ id: StatsSource; label: string }> = [
-  { id: 'opencode', label: 'OpenCode' },
   { id: 'cursor', label: 'Cursor' },
   { id: 'saas', label: 'SaaS' },
 ];

@@ -32,16 +32,6 @@ export interface McpUsageSnapshot {
   tavily_key_limit: number | null;
 }
 
-export interface McpToolUsageRow {
-  tool: string;
-  provider: 'exa' | 'tavily';
-  call_count: number;
-  error_count: number;
-  error_rate: number;
-  avg_duration_ms: number;
-  max_duration_ms: number;
-}
-
 export interface McpDailySnapshotPoint {
   day: string;
   tavily_plan_usage: number | null;

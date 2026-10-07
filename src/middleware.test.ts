@@ -28,10 +28,18 @@ test('middleware keeps /saas on the saas source', () => {
   assert.equal(response.cookies.get(STATS_SOURCE_COOKIE)?.value, 'saas');
 });
 
-test('middleware stamps opencode on /opencode', () => {
+test('middleware redirects /opencode to /saas', () => {
   const response = middleware(request('/opencode'));
-  assert.equal(response.status, 200);
-  assert.equal(response.cookies.get(STATS_SOURCE_COOKIE)?.value, 'opencode');
+  assert.equal(response.status, 307);
+  assert.equal(locationPath(response), '/saas');
+  assert.equal(response.cookies.get(STATS_SOURCE_COOKIE)?.value, 'saas');
+});
+
+test('middleware redirects OpenCode nested routes to /saas', () => {
+  const response = middleware(request('/projects/abc'));
+  assert.equal(response.status, 307);
+  assert.equal(locationPath(response), '/saas');
+  assert.equal(response.cookies.get(STATS_SOURCE_COOKIE)?.value, 'saas');
 });
 
 test('middleware still aliases /mcp to /saas', () => {

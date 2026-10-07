@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { execute, queryAll, queryOne } from '@/lib/db';
-import { getUtcCalendarMonth, utcDayKey } from '@/lib/mcp/calendar';
+import { getUtcCalendarMonth } from '@/lib/mcp/calendar';
 import {
   DEFAULT_TAVILY_WARN_PCT,
   MCP_MIN_REFRESH_MS,
@@ -11,8 +11,6 @@ import { readMcpEnvConfig } from '@/lib/mcp/env';
 import { lastSnapshotPerUtcDay } from '@/lib/mcp/history';
 import {
   computeTavilyMetrics,
-  isMcpProviderTool,
-  mcpToolProvider,
   type TavilyPoolMetrics,
 } from '@/lib/mcp/metrics';
 import { ensureMcpSchema } from '@/lib/mcp/schema';
@@ -21,7 +19,6 @@ import type {
   McpDailySnapshotPoint,
   McpLink,
   McpSettings,
-  McpToolUsageRow,
   McpUsageSnapshot,
 } from '@/types/mcp';
 
@@ -359,123 +356,35 @@ export async function refreshMcpSnapshot(params?: {
   }
 }
 
-const MCP_TOOL_SQL = `
-  (
-    lower(tool) = 'exa'
-    OR lower(tool) LIKE 'exa_%'
-    OR lower(tool) LIKE 'exa-%'
-    OR lower(tool) LIKE '%_exa'
-    OR lower(tool) LIKE '%_exa_%'
-    OR lower(tool) = 'tavily'
-    OR lower(tool) LIKE 'tavily_%'
-    OR lower(tool) LIKE 'tavily-%'
-    OR lower(tool) LIKE '%_tavily%'
-  )
-`;
+export interface McpShellData {
+  settings: McpSettings;
+  links: McpLink[];
+}
 
-export async function getMcpLocalToolUsage(params: {
-  startDay: string;
-  endDay: string;
-}): Promise<{
-  data: McpToolUsageRow[] | null;
+export async function getMcpShell(): Promise<{
+  data: McpShellData | null;
   error: string | null;
-  source: 'daily' | 'all_time' | 'none';
 }> {
-  const daily = await queryAll<{
-    tool: string;
-    call_count: number;
-    error_count: number;
-    avg_duration_ms: number;
-    max_duration_ms: number;
-  }>(
-    `SELECT
-       tool,
-       COALESCE(SUM(call_count), 0) AS call_count,
-       COALESCE(SUM(error_count), 0) AS error_count,
-       CASE
-         WHEN COALESCE(SUM(call_count), 0) > 0
-           THEN ROUND(1.0 * SUM(avg_duration_ms * call_count) / SUM(call_count), 1)
-         ELSE 0
-       END AS avg_duration_ms,
-       COALESCE(MAX(max_duration_ms), 0) AS max_duration_ms
-     FROM daily_tool_rollups
-     WHERE day >= ? AND day <= ?
-       AND ${MCP_TOOL_SQL}
-     GROUP BY tool
-     ORDER BY call_count DESC, tool ASC`,
-    [params.startDay, params.endDay],
-  );
-
-  if (!daily.error && daily.data) {
-    return {
-      data: toToolRows(daily.data),
-      error: null,
-      source: 'daily',
-    };
+  const [settingsResult, linksResult] = await Promise.all([
+    getMcpSettings(),
+    listMcpLinks(),
+  ]);
+  if (settingsResult.error || !settingsResult.data) {
+    return { data: null, error: settingsResult.error ?? 'Failed to load SaaS settings.' };
   }
-
-  const allTime = await queryAll<{
-    tool: string;
-    call_count: number;
-    error_count: number;
-    avg_duration_ms: number;
-    max_duration_ms: number;
-  }>(
-    `SELECT
-       tool,
-       call_count,
-       error_count,
-       avg_duration_ms,
-       max_duration_ms
-     FROM tool_rollups
-     WHERE ${MCP_TOOL_SQL}
-     ORDER BY call_count DESC, tool ASC`,
-  );
-
-  if (allTime.error) {
-    console.error('[getMcpLocalToolUsage]', daily.error ?? allTime.error);
-    return { data: [], error: null, source: 'none' };
+  if (linksResult.error) {
+    return { data: null, error: linksResult.error };
   }
-
   return {
-    data: toToolRows(allTime.data ?? []),
+    data: {
+      settings: settingsResult.data,
+      links: linksResult.data ?? [],
+    },
     error: null,
-    source: (allTime.data && allTime.data.length > 0) ? 'all_time' : 'none',
   };
 }
 
-function toToolRows(
-  rows: Array<{
-    tool: string;
-    call_count: number;
-    error_count: number;
-    avg_duration_ms: number;
-    max_duration_ms: number;
-  }>,
-): McpToolUsageRow[] {
-  return rows
-    .filter((row) => isMcpProviderTool(row.tool))
-    .map((row) => {
-      const provider = mcpToolProvider(row.tool);
-      if (!provider) {
-        return null;
-      }
-      const callCount = Number(row.call_count) || 0;
-      const errorCount = Number(row.error_count) || 0;
-      return {
-        tool: row.tool,
-        provider,
-        call_count: callCount,
-        error_count: errorCount,
-        error_rate: callCount > 0 ? Math.round((1000 * errorCount) / callCount) / 10 : 0,
-        avg_duration_ms: Number(row.avg_duration_ms) || 0,
-        max_duration_ms: Number(row.max_duration_ms) || 0,
-      };
-    })
-    .filter((row): row is McpToolUsageRow => row !== null);
-}
-
-export interface McpDashboardData {
+export interface McpTavilyDashboardData {
   settings: McpSettings;
   snapshot: McpUsageSnapshot | null;
   skippedRefresh: boolean;
@@ -488,44 +397,38 @@ export interface McpDashboardData {
   lastFetchedAt: number | null;
   nextRefreshAt: number | null;
   history: McpDailySnapshotPoint[];
-  localTools: McpToolUsageRow[];
-  localToolSource: 'daily' | 'all_time' | 'none';
-  links: McpLink[];
 }
 
-export async function getMcpDashboard(params?: {
+export async function getMcpTavilyDashboard(params?: {
   forceRefresh?: boolean;
   now?: Date;
-}): Promise<{ data: McpDashboardData | null; error: string | null }> {
+}): Promise<{ data: McpTavilyDashboardData | null; error: string | null }> {
   const now = params?.now ?? new Date();
   const env = readMcpEnvConfig();
   const month = getUtcCalendarMonth(now);
 
-  const settingsResult = await getMcpSettings();
+  const [settingsResult, refreshed] = await Promise.all([
+    getMcpSettings(),
+    env.tavilyConfigured
+      ? refreshMcpSnapshot({ force: params?.forceRefresh, now })
+      : getLatestMcpSnapshot().then((result) => ({
+        data: result.data ?? null,
+        error: null,
+        skipped: true,
+      })),
+  ]);
+
   if (settingsResult.error || !settingsResult.data) {
     return { data: null, error: settingsResult.error ?? 'Failed to load SaaS settings.' };
   }
-  const settings = settingsResult.data;
-
-  const refreshed = env.tavilyConfigured
-    ? await refreshMcpSnapshot({ force: params?.forceRefresh, now })
-    : { data: (await getLatestMcpSnapshot()).data ?? null, error: null, skipped: true };
-
   if (refreshed.error && !refreshed.data) {
     return { data: null, error: refreshed.error };
   }
 
+  const settings = settingsResult.data;
   const snapshot = refreshed.data;
   const historyResult = await listMcpSnapshots({ cycleMonth: month.key });
   const history = lastSnapshotPerUtcDay(historyResult.data ?? []);
-
-  const startDay = utcDayKey(month.startMs);
-  const endDay = utcDayKey(month.endMs);
-  const localToolsResult = await getMcpLocalToolUsage({ startDay, endDay });
-  const linksResult = await listMcpLinks();
-  if (linksResult.error) {
-    return { data: null, error: linksResult.error };
-  }
 
   const tavily = snapshot?.tavily_ok
     ? computeTavilyMetrics({
@@ -558,9 +461,6 @@ export async function getMcpDashboard(params?: {
       lastFetchedAt,
       nextRefreshAt,
       history,
-      localTools: localToolsResult.data ?? [],
-      localToolSource: localToolsResult.source,
-      links: linksResult.data ?? [],
     },
     error: null,
   };

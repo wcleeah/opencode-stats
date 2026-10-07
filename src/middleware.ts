@@ -11,13 +11,17 @@ function setSourceCookie(response: NextResponse, source: string): NextResponse {
   return response;
 }
 
+function redirectToSaas(request: NextRequest): NextResponse {
+  const url = request.nextUrl.clone();
+  url.pathname = '/saas';
+  return setSourceCookie(NextResponse.redirect(url), 'saas');
+}
+
 export function middleware(request: NextRequest): NextResponse {
   const { pathname } = request.nextUrl;
 
   if (pathname === '/') {
-    const url = request.nextUrl.clone();
-    url.pathname = '/saas';
-    return setSourceCookie(NextResponse.redirect(url), 'saas');
+    return redirectToSaas(request);
   }
 
   if (pathname === '/cursor' || pathname.startsWith('/cursor/')) {
@@ -47,7 +51,7 @@ export function middleware(request: NextRequest): NextResponse {
   );
 
   if (isOpenCodeRoute) {
-    return setSourceCookie(NextResponse.next(), 'opencode');
+    return redirectToSaas(request);
   }
 
   return NextResponse.next();
@@ -58,10 +62,15 @@ export const config = {
     '/',
     '/opencode',
     '/opencode/:path*',
+    '/projects',
     '/projects/:path*',
+    '/time',
     '/time/:path*',
+    '/tools',
     '/tools/:path*',
+    '/models',
     '/models/:path*',
+    '/sessions',
     '/sessions/:path*',
     '/cursor',
     '/cursor/:path*',

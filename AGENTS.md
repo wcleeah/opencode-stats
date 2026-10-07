@@ -3,8 +3,9 @@
 ## Project Overview
 
 OpenCode Stats Viewer -- a Next.js web application that displays usage statistics
-from the OpenCode AI assistant. It reads from a local SQLite database at
-`~/.local/share/opencode/usage.db` (overridable via `OPENCODE_USAGE_DB` env var).
+from the OpenCode AI assistant. Production reads a Turso/libSQL database via
+`TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN`. The app is hosted on Railway;
+Cloudflare can remain the DNS host.
 
 See `USAGE-DB-GUIDE.md` for the complete database schema, entity relationships,
 and recommended SQL query patterns.
@@ -15,9 +16,10 @@ price cutoffs (`src/lib/cursor/pricing.ts`).
 ## Tech Stack
 
 - **Framework**: Next.js (App Router)
-- **Runtime / Package Manager**: Bun
+- **Runtime / Package Manager**: Node.js / pnpm
 - **Language**: TypeScript (strict mode)
-- **Database**: SQLite via `bun:sqlite` (Bun's built-in SQLite driver)
+- **Database**: Turso/libSQL via `@libsql/client`
+- **Hosting**: Railway
 - **Styling**: Tailwind CSS; visual design references grep.app and OpenCode's UI
 
 ## Build / Dev / Test Commands
@@ -39,7 +41,7 @@ pnpm test --grep "name"   # run tests matching a pattern
 ```
 
 Test files live alongside source code with the `.test.ts` / `.test.tsx` suffix.
-Use `bun:test` (Bun's built-in test runner) with `describe`, `it`, `expect`.
+Use `node --test` with `tsx` (`describe`, `it`/`test`, `expect`).
 
 ## Project Structure
 
@@ -122,7 +124,6 @@ public/                  # static assets
 
 - All timestamps in the database are Unix epoch **milliseconds** -- divide by
   1000 for SQLite date functions, use `new Date(ts)` in JS
-- Open the database in read-only mode (`readonly: true`) -- this app only reads
 - Use a singleton connection pattern; open once at module scope in `lib/db.ts`
 - Use parameterized queries for all user-supplied values (never interpolate)
 - Cost is 0 for `github-copilot` provider -- display as "Included" or estimate
@@ -133,7 +134,7 @@ public/                  # static assets
 ### Testing
 
 - Test files: `*.test.ts` / `*.test.tsx` next to the source file they test
-- Use `bun:test` -- `describe`, `it`/`test`, `expect`
+- Use `node --test` with `tsx` -- `describe`, `it`/`test`, `expect`
 - For database query tests, use an in-memory SQLite DB seeded with fixture data
 - For component tests, prefer testing behavior over implementation details
 - Mock external dependencies at module boundaries, not deep internals
@@ -151,17 +152,19 @@ These affect how you query and display data:
 
 ## Environment Variables
 
-| Variable            | Description                                   | Default                              |
-|---------------------|-----------------------------------------------|--------------------------------------|
-| `OPENCODE_USAGE_DB` | Path to the SQLite database file | `~/.local/share/opencode/usage.db` |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `TURSO_DATABASE_URL` | Turso/libSQL database URL | — |
+| `TURSO_AUTH_TOKEN` | Turso auth token | — |
+| `TAVILY_API_KEY` | Tavily API key for SaaS remaining-credits | — |
 | `CURSOR_API_KEY` | Cursor Cloud Agents API key (Dashboard → API Keys). Required for the Cursor page **Update pricing** button. | unset |
 | `CURSOR_AGENT_REPO_URL` | GitHub repo the pricing agent should work in | `https://github.com/wcleeah/opencode-stats` |
 | `CURSOR_AGENT_STARTING_REF` | Branch the pricing agent starts from | `main` |
 
 ## Dependencies to Use
 
-- `bun:sqlite` -- built-in SQLite driver, no external package needed
-- `recharts` or `@nivo/core` -- charting (pick one)
+- `@libsql/client` -- Turso/libSQL driver
+- `recharts` -- charting
 - `tailwindcss` -- styling
 - `clsx` + `tailwind-merge` -- conditional class merging
 - `date-fns` -- date formatting and manipulation

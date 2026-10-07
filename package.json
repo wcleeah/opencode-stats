@@ -8,14 +8,10 @@
         "start": "next start",
         "lint": "pnpm exec eslint",
         "test": "node --import tsx --test $(find src -name '*.test.ts' | sort)",
-        "typecheck": "pnpm exec tsc --noEmit",
-        "cf-typegen": "wrangler types --env-interface CloudflareEnv cloudflare-env.d.ts",
-        "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-        "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
+        "typecheck": "pnpm exec tsc --noEmit"
     },
     "dependencies": {
         "@libsql/client": "^0.15",
-        "@opennextjs/cloudflare": "^1.14.8",
         "clsx": "^2.1.1",
         "date-fns": "^4.1.0",
         "next": "16.1.6",
@@ -39,8 +35,10 @@
         "eslint-config-next": "16.1.6",
         "tailwindcss": "^4",
         "tsx": "^4.20.6",
-        "typescript": "^5",
-        "wrangler": "^4.54.0"
+        "typescript": "^5"
     },
-    "packageManager": "pnpm@10.29.1+sha512.48dae233635a645768a3028d19545cacc1688639eeb1f3734e42d6d6b971afbf22aa1ac9af52a173d9c3a20c15857cfa400f19994d79a2f626fcc73fccda9bbc"
+    "packageManager": "pnpm@10.29.1+sha512.48dae233635a645768a3028d19545cacc1688639eeb1f3734e42d6d6b971afbf22aa1ac9af52a173d9c3a20c15857cfa400f19994d79a2f626fcc73fccda9bbc",
+    "engines": {
+        "node": ">=20"
+    }
 }

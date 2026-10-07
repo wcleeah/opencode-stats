@@ -5,7 +5,7 @@ import {
   type Client,
   type InStatement,
   type ResultSet,
-} from '@libsql/client/web';
+} from '@libsql/client';
 
 let client: Client | null = null;
 

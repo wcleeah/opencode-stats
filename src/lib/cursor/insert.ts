@@ -32,9 +32,8 @@ export const CURSOR_IMPORT_ROWS_PER_STATEMENT = 50;
 
 /**
  * Multi-row INSERT statements grouped into one libsql `batch()` HTTP call.
- * Each `execute`/`batch` is a Cloudflare Worker subrequest to Turso; a CSV
- * with tens of thousands of rows used to issue one batch per 50 rows and
- * hit the per-invocation subrequest limit.
+ * A CSV with tens of thousands of rows used to issue one batch per 50 rows;
+ * grouping keeps Turso round-trips bounded.
  */
 export const CURSOR_IMPORT_STATEMENTS_PER_BATCH = 40;
 

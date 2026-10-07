@@ -18,7 +18,7 @@ OpenCode Stats is a Next.js dashboard for exploring OpenCode usage data from a T
 - Tailwind
 - Recharts
 - `@libsql/client` for Turso/libSQL access
-- OpenNext + Wrangler for Cloudflare deployment
+- Railway for production hosting (Cloudflare remains DNS-only)
 
 ## Requirements
 - `pnpm`
@@ -38,7 +38,7 @@ CURSOR_API_KEY=<cursor cloud agents api key>
 ```
 The repo also includes `.env.example` with the same placeholders.
 
-SaaS provider keys and `CURSOR_API_KEY` are read from process env (Railway / Cloudflare / `.env.local`). They are never stored in Turso. Restart the process after changing secrets. Exa personal plans have no billing API, so remaining USD is not fetched; add a named Quick link on the SaaS page to open the Exa dashboard instead.
+SaaS provider keys and `CURSOR_API_KEY` are read from process env (Railway variables / `.env.local`). They are never stored in Turso. Restart the process after changing secrets. Exa personal plans have no billing API, so remaining USD is not fetched; add a named Quick link on the SaaS page to open the Exa dashboard instead.
 
 Create a Cursor API key at Dashboard → API Keys. The Cursor page **Update pricing** button uses it to launch a Cloud Agent that syncs `src/lib/cursor/pricing.ts` and opens a PR. The key owner must have access to `CURSOR_AGENT_REPO_URL` (defaults to this repo).
 
@@ -57,24 +57,27 @@ OpenCode usage is at `/opencode`; Cursor usage is at `/cursor`.
 Pages are server-rendered and query the database directly from server code; the
 app does not add a separate internal API layer for the main analytics screens.
 
-## Cloudflare Deployment
+## Railway Deployment
 
-This repo is configured for Cloudflare Workers via OpenNext.
+This repo is a standard Next.js app. Railway builds with `pnpm run build` and
+starts with `pnpm start` (`next start`).
 
-Preview locally:
-
-```bash
-pnpm preview
-```
-
-Deploy:
+Set these variables on the Railway service (do not commit them):
 
 ```bash
-pnpm deploy
+TURSO_DATABASE_URL=libsql://opencode-usage-<org>.turso.io
+TURSO_AUTH_TOKEN=<token>
+TAVILY_API_KEY=<tavily api key>
+CURSOR_API_KEY=<cursor cloud agents api key>
+# Optional:
+# CURSOR_AGENT_REPO_URL=https://github.com/wcleeah/opencode-stats
+# CURSOR_AGENT_STARTING_REF=main
 ```
 
-Before deploying, make sure `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` are
-available to the Cloudflare runtime.
+Generate a Railway service domain first, confirm the app boots, then attach a
+custom domain in Railway if you want one. Keep the DNS zone on Cloudflare and
+point the hostname at the Railway CNAME (plus the Railway TXT ownership record).
+Cloudflare proxy is optional; DNS-only (grey cloud) is the simplest setup.
 
 ## Project Structure
 

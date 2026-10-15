@@ -65,6 +65,9 @@ test('computeTavilyMetrics remaining credits and exhaustion', () => {
   assert.equal(out.remaining, 0);
   assert.equal(out.exhausted, true);
   assert.equal(out.paygoActive, true);
+  assert.equal(out.paygoRemaining, 75);
+  assert.equal(out.paygoUsedPct, 25);
+  assert.equal(out.paygoWarn, false);
   assert.equal(out.estimatedPaygoUsd, 0.2);
 });
 
@@ -123,6 +126,7 @@ test('parseTavilyUsage reads plan remaining fields', () => {
   assert.equal(parsed.plan, 'Researcher');
   assert.equal(parsed.planUsage, 400);
   assert.equal(parsed.planLimit, 1000);
+  assert.equal(parsed.paygoUsage, 0);
   assert.equal(parsed.paygoLimit, null);
   assert.equal(parsed.searchUsage, 350);
   assert.equal(parsed.keyUsage, 150);
@@ -171,7 +175,24 @@ test('lastSnapshotPerUtcDay keeps the last poll of each UTC day', () => {
   assert.equal(points.length, 2);
   assert.equal(points[0].day, '2026-09-02');
   assert.equal(points[0].tavily_plan_usage, 40);
+  assert.equal(points[0].tavily_paygo_usage, 0);
   assert.equal(points[1].day, '2026-09-03');
+});
+
+test('parseTavilyUsage reads pay-as-you-go credits', () => {
+  const parsed = parseTavilyUsage({
+    account: {
+      current_plan: 'Bootstrap',
+      plan_usage: 15000,
+      plan_limit: 15000,
+      paygo_usage: 25,
+      paygo_limit: 100,
+    },
+  });
+  assert.ok(!('error' in parsed));
+  if ('error' in parsed) return;
+  assert.equal(parsed.paygoUsage, 25);
+  assert.equal(parsed.paygoLimit, 100);
 });
 
 test('fetchTavilyUsage sends bearer auth', async () => {

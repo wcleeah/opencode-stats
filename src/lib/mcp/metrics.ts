@@ -10,7 +10,10 @@ export interface TavilyPoolMetrics {
   exhausted: boolean;
   paygoUsage: number;
   paygoLimit: number | null;
+  paygoRemaining: number | null;
+  paygoUsedPct: number | null;
   paygoActive: boolean;
+  paygoWarn: boolean;
   estimatedPaygoUsd: number;
   burnRatio: number | null;
   warn: boolean;
@@ -38,6 +41,14 @@ export function computeTavilyMetrics(params: {
   const usedFraction = usedPct === null ? 0 : usedPct / 100;
   const burnRatio =
     params.elapsedRatio <= 0 ? null : usedFraction / params.elapsedRatio;
+  const paygoLimit = params.paygoLimit;
+  const paygoRemaining = paygoLimit === null
+    ? null
+    : Math.max(0, paygoLimit - params.paygoUsage);
+  const paygoUsedPct =
+    paygoLimit === null || paygoLimit <= 0
+      ? null
+      : Math.min(100, (params.paygoUsage / paygoLimit) * 100);
 
   return {
     plan: params.plan,
@@ -48,8 +59,11 @@ export function computeTavilyMetrics(params: {
     unlimited,
     exhausted,
     paygoUsage: params.paygoUsage,
-    paygoLimit: params.paygoLimit,
+    paygoLimit,
+    paygoRemaining,
+    paygoUsedPct,
     paygoActive: params.paygoUsage > 0,
+    paygoWarn: paygoUsedPct !== null && paygoUsedPct >= params.warnPct,
     estimatedPaygoUsd: params.paygoUsage * TAVILY_PAYGO_USD_PER_CREDIT,
     burnRatio,
     warn:

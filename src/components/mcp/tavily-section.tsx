@@ -87,7 +87,7 @@ export async function TavilySection() {
         </Card>
       )}
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard
           label="Remaining"
           value={
@@ -107,13 +107,22 @@ export async function TavilySection() {
           accent
         />
         <StatCard
+          label="Pay as you go"
+          value={d.tavily ? formatCredits(d.tavily.paygoUsage) : '—'}
+          subValue={
+            d.tavily
+              ? `${
+                  d.tavily.paygoLimit === null
+                    ? 'no cap'
+                    : `${formatCredits(d.tavily.paygoRemaining ?? 0)} left of ${formatCredits(d.tavily.paygoLimit)}`
+                } · ${formatCost(d.tavily.estimatedPaygoUsd, true)}`
+              : snapshot?.tavily_error ?? 'Not fetched'
+          }
+        />
+        <StatCard
           label="Burn"
           value={formatBurnRatio(d.tavily?.burnRatio ?? null)}
-          subValue={
-            d.tavily?.paygoActive
-              ? `PAYGO ${formatCredits(d.tavily.paygoUsage)} · ${formatCost(d.tavily.estimatedPaygoUsd, true)}`
-              : 'vs month elapsed'
-          }
+          subValue="vs month elapsed"
         />
         <StatCard
           label="Reset"
@@ -135,7 +144,7 @@ export async function TavilySection() {
         warn={Boolean(d.tavily?.warn)}
         detail={
           d.tavily?.exhausted
-            ? 'Free credits used up — enable PAYGO or wait for reset.'
+            ? 'Plan credits used up. Extra usage is billed as pay as you go.'
             : d.tavily?.warn
               ? `At or above the ${d.settings.tavily_warn_pct}% warning.`
               : snapshot?.tavily_error && !d.tavily
@@ -143,6 +152,16 @@ export async function TavilySection() {
                 : `${(d.elapsedRatio * 100).toFixed(0)}% of month elapsed`
         }
       />
+
+      {d.tavily && d.tavily.paygoLimit !== null && d.tavily.paygoLimit > 0 && (
+        <PoolMeter
+          label="Pay as you go"
+          usedLabel={`${formatCredits(d.tavily.paygoUsage)} / ${formatCredits(d.tavily.paygoLimit)}`}
+          percent={d.tavily.paygoUsedPct ?? 0}
+          warn={d.tavily.paygoWarn}
+          detail={`${formatCost(d.tavily.estimatedPaygoUsd, true)} at $0.008 / credit`}
+        />
+      )}
 
       <div className="flex flex-wrap gap-2">
         {d.tavily?.exhausted && <Badge variant="error">Exhausted</Badge>}

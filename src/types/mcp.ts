@@ -35,4 +35,5 @@ export interface McpUsageSnapshot {
 export interface McpDailySnapshotPoint {
   day: string;
   tavily_plan_usage: number | null;
+  tavily_paygo_usage: number | null;
 }

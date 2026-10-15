@@ -7,6 +7,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from 'recharts';
 
@@ -15,6 +16,7 @@ import { useChartColors } from '@/lib/use-chart-colors';
 export interface McpHistoryPoint {
   day: string;
   tavily_plan_usage: number | null;
+  tavily_paygo_usage: number | null;
 }
 
 interface McpHistoryChartProps {
@@ -31,24 +33,31 @@ function CustomTooltip({
   label,
 }: {
   active?: boolean;
-  payload?: Array<{ value: number }>;
+  payload?: Array<{ name?: string; value: number; color?: string }>;
   label?: string;
 }) {
   if (!active || !payload?.length) return null;
-  const value = payload[0].value;
   return (
     <div className="rounded-sm border border-border bg-surface px-3 py-2 text-xs">
       <div className="mb-1 text-muted">{label}</div>
-      <div className="font-medium tabular-nums text-foreground">
-        {`${formatTavily(value)} credits`}
-      </div>
+      {payload.map((item) => (
+        <div
+          key={item.name}
+          className="font-medium tabular-nums text-foreground"
+          style={{ color: item.color }}
+        >
+          {`${item.name ?? 'Credits'}: ${formatTavily(item.value)}`}
+        </div>
+      ))}
     </div>
   );
 }
 
 export function McpHistoryChart({ data }: McpHistoryChartProps) {
   const c = useChartColors();
-  const series = data.filter((row) => row.tavily_plan_usage !== null);
+  const series = data.filter(
+    (row) => row.tavily_plan_usage !== null || row.tavily_paygo_usage !== null,
+  );
 
   if (series.length === 0) {
     return (
@@ -77,7 +86,14 @@ export function McpHistoryChart({ data }: McpHistoryChartProps) {
           width={48}
         />
         <Tooltip content={<CustomTooltip />} />
-        <Bar dataKey="tavily_plan_usage" fill={c.chart1} radius={[2, 2, 0, 0]} />
+        <Legend wrapperStyle={{ fontSize: 11, color: c.legend }} />
+        <Bar dataKey="tavily_plan_usage" name="Plan" fill={c.chart1} radius={[2, 2, 0, 0]} />
+        <Bar
+          dataKey="tavily_paygo_usage"
+          name="Pay as you go"
+          fill={c.chart3}
+          radius={[2, 2, 0, 0]}
+        />
       </BarChart>
     </ResponsiveContainer>
   );

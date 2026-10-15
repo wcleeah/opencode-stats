@@ -14,5 +14,6 @@ export function lastSnapshotPerUtcDay(
     .map(([day, snapshot]) => ({
       day,
       tavily_plan_usage: snapshot.tavily_plan_usage,
+      tavily_paygo_usage: snapshot.tavily_paygo_usage,
     }));
 }

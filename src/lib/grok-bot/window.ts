@@ -1,4 +1,8 @@
-import type { GrokBotChartMode } from '@/lib/grok-bot/href';
+import type {
+  GrokBotProjectedCompare,
+  GrokBotProjectedPrimary,
+} from '@/lib/grok-bot/cycle';
+import type { GrokBotChartMode, GrokBotNegativeCycleDelta } from '@/lib/grok-bot/href';
 import {
   grokBotOutsUsd,
   grokBotTokenTotal,
@@ -227,4 +231,184 @@ export function foldGrokBotWindow(input: {
     ? { mode: 'by-type', lines: input.seriesTypes, points: byTypePoints }
     : { mode: 'ins-outs', points: insOutsPoints };
   return { totals, charts };
+}
+
+export interface GrokBotPrimaryPeriod {
+  readonly role: 'primary';
+  readonly label: string;
+  readonly shortLabel: string;
+  readonly totals: GrokBotWindowTotals;
+}
+
+export interface GrokBotComparePeriod {
+  readonly role: 'compare';
+  readonly delta: GrokBotNegativeCycleDelta;
+  readonly label: string;
+  readonly shortLabel: string;
+  readonly totals: GrokBotWindowTotals;
+}
+
+export type GrokBotPeriod = GrokBotPrimaryPeriod | GrokBotComparePeriod;
+
+/** Index 0 is the primary. Every later entry is a compare period. */
+export type GrokBotPeriodList = readonly [
+  GrokBotPrimaryPeriod,
+  ...GrokBotComparePeriod[],
+];
+
+export function grokBotCompareDeltas(
+  periods: GrokBotPeriodList,
+): readonly GrokBotNegativeCycleDelta[] {
+  const deltas: GrokBotNegativeCycleDelta[] = [];
+  for (const period of periods) {
+    if (period.role === 'compare') deltas.push(period.delta);
+  }
+  return deltas;
+}
+
+export interface GrokBotMeasureCell {
+  readonly tokens: number;
+  readonly usd: number;
+}
+
+export interface GrokBotByTypeAlignedPoint {
+  readonly bucketStartMs: number;
+  /** `values[lineIndex][periodIndex]` matches `lines` and `periods`. */
+  readonly values: readonly (readonly GrokBotMeasureCell[])[];
+}
+
+export interface GrokBotInsOutsSide {
+  readonly insTokens: number;
+  readonly outsTokens: number;
+  readonly insUsd: number;
+  readonly outsUsd: number;
+}
+
+export interface GrokBotInsOutsAlignedPoint {
+  readonly bucketStartMs: number;
+  /** `sides[periodIndex]` matches `periods`. */
+  readonly sides: readonly GrokBotInsOutsSide[];
+}
+
+export type GrokBotAlignedCharts =
+  | {
+      readonly mode: 'by-type';
+      readonly lines: readonly GrokBotTypeLine[];
+      readonly periods: GrokBotPeriodList;
+      readonly points: readonly GrokBotByTypeAlignedPoint[];
+    }
+  | {
+      readonly mode: 'ins-outs';
+      readonly periods: GrokBotPeriodList;
+      readonly points: readonly GrokBotInsOutsAlignedPoint[];
+    };
+
+const ZERO_MEASURE: GrokBotMeasureCell = { tokens: 0, usd: 0 };
+
+const ZERO_SIDE: GrokBotInsOutsSide = {
+  insTokens: 0,
+  outsTokens: 0,
+  insUsd: 0,
+  outsUsd: 0,
+};
+
+interface AlignedFold {
+  readonly projected: GrokBotProjectedPrimary | GrokBotProjectedCompare;
+  readonly folded: {
+    readonly totals: GrokBotWindowTotals;
+    readonly charts: GrokBotCharts;
+  };
+}
+
+function toPeriod(fold: AlignedFold): GrokBotPeriod {
+  const { projected } = fold;
+  if (projected.role === 'primary') {
+    return {
+      role: 'primary',
+      label: projected.label,
+      shortLabel: projected.shortLabel,
+      totals: fold.folded.totals,
+    };
+  }
+  return {
+    role: 'compare',
+    delta: projected.delta,
+    label: projected.label,
+    shortLabel: projected.shortLabel,
+    totals: fold.folded.totals,
+  };
+}
+
+function asPeriodList(folds: readonly AlignedFold[]): GrokBotPeriodList {
+  const primary = folds[0] === undefined ? undefined : toPeriod(folds[0]);
+  if (primary === undefined || primary.role !== 'primary') {
+    throw new Error('alignGrokBotPeriods requires a primary fold');
+  }
+  const compared: GrokBotComparePeriod[] = [];
+  for (const fold of folds.slice(1)) {
+    const period = toPeriod(fold);
+    if (period.role !== 'compare') {
+      throw new Error('alignGrokBotPeriods tail must be compare periods');
+    }
+    compared.push(period);
+  }
+  return [primary, ...compared];
+}
+
+function measureAt(
+  fold: AlignedFold,
+  pointIndex: number,
+  lineIndex: number,
+): GrokBotMeasureCell {
+  const charts = fold.folded.charts;
+  if (charts.mode !== 'by-type') return ZERO_MEASURE;
+  return charts.points[pointIndex]?.values[lineIndex] ?? ZERO_MEASURE;
+}
+
+function sideAt(fold: AlignedFold, pointIndex: number): GrokBotInsOutsSide {
+  const charts = fold.folded.charts;
+  if (charts.mode !== 'ins-outs') return ZERO_SIDE;
+  const point = charts.points[pointIndex];
+  if (!point) return ZERO_SIDE;
+  return {
+    insTokens: point.insTokens,
+    outsTokens: point.outsTokens,
+    insUsd: point.insUsd,
+    outsUsd: point.outsUsd,
+  };
+}
+
+export function alignGrokBotPeriods(input: {
+  readonly seriesTypes: readonly GrokBotTypeLine[];
+  readonly folds: readonly AlignedFold[];
+}): GrokBotAlignedCharts {
+  const periods = asPeriodList(input.folds);
+  const primaryCharts = input.folds[0].folded.charts;
+  if (primaryCharts.points.length === 0) {
+    if (primaryCharts.mode === 'by-type') {
+      return { mode: 'by-type', lines: input.seriesTypes, periods, points: [] };
+    }
+    return { mode: 'ins-outs', periods, points: [] };
+  }
+  if (primaryCharts.mode === 'by-type') {
+    return {
+      mode: 'by-type',
+      lines: input.seriesTypes,
+      periods,
+      points: primaryCharts.points.map((primaryPoint, pointIndex) => ({
+        bucketStartMs: primaryPoint.bucketStartMs,
+        values: input.seriesTypes.map((_, lineIndex) => (
+          input.folds.map((fold) => measureAt(fold, pointIndex, lineIndex))
+        )),
+      })),
+    };
+  }
+  return {
+    mode: 'ins-outs',
+    periods,
+    points: primaryCharts.points.map((primaryPoint, pointIndex) => ({
+      bucketStartMs: primaryPoint.bucketStartMs,
+      sides: input.folds.map((fold) => sideAt(fold, pointIndex)),
+    })),
+  };
 }

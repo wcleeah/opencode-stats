@@ -24,6 +24,23 @@ test('spending card marks a card estimate and names unpriced cache writes', () =
   assert.match(html, /ins 2\.00M · outs 500/);
 });
 
+test('rounded spending lines still add to the rounded total', () => {
+  const html = renderToStaticMarkup(createElement(GrokBotWindowStats, {
+    totals: {
+      tokens: { ins: 1, outs: 1 },
+      spend: {
+        totalUsd: 929.57840484,
+        insUsd: 848.66404044,
+        unpricedCacheWriteTokens: 0,
+        includesCardEstimate: true,
+      },
+    },
+  }));
+  assert.match(html, /~\$929\.58/);
+  assert.match(html, /ins ~\$848\.66 · outs ~\$80\.92/);
+  assert.equal(html.includes('~$80.91'), false);
+});
+
 test('a stored on-demand window prints spending without a tilde', () => {
   const html = renderToStaticMarkup(createElement(GrokBotWindowStats, {
     totals: {

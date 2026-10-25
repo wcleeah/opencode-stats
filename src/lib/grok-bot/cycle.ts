@@ -1,3 +1,5 @@
+import type { GrokBotNegativeCycleDelta } from '@/lib/grok-bot/href';
+
 export const GROK_BOT_WEEKDAYS = [
   'sunday',
   'monday',
@@ -204,10 +206,17 @@ function pad2(value: number): string {
   return String(value).padStart(2, '0');
 }
 
-export function formatGrokBotWallTime(wall: GrokBotWallTime): string {
-  const weekday = wall.weekday.charAt(0).toUpperCase() + wall.weekday.slice(1, 3);
+function weekdayAbbrev(weekday: GrokBotWeekday): string {
+  return weekday.charAt(0).toUpperCase() + weekday.slice(1, 3);
+}
+
+export function formatGrokBotWallDate(wall: GrokBotWallTime): string {
   const month = MONTHS[wall.month - 1] ?? '';
-  return `${weekday} ${wall.day} ${month} ${wall.year} ${pad2(wall.hour)}:${pad2(wall.minute)}`;
+  return `${weekdayAbbrev(wall.weekday)} ${wall.day} ${month} ${wall.year}`;
+}
+
+export function formatGrokBotWallTime(wall: GrokBotWallTime): string {
+  return `${formatGrokBotWallDate(wall)} ${pad2(wall.hour)}:${pad2(wall.minute)}`;
 }
 
 function shiftCalendarDays(
@@ -266,13 +275,85 @@ export function grokBotCycleBounds(
   }
   const nextDate = shiftCalendarDays(date.year, date.month, date.day, 7);
   const endMs = clockInstant(nextDate, clock) - 1;
-  const startWall = grokBotWallTimeFromUtcMs(startMs, clock.timeZone);
-  const endWall = grokBotWallTimeFromUtcMs(endMs, clock.timeZone);
   return {
     startMs,
     endMs,
-    label: `${formatGrokBotWallTime(startWall)} to ${formatGrokBotWallTime(endWall)}`,
+    label: rangeLabel(startMs, endMs, clock.timeZone),
   };
+}
+
+function rangeLabel(
+  startMs: number,
+  endMs: number,
+  timeZone: typeof GROK_BOT_CYCLE_TIME_ZONE,
+): string {
+  const start = formatGrokBotWallTime(grokBotWallTimeFromUtcMs(startMs, timeZone));
+  const end = formatGrokBotWallTime(grokBotWallTimeFromUtcMs(endMs, timeZone));
+  return `${start} to ${end}`;
+}
+
+function shortLabelFor(
+  utcMs: number,
+  timeZone: typeof GROK_BOT_CYCLE_TIME_ZONE,
+): string {
+  return formatGrokBotWallDate(grokBotWallTimeFromUtcMs(utcMs, timeZone));
+}
+
+export interface GrokBotProjectedPrimary {
+  readonly role: 'primary';
+  readonly window: { readonly startMs: number; readonly endMs: number; readonly bucketMs: number };
+  readonly label: string;
+  readonly shortLabel: string;
+}
+
+export interface GrokBotProjectedCompare {
+  readonly role: 'compare';
+  readonly delta: GrokBotNegativeCycleDelta;
+  readonly window: { readonly startMs: number; readonly endMs: number; readonly bucketMs: number };
+  readonly label: string;
+  readonly shortLabel: string;
+}
+
+export type GrokBotProjectedList = readonly [
+  GrokBotProjectedPrimary,
+  ...GrokBotProjectedCompare[],
+];
+
+export function projectGrokBotPeriods(input: {
+  readonly clock: GrokBotCycleClock;
+  readonly now: Date;
+  readonly primary: GrokBotResolvedWindow;
+  readonly compareDeltas: readonly GrokBotNegativeCycleDelta[];
+}): GrokBotProjectedList {
+  const span = input.primary.window.endMs - input.primary.window.startMs;
+  const shift = input.primary.window.startMs - input.primary.cycle.startMs;
+  const bucketMs = input.primary.window.bucketMs;
+  const primaryLabel = input.primary.mode.kind === 'cycle'
+    ? input.primary.cycle.label
+    : rangeLabel(input.primary.window.startMs, input.primary.window.endMs, input.clock.timeZone);
+  const primary: GrokBotProjectedPrimary = {
+    role: 'primary',
+    window: input.primary.window,
+    label: primaryLabel,
+    shortLabel: shortLabelFor(input.primary.window.startMs, input.clock.timeZone),
+  };
+  const compared = input.compareDeltas.map((delta): GrokBotProjectedCompare => {
+    const bounds = grokBotCycleBounds(
+      input.clock,
+      input.now,
+      input.primary.cycle.offset + delta,
+    );
+    const startMs = bounds.startMs + shift;
+    const endMs = startMs + span;
+    return {
+      role: 'compare',
+      delta,
+      window: { startMs, endMs, bucketMs },
+      label: rangeLabel(startMs, endMs, input.clock.timeZone),
+      shortLabel: shortLabelFor(startMs, input.clock.timeZone),
+    };
+  });
+  return [primary, ...compared];
 }
 
 export type GrokBotWindowMode =

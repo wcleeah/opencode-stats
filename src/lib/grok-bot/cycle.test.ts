@@ -5,14 +5,18 @@ import { createClient } from '@libsql/client';
 
 import {
   DEFAULT_GROK_BOT_CYCLE,
+  formatGrokBotWallDate,
+  formatGrokBotWallTime,
   grokBotBucketMs,
   grokBotBucketStartSql,
   grokBotCycleBounds,
   grokBotWallTimeFromUtcMs,
   grokBotWallTimeToUtcMs,
   parseGrokBotCycleClock,
+  projectGrokBotPeriods,
   resolveGrokBotWindow,
 } from './cycle';
+import { parseGrokBotCompareDeltas } from './href';
 
 const DEFAULT_START = Date.parse('2026-10-14T03:30:00.000Z');
 const PREVIOUS_START = Date.parse('2026-10-07T03:30:00.000Z');
@@ -121,6 +125,86 @@ test('bucket width steps from one minute to one hour', () => {
   assert.equal(grokBotBucketMs(48 * 60 * 60 * 1000 + 1), 60 * 60 * 1000);
   const week = 7 * 24 * 60 * 60 * 1000;
   assert.equal(grokBotBucketMs(week), 60 * 60 * 1000);
+});
+
+test('wall date is the clockless portion of wall time', () => {
+  const wall = grokBotWallTimeFromUtcMs(DEFAULT_START, 'Asia/Hong_Kong');
+  assert.equal(formatGrokBotWallDate(wall), 'Wed 14 Oct 2026');
+  assert.equal(formatGrokBotWallTime(wall), 'Wed 14 Oct 2026 11:30');
+});
+
+test('a compared slice copies shift, span, and bucket width', () => {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const weekMs = 7 * dayMs;
+  const clock = {
+    weekday: 'wednesday' as const,
+    hour: 11,
+    minute: 30,
+    timeZone: 'Asia/Hong_Kong' as const,
+  };
+  const now = new Date(DEFAULT_START);
+  const cyclePrimary = resolveGrokBotWindow({ clock, now, cycle: '0' });
+  const nearer = parseGrokBotCompareDeltas('-1')[0];
+  const later = parseGrokBotCompareDeltas('-8')[0];
+  assert.ok(nearer);
+  assert.ok(later);
+  const cycleProjected = projectGrokBotPeriods({
+    clock,
+    now,
+    primary: cyclePrimary,
+    compareDeltas: [later, nearer],
+  });
+  assert.equal(cycleProjected[0].role, 'primary');
+  assert.equal(cycleProjected[0].window, cyclePrimary.window);
+  assert.equal(cycleProjected[0].label, 'Wed 14 Oct 2026 11:30 to Wed 21 Oct 2026 11:29');
+  assert.equal(cycleProjected[0].shortLabel, 'Wed 14 Oct 2026');
+  assert.equal(cycleProjected[1].role, 'compare');
+  assert.equal(cycleProjected[1].delta, -8);
+  assert.equal(cycleProjected[1].window.startMs, DEFAULT_START - 8 * weekMs);
+  assert.equal(
+    cycleProjected[1].window.endMs,
+    DEFAULT_START - 8 * weekMs + (cyclePrimary.window.endMs - cyclePrimary.window.startMs),
+  );
+  assert.equal(cycleProjected[1].window.bucketMs, 60 * 60 * 1000);
+  assert.equal(cycleProjected[1].shortLabel, 'Wed 19 Aug 2026');
+  assert.equal(cycleProjected[2].delta, -1);
+  assert.equal(cycleProjected[2].window.startMs, PREVIOUS_START);
+  assert.equal(cycleProjected[2].window.endMs, PREVIOUS_START + weekMs - 1);
+  assert.equal(cycleProjected[2].window.bucketMs, cyclePrimary.window.bucketMs);
+  assert.equal(cycleProjected[2].shortLabel, 'Wed 7 Oct 2026');
+  assert.equal(
+    cycleProjected[2].label,
+    'Wed 7 Oct 2026 11:30 to Wed 14 Oct 2026 11:29',
+  );
+
+  const brushedStart = DEFAULT_START + 6 * dayMs;
+  const brushed = resolveGrokBotWindow({
+    clock,
+    now,
+    start: String(brushedStart),
+    end: String(brushedStart + 8 * dayMs),
+  });
+  const compared = projectGrokBotPeriods({
+    clock,
+    now,
+    primary: brushed,
+    compareDeltas: [nearer],
+  });
+  const shift = brushed.window.startMs - brushed.cycle.startMs;
+  const span = brushed.window.endMs - brushed.window.startMs;
+  assert.equal(shift, 6 * dayMs);
+  assert.equal(span, weekMs - 1);
+  assert.equal(compared[0].window, brushed.window);
+  assert.equal(compared[0].label, 'Tue 20 Oct 2026 11:30 to Tue 27 Oct 2026 11:29');
+  assert.equal(compared[0].shortLabel, 'Tue 20 Oct 2026');
+  assert.notEqual(compared[0].label, brushed.cycle.label);
+  assert.equal(compared[1].role, 'compare');
+  assert.equal(compared[1].window.startMs, PREVIOUS_START + shift);
+  assert.equal(compared[1].window.endMs, PREVIOUS_START + shift + span);
+  assert.equal(compared[1].window.bucketMs, brushed.window.bucketMs);
+  assert.equal(compared[1].window.bucketMs, 60 * 60 * 1000);
+  assert.equal(compared[1].shortLabel, 'Tue 13 Oct 2026');
+  assert.equal(compared[1].label, 'Tue 13 Oct 2026 11:30 to Tue 20 Oct 2026 11:29');
 });
 
 test('sqlite groups an event into the window bucket', async () => {

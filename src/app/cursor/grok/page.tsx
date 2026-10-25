@@ -10,10 +10,13 @@ import {
 import {
   GROK_BOT_INS_LINE,
   GROK_BOT_OUTS_LINE,
+  addGrokBotCompareDelta,
   grokBotHref,
+  removeGrokBotCompareDelta,
   toggleGrokBotUsageParam,
 } from '@/lib/grok-bot/href';
 import type { GrokBotCharge } from '@/lib/grok-bot/rates';
+import { grokBotCompareDeltas } from '@/lib/grok-bot/window';
 import { getCursorSettings } from '@/lib/queries/cursor';
 import { getGrokBotBoard, type GrokBotBoard } from '@/lib/queries/grok-bot';
 
@@ -37,6 +40,7 @@ interface GrokPageProps {
     usage?: string;
     page?: string;
     view?: string;
+    cmp?: string;
   }>;
 }
 
@@ -75,19 +79,89 @@ function eventTime(utcMs: number): string {
   return formatGrokBotWallTime(grokBotWallTimeFromUtcMs(utcMs, 'Asia/Hong_Kong'));
 }
 
+function CompareStrip({ board }: { board: GrokBotBoard }) {
+  const deltas = grokBotCompareDeltas(board.charts.periods);
+  const mode = board.charts.mode;
+  const windowHref = board.windowMode.kind === 'cycle'
+    ? { cycle: board.windowMode.offset }
+    : { startMs: board.windowMode.startMs, endMs: board.windowMode.endMs };
+  const nextDeltas = addGrokBotCompareDelta(deltas);
+  const addHref = nextDeltas === undefined
+    ? undefined
+    : grokBotHref({
+        ...windowHref,
+        usage: board.usageParam,
+        mode,
+        page: board.page,
+        compareDeltas: nextDeltas,
+      });
+  const periods = board.charts.periods;
+  const chipOn = 'rounded-md border border-foreground px-2 py-1 text-xs text-foreground';
+  const chipOff = 'rounded-md border border-border px-2 py-1 text-xs text-muted hover:text-foreground';
+
+  return (
+    <>
+      {periods.length > 1 ? (
+        <span title={periods[0].label} className={chipOn}>
+          {periods[0].shortLabel}
+        </span>
+      ) : null}
+      {periods.slice(1).map((period) => {
+        if (period.role !== 'compare') return null;
+        const removeHref = grokBotHref({
+          ...windowHref,
+          usage: board.usageParam,
+          mode,
+          page: board.page,
+          compareDeltas: removeGrokBotCompareDelta(deltas, period.delta),
+        });
+        return (
+          <span
+            key={period.delta}
+            title={period.label}
+            className={`inline-flex items-center gap-1 ${chipOn}`}
+          >
+            {period.shortLabel}
+            <Link
+              href={removeHref}
+              aria-label={`Remove ${period.shortLabel}`}
+              className="text-muted hover:text-foreground"
+            >
+              ×
+            </Link>
+          </span>
+        );
+      })}
+      {addHref === undefined ? null : (
+        <Link href={addHref} className={chipOff}>
+          Earlier cycle
+        </Link>
+      )}
+    </>
+  );
+}
+
 function CycleLinks({ board }: { board: GrokBotBoard }) {
   const mode = board.charts.mode;
+  const deltas = grokBotCompareDeltas(board.charts.periods);
   const previousHref = grokBotHref({
     cycle: board.cycle.offset - 1,
     usage: board.usageParam,
     mode,
+    compareDeltas: deltas,
   });
   const nextHref = grokBotHref({
     cycle: board.cycle.offset + 1,
     usage: board.usageParam,
     mode,
+    compareDeltas: deltas,
   });
-  const thisHref = grokBotHref({ cycle: 0, usage: board.usageParam, mode });
+  const thisHref = grokBotHref({
+    cycle: 0,
+    usage: board.usageParam,
+    mode,
+    compareDeltas: deltas,
+  });
   const linkClass = 'px-2 py-1 text-xs text-muted hover:text-foreground transition-colors';
 
   return (
@@ -117,6 +191,7 @@ function CycleLinks({ board }: { board: GrokBotBoard }) {
           {eventTime(board.window.endMs)}
         </span>
       ) : null}
+      <CompareStrip board={board} />
     </div>
   );
 }
@@ -128,6 +203,7 @@ function UsageLinks({ board }: { board: GrokBotBoard }) {
   const catalogIds = board.usageTypes.map((entry) => entry.id);
   const selected = new Set(board.selectedUsageTypeIds);
   const mode = board.charts.mode;
+  const deltas = grokBotCompareDeltas(board.charts.periods);
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -137,6 +213,7 @@ function UsageLinks({ board }: { board: GrokBotBoard }) {
           ...windowHref,
           usage: toggleGrokBotUsageParam(catalogIds, board.usageParam, type.id),
           mode,
+          compareDeltas: deltas,
         });
         const on = selected.has(type.id);
         return (
@@ -183,6 +260,7 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
     usage: params.usage,
     page: params.page,
     view: params.view,
+    cmp: params.cmp,
   });
   if (boardResult.error || !boardResult.data) {
     return (
@@ -197,6 +275,7 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
 
   const board = boardResult.data;
   const mode = board.charts.mode;
+  const deltas = grokBotCompareDeltas(board.charts.periods);
   const windowHref = board.windowMode.kind === 'cycle'
     ? { cycle: board.windowMode.offset }
     : { startMs: board.windowMode.startMs, endMs: board.windowMode.endMs };
@@ -204,11 +283,13 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
     ...windowHref,
     usage: board.usageParam,
     mode,
+    compareDeltas: deltas,
   });
   const toggleHref = grokBotHref({
     ...windowHref,
     usage: board.usageParam,
     mode: mode === 'by-type' ? 'ins-outs' : 'by-type',
+    compareDeltas: deltas,
   });
   const chartProps = {
     charts: board.charts,
@@ -226,7 +307,7 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
       <UsageLinks board={board} />
       {board.cycleHasRows ? (
         <>
-          <GrokBotWindowStats totals={board.totals} />
+          <GrokBotWindowStats periods={board.charts.periods} />
           <Link
             href={toggleHref}
             aria-pressed={mode === 'ins-outs'}
@@ -244,11 +325,7 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
           </Card>
           <Card>
             <div className="mb-3 text-xs text-muted uppercase tracking-wider">Spending</div>
-            <GrokBotSeriesChart
-              {...chartProps}
-              measure="usd"
-              dollarsAreEstimates={board.totals.spend.includesCardEstimate}
-            />
+            <GrokBotSeriesChart {...chartProps} measure="usd" />
           </Card>
           {board.totalRows === 0 ? (
             <Card>
@@ -256,7 +333,11 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
             </Card>
           ) : (
             <div className="space-y-3">
-              <div className="text-xs text-muted uppercase tracking-wider">Events</div>
+              <div className="text-xs text-muted uppercase tracking-wider">
+                {board.charts.periods.length > 1
+                  ? `Events in ${board.charts.periods[0].shortLabel}`
+                  : 'Events'}
+              </div>
               <Table>
                 <TableHeader>
                   <TableRow>

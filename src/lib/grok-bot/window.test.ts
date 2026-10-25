@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import type { GrokBotProjectedCompare, GrokBotProjectedPrimary } from './cycle';
 import { grokBotBucketMs } from './cycle';
+import { parseGrokBotCompareDeltas } from './href';
 import {
   grokBotOutsUsd,
   grokBotTokenTotal,
@@ -9,10 +11,13 @@ import {
   type GrokBotPriceInput,
 } from './rates';
 import {
+  alignGrokBotPeriods,
   foldGrokBotWindow,
+  grokBotCompareDeltas,
   type GrokBotCharts,
   type GrokBotFoldEvent,
   type GrokBotTypeLine,
+  type GrokBotWindowTotals,
 } from './window';
 
 const BUCKET_MS = 60_000;
@@ -262,6 +267,261 @@ test('fold zero-fills buckets around one event', () => {
   assert.equal(charts.points[1].values[0].usd, 12 * 2 / 1_000_000);
   assert.equal(charts.points[2].values[0].tokens, 0);
   assert.equal(grokBotTokenTotal(folded.totals.tokens), 12);
+});
+
+function periodTotals(
+  tokens: { ins: number; outs: number },
+  spend: GrokBotWindowTotals['spend'],
+): GrokBotWindowTotals {
+  return { tokens, spend };
+}
+
+test('alignment uses the primary bucket and zeros a missing compared point', () => {
+  const nearer = parseGrokBotCompareDeltas('-1')[0];
+  const later = parseGrokBotCompareDeltas('-8')[0];
+  assert.ok(nearer);
+  assert.ok(later);
+  const lines: readonly GrokBotTypeLine[] = [
+    { id: 'grok-bot-default', label: 'Default' },
+    { id: 'grok-bot-cua', label: 'CUA' },
+  ];
+  const primaryProjected: GrokBotProjectedPrimary = {
+    role: 'primary',
+    window: { startMs: 0, endMs: 1, bucketMs: 1 },
+    label: 'primary label',
+    shortLabel: 'Wed 14 Oct 2026',
+  };
+  const compareProjected: GrokBotProjectedCompare = {
+    role: 'compare',
+    delta: nearer,
+    window: { startMs: 10, endMs: 11, bucketMs: 1 },
+    label: 'compare label',
+    shortLabel: 'Wed 7 Oct 2026',
+  };
+  const olderProjected: GrokBotProjectedCompare = {
+    role: 'compare',
+    delta: later,
+    window: { startMs: 20, endMs: 21, bucketMs: 1 },
+    label: 'older label',
+    shortLabel: 'Wed 19 Aug 2026',
+  };
+  const primaryTotals = periodTotals(
+    { ins: 3, outs: 4 },
+    { totalUsd: 1, insUsd: 0.25, unpricedCacheWriteTokens: 0, includesCardEstimate: false },
+  );
+  const compareTotals = periodTotals(
+    { ins: 8, outs: 1 },
+    { totalUsd: 9, insUsd: 2, unpricedCacheWriteTokens: 5, includesCardEstimate: true },
+  );
+  const aligned = alignGrokBotPeriods({
+    seriesTypes: lines,
+    folds: [
+      {
+        projected: primaryProjected,
+        folded: {
+          totals: primaryTotals,
+          charts: {
+            mode: 'by-type',
+            lines,
+            points: [
+              {
+                bucketStartMs: 100,
+                values: [{ tokens: 3, usd: 1 }, { tokens: 4, usd: 2 }],
+              },
+              {
+                bucketStartMs: 200,
+                values: [{ tokens: 0, usd: 0 }, { tokens: 0, usd: 0 }],
+              },
+            ],
+          },
+        },
+      },
+      {
+        projected: compareProjected,
+        folded: {
+          totals: compareTotals,
+          charts: {
+            mode: 'by-type',
+            lines,
+            points: [{ bucketStartMs: 9_999, values: [{ tokens: 8, usd: 9 }] }],
+          },
+        },
+      },
+      {
+        projected: olderProjected,
+        folded: {
+          totals: primaryTotals,
+          charts: {
+            mode: 'by-type',
+            lines,
+            points: [
+              { bucketStartMs: 1, values: [{ tokens: 5, usd: 5 }, { tokens: 6, usd: 6 }] },
+              { bucketStartMs: 2, values: [{ tokens: 7, usd: 7 }, { tokens: 0, usd: 0 }] },
+              { bucketStartMs: 3, values: [{ tokens: 999, usd: 999 }, { tokens: 999, usd: 999 }] },
+            ],
+          },
+        },
+      },
+    ],
+  });
+  assert.equal(aligned.mode, 'by-type');
+  if (aligned.mode !== 'by-type') return;
+  assert.equal(aligned.points.length, 2);
+  assert.equal(aligned.points[0].bucketStartMs, 100);
+  assert.equal(aligned.points[1].bucketStartMs, 200);
+  assert.deepEqual(aligned.points[0].values, [
+    [{ tokens: 3, usd: 1 }, { tokens: 8, usd: 9 }, { tokens: 5, usd: 5 }],
+    [{ tokens: 4, usd: 2 }, { tokens: 0, usd: 0 }, { tokens: 6, usd: 6 }],
+  ]);
+  assert.deepEqual(aligned.points[1].values[0], [
+    { tokens: 0, usd: 0 },
+    { tokens: 0, usd: 0 },
+    { tokens: 7, usd: 7 },
+  ]);
+  assert.equal(JSON.stringify(aligned).includes('999'), false);
+  assert.deepEqual(aligned.periods[0].totals, primaryTotals);
+  assert.deepEqual(aligned.periods[1].totals, compareTotals);
+  assert.equal(aligned.periods[1].shortLabel, 'Wed 7 Oct 2026');
+  assert.deepEqual(grokBotCompareDeltas(aligned.periods), [nearer, later]);
+});
+
+test('alignment copies outs dollars from the fold', () => {
+  const delta = parseGrokBotCompareDeltas('-1')[0];
+  assert.ok(delta);
+  const primaryTotals = periodTotals(
+    { ins: 1, outs: 2 },
+    { totalUsd: 5.25, insUsd: 1, unpricedCacheWriteTokens: 0, includesCardEstimate: false },
+  );
+  const compareTotals = periodTotals(
+    { ins: 0, outs: 0 },
+    { totalUsd: 0, insUsd: 0, unpricedCacheWriteTokens: 0, includesCardEstimate: false },
+  );
+  const aligned = alignGrokBotPeriods({
+    seriesTypes: [],
+    folds: [
+      {
+        projected: {
+          role: 'primary',
+          window: { startMs: 0, endMs: 1, bucketMs: 1 },
+          label: 'primary label',
+          shortLabel: 'Wed 14 Oct 2026',
+        },
+        folded: {
+          totals: primaryTotals,
+          charts: {
+            mode: 'ins-outs',
+            points: [
+              {
+                bucketStartMs: 100,
+                insTokens: 1,
+                outsTokens: 2,
+                insUsd: 1,
+                outsUsd: 4.25,
+              },
+              {
+                bucketStartMs: 200,
+                insTokens: 0,
+                outsTokens: 0,
+                insUsd: 0,
+                outsUsd: 0,
+              },
+            ],
+          },
+        },
+      },
+      {
+        projected: {
+          role: 'compare',
+          delta,
+          window: { startMs: 0, endMs: 1, bucketMs: 1 },
+          label: 'compare label',
+          shortLabel: 'Wed 7 Oct 2026',
+        },
+        folded: {
+          totals: compareTotals,
+          charts: {
+            mode: 'ins-outs',
+            points: [{
+              bucketStartMs: 9_999,
+              insTokens: 5,
+              outsTokens: 6,
+              insUsd: 0.5,
+              outsUsd: 4.25,
+            }],
+          },
+        },
+      },
+    ],
+  });
+  assert.equal(aligned.mode, 'ins-outs');
+  if (aligned.mode !== 'ins-outs') return;
+  assert.deepEqual(aligned.points[0], {
+    bucketStartMs: 100,
+    sides: [
+      { insTokens: 1, outsTokens: 2, insUsd: 1, outsUsd: 4.25 },
+      { insTokens: 5, outsTokens: 6, insUsd: 0.5, outsUsd: 4.25 },
+    ],
+  });
+  assert.deepEqual(aligned.points[1].sides[1], {
+    insTokens: 0,
+    outsTokens: 0,
+    insUsd: 0,
+    outsUsd: 0,
+  });
+  assert.equal(aligned.periods[0].totals, primaryTotals);
+});
+
+test('an empty primary fold keeps period totals and draws no points', () => {
+  const delta = parseGrokBotCompareDeltas('-1')[0];
+  assert.ok(delta);
+  const primaryTotals = periodTotals(
+    { ins: 0, outs: 0 },
+    { totalUsd: 0, insUsd: 0, unpricedCacheWriteTokens: 0, includesCardEstimate: false },
+  );
+  const compareTotals = periodTotals(
+    { ins: 4, outs: 0 },
+    { totalUsd: 2, insUsd: 2, unpricedCacheWriteTokens: 0, includesCardEstimate: true },
+  );
+  const aligned = alignGrokBotPeriods({
+    seriesTypes: [{ id: 'grok-bot-default', label: 'Default' }],
+    folds: [
+      {
+        projected: {
+          role: 'primary',
+          window: { startMs: 0, endMs: 1, bucketMs: 1 },
+          label: 'primary label',
+          shortLabel: 'Wed 14 Oct 2026',
+        },
+        folded: {
+          totals: primaryTotals,
+          charts: { mode: 'by-type', lines: [], points: [] },
+        },
+      },
+      {
+        projected: {
+          role: 'compare',
+          delta,
+          window: { startMs: 0, endMs: 1, bucketMs: 1 },
+          label: 'compare label',
+          shortLabel: 'Wed 7 Oct 2026',
+        },
+        folded: {
+          totals: compareTotals,
+          charts: {
+            mode: 'by-type',
+            lines: [],
+            points: [{ bucketStartMs: 50, values: [{ tokens: 4, usd: 2 }] }],
+          },
+        },
+      },
+    ],
+  });
+  assert.equal(aligned.mode, 'by-type');
+  if (aligned.mode !== 'by-type') return;
+  assert.equal(aligned.points.length, 0);
+  assert.deepEqual(aligned.periods[0].totals, primaryTotals);
+  assert.deepEqual(aligned.periods[1].totals, compareTotals);
+  assert.equal(aligned.lines.length, 1);
 });
 
 test('an empty series list keeps the requested mode and drops events', () => {

@@ -1,6 +1,6 @@
 import { execute } from '@/lib/db';
 import { ensureCursorSchema } from '@/lib/cursor/schema';
-import type { GrokBotCharts, GrokBotWindowTotals } from '@/lib/grok-bot/window';
+import type { GrokBotAlignedCharts, GrokBotWindowTotals } from '@/lib/grok-bot/window';
 import {
   getGrokBotBoard,
   type GrokBotBoard,
@@ -66,37 +66,52 @@ function summarizeRow(row: GrokBotTableRow): {
   };
 }
 
-function summarizeCharts(charts: GrokBotCharts): {
-  mode: GrokBotCharts['mode'];
+function summarizeCharts(charts: GrokBotAlignedCharts): {
+  mode: GrokBotAlignedCharts['mode'];
   lines: Array<{ id: string; label: string }>;
+  periods: Array<{ role: 'primary' | 'compare'; delta: number | null; shortLabel: string }>;
   points: Array<{
     bucketStartMs: number;
-    values?: Array<{ tokens: number; usd: number }>;
-    insTokens?: number;
-    outsTokens?: number;
-    insUsd?: number;
-    outsUsd?: number;
+    values?: Array<Array<{ tokens: number; usd: number }>>;
+    sides?: Array<{
+      insTokens: number;
+      outsTokens: number;
+      insUsd: number;
+      outsUsd: number;
+    }>;
   }>;
 } {
+  const periods = charts.periods.map((period) => ({
+    role: period.role,
+    delta: period.role === 'compare' ? period.delta : null,
+    shortLabel: period.shortLabel,
+  }));
   if (charts.mode === 'by-type') {
     return {
       mode: charts.mode,
       lines: charts.lines.map((line) => ({ id: line.id, label: line.label })),
+      periods,
       points: charts.points.map((point) => ({
         bucketStartMs: point.bucketStartMs,
-        values: point.values.map((value) => ({ tokens: value.tokens, usd: value.usd })),
+        values: point.values.map((cells) => cells.map((cell) => ({
+          tokens: cell.tokens,
+          usd: cell.usd,
+        }))),
       })),
     };
   }
   return {
     mode: charts.mode,
     lines: [],
+    periods,
     points: charts.points.map((point) => ({
       bucketStartMs: point.bucketStartMs,
-      insTokens: point.insTokens,
-      outsTokens: point.outsTokens,
-      insUsd: point.insUsd,
-      outsUsd: point.outsUsd,
+      sides: point.sides.map((side) => ({
+        insTokens: side.insTokens,
+        outsTokens: side.outsTokens,
+        insUsd: side.insUsd,
+        outsUsd: side.outsUsd,
+      })),
     })),
   };
 }
@@ -145,7 +160,7 @@ function summarizeBoard(board: GrokBotBoard): {
     bucketMs: board.window.bucketMs,
     cycleStartMs: board.cycle.startMs,
     offset: board.cycle.offset,
-    totals: summarizeTotals(board.totals),
+    totals: summarizeTotals(board.charts.periods[0].totals),
     charts: summarizeCharts(board.charts),
     rows: board.rows.map(summarizeRow),
   };
@@ -158,6 +173,7 @@ async function load(query: {
   usage?: string;
   page?: string;
   view?: string;
+  cmp?: string;
   weekday?: string;
 }): Promise<{ data: ReturnType<typeof summarizeBoard> | null; error: string | null }> {
   const result = await getGrokBotBoard({
@@ -170,6 +186,7 @@ async function load(query: {
     usage: query.usage,
     page: query.page,
     view: query.view,
+    cmp: query.cmp,
     now: NOW,
   });
   if (result.error || !result.data) return { data: null, error: result.error };
@@ -260,6 +277,19 @@ async function main(): Promise<void> {
       tokensOutput: 0,
       tokensTotal: 99,
     },
+    {
+      hash: 'previous-cycle',
+      eventAt: BASE_MS - 7 * DAY_MS + 90_000,
+      model: 'grok-bot-default',
+      kind: 'Included',
+      costRaw: 'Included',
+      reportedCost: null,
+      tokensInput: 77,
+      tokensCacheWrite: 0,
+      tokensCacheRead: 0,
+      tokensOutput: 0,
+      tokensTotal: 77,
+    },
   ];
   for (let index = 0; index < 50; index += 1) {
     rows.push({
@@ -280,17 +310,21 @@ async function main(): Promise<void> {
 
   const shortEnd = BASE_MS + 180_000 - 1;
   const emptyStart = BASE_MS + 3 * DAY_MS;
-  const [bad, short, shortSplit, cycle, page2, page99, cua, empty, future] = await Promise.all([
-    load({ weekday: 'funday' }),
-    load({ start: String(BASE_MS), end: String(shortEnd) }),
-    load({ start: String(BASE_MS), end: String(shortEnd), view: 'ins-outs' }),
-    load({}),
-    load({ page: '2' }),
-    load({ page: '99' }),
-    load({ usage: 'grok-bot-cua' }),
-    load({ start: String(emptyStart), end: String(emptyStart + 60_000 - 1) }),
-    load({ cycle: '1' }),
-  ]);
+  const [bad, short, shortSplit, cycle, page2, page99, cua, empty, future, compare, junk] = (
+    await Promise.all([
+      load({ weekday: 'funday' }),
+      load({ start: String(BASE_MS), end: String(shortEnd) }),
+      load({ start: String(BASE_MS), end: String(shortEnd), view: 'ins-outs' }),
+      load({}),
+      load({ page: '2' }),
+      load({ page: '99' }),
+      load({ usage: 'grok-bot-cua' }),
+      load({ start: String(emptyStart), end: String(emptyStart + 60_000 - 1) }),
+      load({ cycle: '1' }),
+      load({ start: String(BASE_MS), end: String(shortEnd), cmp: '-1' }),
+      load({ start: String(BASE_MS), end: String(shortEnd), cmp: '0,nope,1' }),
+    ])
+  );
 
   console.log(JSON.stringify({
     bad,
@@ -302,6 +336,8 @@ async function main(): Promise<void> {
     cua,
     empty,
     future,
+    compare,
+    junk,
   }));
 }
 

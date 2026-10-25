@@ -33,16 +33,25 @@ interface TotalsSummary {
 
 interface ChartPoint {
   bucketStartMs: number;
-  values?: { tokens: number; usd: number }[];
-  insTokens?: number;
-  outsTokens?: number;
-  insUsd?: number;
-  outsUsd?: number;
+  values?: { tokens: number; usd: number }[][];
+  sides?: {
+    insTokens: number;
+    outsTokens: number;
+    insUsd: number;
+    outsUsd: number;
+  }[];
+}
+
+interface PeriodSummary {
+  role: string;
+  delta: number | null;
+  shortLabel: string;
 }
 
 interface ChartSummary {
   mode: string;
   lines: { id: string; label: string }[];
+  periods: PeriodSummary[];
   points: ChartPoint[];
 }
 
@@ -72,21 +81,35 @@ interface Payload {
   cua: { data: BoardSummary | null; error: string | null };
   empty: { data: BoardSummary | null; error: string | null };
   future: { data: BoardSummary | null; error: string | null };
+  compare: { data: BoardSummary | null; error: string | null };
+  junk: { data: BoardSummary | null; error: string | null };
 }
 
 function byTypeValue(
   board: BoardSummary,
   bucketStartMs: number,
   typeId: string,
+  periodIndex = 0,
 ): { tokens: number; usd: number } {
   assert.equal(board.charts.mode, 'by-type');
   const index = board.charts.lines.findIndex((line) => line.id === typeId);
   assert.ok(index >= 0, typeId);
   const point = board.charts.points.find((entry) => entry.bucketStartMs === bucketStartMs);
   assert.ok(point, String(bucketStartMs));
-  const value = point.values?.[index];
+  const value = point.values?.[index]?.[periodIndex];
   assert.ok(value, typeId);
   return value;
+}
+
+function primarySide(point: ChartPoint): {
+  insTokens: number;
+  outsTokens: number;
+  insUsd: number;
+  outsUsd: number;
+} {
+  const side = point.sides?.[0];
+  assert.ok(side);
+  return side;
 }
 
 function requireBoard(
@@ -156,17 +179,17 @@ test('grok bot board prices member rows and leaves cursor models out', () => {
   assert.equal(shortSplit.charts.points.length, 3);
   assert.deepEqual(shortSplit.totals, short.totals);
   const splitTokens = shortSplit.charts.points.reduce(
-    (sum, point) => sum + (point.insTokens ?? 0) + (point.outsTokens ?? 0),
+    (sum, point) => sum + primarySide(point).insTokens + primarySide(point).outsTokens,
     0,
   );
   const splitUsd = shortSplit.charts.points.reduce(
-    (sum, point) => sum + (point.insUsd ?? 0) + (point.outsUsd ?? 0),
+    (sum, point) => sum + primarySide(point).insUsd + primarySide(point).outsUsd,
     0,
   );
   assert.equal(splitTokens, short.totals.ins + short.totals.outs);
   assert.equal(splitUsd, short.totals.totalUsd);
-  assert.equal(shortSplit.charts.points[1].insTokens, 12);
-  assert.equal(shortSplit.charts.points[1].outsTokens, 0);
+  assert.equal(primarySide(shortSplit.charts.points[1]).insTokens, 12);
+  assert.equal(primarySide(shortSplit.charts.points[1]).outsTokens, 0);
 
   const cycle = requireBoard(payload.cycle, 'cycle');
   assert.equal(cycle.totalRows, 55);
@@ -264,7 +287,9 @@ test('grok bot board prices member rows and leaves cursor models out', () => {
     'grok-bot-knowledge-work',
   ]);
   const emptyTokens = empty.charts.points.reduce((sum, point) => (
-    sum + (point.values ?? []).reduce((inner, value) => inner + value.tokens, 0)
+    sum + (point.values ?? []).reduce((lineSum, cells) => (
+      lineSum + cells.reduce((cellSum, cell) => cellSum + cell.tokens, 0)
+    ), 0)
   ), 0);
   assert.equal(emptyTokens, 0);
   assert.equal(empty.charts.points.length, 1);
@@ -275,4 +300,32 @@ test('grok bot board prices member rows and leaves cursor models out', () => {
   assert.equal(future.cycleStartMs, Date.parse('2026-10-21T03:30:00.000Z'));
   assert.equal(future.charts.lines.length, 0);
   assert.equal(future.charts.points.length, 0);
+
+  const compare = requireBoard(payload.compare, 'compare');
+  assert.equal(compare.charts.periods.length, 2);
+  assert.equal(compare.charts.periods[0].role, 'primary');
+  assert.equal(compare.charts.periods[0].shortLabel, 'Wed 14 Oct 2026');
+  assert.equal(compare.charts.periods[1].role, 'compare');
+  assert.equal(compare.charts.periods[1].delta, -1);
+  assert.equal(compare.charts.periods[1].shortLabel, 'Wed 7 Oct 2026');
+  assert.deepEqual(compare.totals, short.totals);
+  assert.deepEqual(compare.rows, short.rows);
+  assert.equal(compare.totalRows, short.totalRows);
+  assert.equal(compare.charts.points.length, short.charts.points.length);
+  assert.equal(
+    byTypeValue(compare, BASE_MS + 60_000, 'grok-bot-default', 0).tokens,
+    12,
+  );
+  assert.equal(
+    byTypeValue(compare, BASE_MS + 60_000, 'grok-bot-default', 1).tokens,
+    77,
+  );
+  assert.equal(byTypeValue(compare, BASE_MS, 'grok-bot-default', 1).tokens, 0);
+  assert.equal(
+    byTypeValue(compare, BASE_MS + 60_000, 'grok-bot-default', 1).usd,
+    77 * 2 / 1_000_000,
+  );
+
+  const junk = requireBoard(payload.junk, 'junk');
+  assert.deepEqual(junk, short);
 });

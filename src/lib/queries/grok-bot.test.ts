@@ -140,8 +140,8 @@ test('grok bot board prices member rows and leaves cursor models out', () => {
       usageType: 'grok-bot-knowledge-work',
       kind: 'Included',
       tokensTotal: 8,
-      status: 'unpriced',
-      usd: undefined,
+      status: 'rated',
+      usd: 8 * 2 / 1_000_000,
     },
     {
       usageType: 'grok-bot-default',

@@ -53,7 +53,7 @@ const USAGE_TYPES: readonly {
   { id: 'grok-bot-default', label: 'Default', rates: STANDARD_RATES },
   { id: 'grok-bot-automation', label: 'Automation', rates: STANDARD_RATES },
   { id: 'grok-bot-cua', label: 'CUA', rates: CUA_RATES },
-  { id: 'grok-bot-knowledge-work', label: 'Knowledge work', rates: null },
+  { id: 'grok-bot-knowledge-work', label: 'Knowledge work', rates: STANDARD_RATES },
 ];
 
 function normalizeKind(kind: string): string {

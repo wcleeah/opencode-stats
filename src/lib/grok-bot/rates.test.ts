@@ -17,7 +17,7 @@ function row(overrides: Partial<GrokBotPriceInput>): GrokBotPriceInput {
   };
 }
 
-test('included default and automation use the shared card', () => {
+test('included default, automation, and knowledge work use the shared card', () => {
   const included = priceGrokBotRow(row({ tokensInput: 1_000_000 }));
   assert.deepEqual(included, { status: 'rated', usd: 2 });
 
@@ -26,6 +26,14 @@ test('included default and automation use the shared card', () => {
     tokensInput: 1_000_000,
   }));
   assert.deepEqual(automation, { status: 'rated', usd: 2 });
+
+  const knowledge = priceGrokBotRow(row({
+    model: 'grok-bot-knowledge-work',
+    tokensInput: 1_000_000,
+    tokensCacheRead: 1_000_000,
+    tokensOutput: 1_000_000,
+  }));
+  assert.deepEqual(knowledge, { status: 'rated', usd: 8.5 });
 });
 
 test('included CUA rates input, cache read, and output and ignores a stored decimal', () => {
@@ -38,14 +46,6 @@ test('included CUA rates input, cache read, and output and ignores a stored deci
     reportedCost: 9,
   }));
   assert.deepEqual(charge, { status: 'rated', usd: 1.4 });
-});
-
-test('knowledge-work included is unpriced', () => {
-  const charge = priceGrokBotRow(row({
-    model: 'grok-bot-knowledge-work',
-    tokensInput: 1_000_000,
-  }));
-  assert.deepEqual(charge, { status: 'unpriced' });
 });
 
 test('on-demand uses reported cost, including zero, and never the card', () => {
@@ -142,7 +142,7 @@ test('usage catalog keeps registry order then unknown members', () => {
     ],
   );
   assert.equal(catalog.find((entry) => entry.id === 'grok-bot-default')?.priced, true);
-  assert.equal(catalog.find((entry) => entry.id === 'grok-bot-knowledge-work')?.priced, false);
+  assert.equal(catalog.find((entry) => entry.id === 'grok-bot-knowledge-work')?.priced, true);
   assert.equal(catalog.find((entry) => entry.id === 'grok-bot-cua')?.label, 'CUA');
   assert.equal(catalog.find((entry) => entry.id === 'grok-bot-extra')?.priced, false);
 });

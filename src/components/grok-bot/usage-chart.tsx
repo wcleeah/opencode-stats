@@ -29,6 +29,7 @@ import { useChartColors } from '@/lib/use-chart-colors';
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
+const CHART_HEIGHT = 448;
 
 interface GrokBotUsageChartProps {
   seriesTypes: readonly GrokBotUsageTypeOption[];
@@ -230,8 +231,12 @@ export function GrokBotUsageChart({
           />
         </label>
       </div>
-      <div className="h-[28rem] w-full">
-        <ResponsiveContainer width="100%" height="100%">
+      <div className="w-full">
+        <ResponsiveContainer
+          width="100%"
+          height={CHART_HEIGHT}
+          initialDimension={{ width: 720, height: CHART_HEIGHT }}
+        >
           <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
             <XAxis

@@ -294,7 +294,7 @@ export async function getGrokBotBoard(
         tokensInputCacheWrite: tokensCacheWrite,
         tokensCacheRead,
         tokensOutput,
-      }),
+      }).charge,
     };
   });
 

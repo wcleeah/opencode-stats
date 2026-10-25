@@ -19,13 +19,33 @@ export interface GrokBotPriceInput {
   tokensOutput: number;
 }
 
+export interface GrokBotTokenSides {
+  readonly ins: number;
+  readonly outs: number;
+}
+
+export interface GrokBotPartition {
+  readonly totalUsd: number;
+  readonly insUsd: number;
+}
+
 export type GrokBotCharge =
-  | { status: 'unbilled' }
-  | { status: 'reported'; usd: number }
-  | { status: 'reported-missing' }
-  | { status: 'rated'; usd: number }
-  | { status: 'partial'; usd: number; unknownCacheWriteTokens: number }
-  | { status: 'unpriced' };
+  | { readonly status: 'unbilled' }
+  | { readonly status: 'reported-missing' }
+  | { readonly status: 'unpriced' }
+  | { readonly status: 'reported'; readonly split: GrokBotPartition }
+  | { readonly status: 'rated'; readonly split: GrokBotPartition }
+  | {
+      readonly status: 'partial';
+      readonly split: GrokBotPartition;
+      /** Cache-write tokens omitted from `split.totalUsd`. Count, not dollars. */
+      readonly unpricedCacheWriteTokens: number;
+    };
+
+export interface GrokBotPricedRow {
+  readonly tokens: GrokBotTokenSides;
+  readonly charge: GrokBotCharge;
+}
 
 export interface GrokBotUsageTypeOption {
   id: string;
@@ -68,41 +88,82 @@ function ratesFor(model: string): GrokBotTokenRates | null {
   return null;
 }
 
+function tokenSides(row: GrokBotPriceInput): GrokBotTokenSides {
+  return {
+    ins: row.tokensInput + row.tokensInputCacheWrite + row.tokensCacheRead,
+    outs: row.tokensOutput,
+  };
+}
+
+function storedPartition(row: GrokBotPriceInput, usd: number): GrokBotPartition {
+  const rates = ratesFor(row.model);
+  const insWeight = rates
+    ? row.tokensInput * rates.inputPerMillion
+      + row.tokensCacheRead * rates.cacheReadPerMillion
+    : row.tokensInput + row.tokensInputCacheWrite + row.tokensCacheRead;
+  const outsWeight = rates
+    ? row.tokensOutput * rates.outputPerMillion
+    : row.tokensOutput;
+  let insUsd: number;
+  if (outsWeight > 0 && insWeight <= 0) insUsd = 0;
+  else if (outsWeight <= 0) insUsd = usd;
+  else insUsd = usd * insWeight / (insWeight + outsWeight);
+  return { totalUsd: usd, insUsd };
+}
+
 function chargeFromCard(row: GrokBotPriceInput, rates: GrokBotTokenRates): GrokBotCharge {
-  const usd = (
+  const insUsd = (
     row.tokensInput * rates.inputPerMillion
     + row.tokensCacheRead * rates.cacheReadPerMillion
-    + row.tokensOutput * rates.outputPerMillion
   ) / 1_000_000;
+  const outsUsd = (row.tokensOutput * rates.outputPerMillion) / 1_000_000;
+  const split: GrokBotPartition = { totalUsd: insUsd + outsUsd, insUsd };
   if (row.tokensInputCacheWrite > 0) {
     return {
       status: 'partial',
-      usd,
-      unknownCacheWriteTokens: row.tokensInputCacheWrite,
+      split,
+      unpricedCacheWriteTokens: row.tokensInputCacheWrite,
     };
   }
-  return { status: 'rated', usd };
+  return { status: 'rated', split };
 }
 
-export function priceGrokBotRow(row: GrokBotPriceInput): GrokBotCharge {
+export function grokBotTokenTotal(tokens: GrokBotTokenSides): number {
+  return tokens.ins + tokens.outs;
+}
+
+export function grokBotOutsUsd(totalUsd: number, insUsd: number): number {
+  return totalUsd - insUsd;
+}
+
+export function priceGrokBotRow(row: GrokBotPriceInput): GrokBotPricedRow {
+  const tokens = tokenSides(row);
   if (isUnbilledCursorEvent(row.kind, row.costRaw)) {
-    return { status: 'unbilled' };
+    return { tokens, charge: { status: 'unbilled' } };
   }
 
   const kind = normalizeKind(row.kind);
   if (kind === 'on-demand') {
-    if (row.reportedCost === null) return { status: 'reported-missing' };
-    return { status: 'reported', usd: row.reportedCost };
+    if (row.reportedCost === null) {
+      return { tokens, charge: { status: 'reported-missing' } };
+    }
+    return {
+      tokens,
+      charge: { status: 'reported', split: storedPartition(row, row.reportedCost) },
+    };
   }
   if (kind === 'included') {
     const rates = ratesFor(row.model);
-    if (!rates) return { status: 'unpriced' };
-    return chargeFromCard(row, rates);
+    if (!rates) return { tokens, charge: { status: 'unpriced' } };
+    return { tokens, charge: chargeFromCard(row, rates) };
   }
   if (row.reportedCost !== null) {
-    return { status: 'reported', usd: row.reportedCost };
+    return {
+      tokens,
+      charge: { status: 'reported', split: storedPartition(row, row.reportedCost) },
+    };
   }
-  return { status: 'unpriced' };
+  return { tokens, charge: { status: 'unpriced' } };
 }
 
 export function grokBotUsageCatalog(

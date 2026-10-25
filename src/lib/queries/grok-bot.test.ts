@@ -11,7 +11,8 @@ const HOUR_MS = 60 * 60 * 1000;
 
 interface Charge {
   status: string;
-  usd?: number;
+  split?: { totalUsd: number; insUsd: number };
+  unpricedCacheWriteTokens?: number;
 }
 
 interface SummaryRow {
@@ -133,43 +134,52 @@ test('grok bot board prices member rows and leaves cursor models out', () => {
     usageType: row.usageType,
     kind: row.kind,
     tokensTotal: row.tokensTotal,
-    status: row.charge.status,
-    usd: row.charge.usd,
+    charge: row.charge,
   })), [
     {
       usageType: 'grok-bot-knowledge-work',
       kind: 'Included',
       tokensTotal: 8,
-      status: 'rated',
-      usd: 8 * 2 / 1_000_000,
+      charge: {
+        status: 'rated',
+        split: { totalUsd: 8 * 2 / 1_000_000, insUsd: 8 * 2 / 1_000_000 },
+      },
     },
     {
       usageType: 'grok-bot-default',
       kind: 'Free',
       tokensTotal: 4,
-      status: 'unbilled',
-      usd: undefined,
+      charge: { status: 'unbilled' },
     },
     {
       usageType: 'grok-bot-cua',
       kind: 'On-Demand',
       tokensTotal: 100,
-      status: 'reported',
-      usd: 3.5,
+      charge: {
+        status: 'reported',
+        split: { totalUsd: 3.5, insUsd: 3.5 },
+      },
     },
     {
       usageType: 'grok-bot-default',
       kind: 'Included',
       tokensTotal: 1_000_000,
-      status: 'rated',
-      usd: 2,
+      charge: {
+        status: 'rated',
+        split: { totalUsd: 2, insUsd: 2 },
+      },
     },
     {
       usageType: 'grok-bot-default',
       kind: 'Included',
       tokensTotal: 12,
-      status: 'rated',
-      usd: 12 * 2 / 1_000_000,
+      charge: {
+        status: 'rated',
+        split: {
+          totalUsd: 12 * 2 / 1_000_000,
+          insUsd: 12 * 2 / 1_000_000,
+        },
+      },
     },
   ]);
 
@@ -180,7 +190,10 @@ test('grok bot board prices member rows and leaves cursor models out', () => {
   const cua = requireBoard(payload.cua, 'cua');
   assert.equal(cua.totalRows, 1);
   assert.equal(cua.rows[0].usageType, 'grok-bot-cua');
-  assert.deepEqual(cua.rows[0].charge, { status: 'reported', usd: 3.5 });
+  assert.deepEqual(cua.rows[0].charge, {
+    status: 'reported',
+    split: { totalUsd: 3.5, insUsd: 3.5 },
+  });
   assert.deepEqual(cua.seriesTypeIds, ['grok-bot-cua']);
 
   const empty = requireBoard(payload.empty, 'empty');

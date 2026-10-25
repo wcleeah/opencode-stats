@@ -50,11 +50,11 @@ function GrokHeader() {
 function chargeText(charge: GrokBotCharge): string {
   switch (charge.status) {
     case 'reported':
-      return formatCost(charge.usd, false);
+      return formatCost(charge.split.totalUsd, false);
     case 'rated':
-      return formatCost(charge.usd, true);
+      return formatCost(charge.split.totalUsd, true);
     case 'partial':
-      return `${formatCost(charge.usd, true)} · cache write unpriced`;
+      return `${formatCost(charge.split.totalUsd, true)} · cache write unpriced`;
     case 'unbilled':
       return 'Free';
     case 'reported-missing':

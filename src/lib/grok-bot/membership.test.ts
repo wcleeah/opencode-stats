@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import { createClient } from '@libsql/client';
 
 import {
-  GROK_BOT_MODEL_PREFIX,
+  GROK_BOT_HYPHEN_PREFIX,
   grokBotModelSql,
   isGrokBotModel,
   normalizeGrokBotModelId,
@@ -22,7 +22,7 @@ test('isGrokBotModel requires the grok-bot- prefix', () => {
 test('grokBotModelSql uses the shared prefix and rejects unsafe columns', () => {
   assert.equal(
     grokBotModelSql('model'),
-    `lower(model) LIKE '${GROK_BOT_MODEL_PREFIX}%'`,
+    `lower(model) LIKE '${GROK_BOT_HYPHEN_PREFIX}%'`,
   );
   assert.throws(() => grokBotModelSql('model;drop'), /Unsafe SQL column/);
 });

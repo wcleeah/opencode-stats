@@ -250,7 +250,6 @@ export interface GrokBotComparePeriod {
 
 export type GrokBotPeriod = GrokBotPrimaryPeriod | GrokBotComparePeriod;
 
-/** Index 0 is the primary. Every later entry is a compare period. */
 export type GrokBotPeriodList = readonly [
   GrokBotPrimaryPeriod,
   ...GrokBotComparePeriod[],

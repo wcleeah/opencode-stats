@@ -314,7 +314,6 @@ export interface GrokBotProjectedCompare {
   readonly shortLabel: string;
 }
 
-/** Index 0 is the primary. The tail matches `compareDeltas` in order. */
 export type GrokBotProjectedList = readonly [
   GrokBotProjectedPrimary,
   ...GrokBotProjectedCompare[],

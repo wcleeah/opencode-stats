@@ -24,10 +24,6 @@ export interface GrokBotHrefParams {
   usage?: string;
   page?: number;
   mode: GrokBotChartMode;
-  /**
-   * Compared cycles relative to the primary owning cycle.
-   * Empty or omitted omits `cmp`. The writer does not sort or cap.
-   */
   compareDeltas?: readonly GrokBotNegativeCycleDelta[];
 }
 

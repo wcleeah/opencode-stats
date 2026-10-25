@@ -22,9 +22,28 @@ interface SummaryRow {
   charge: Charge;
 }
 
-interface SummaryPoint {
+interface TotalsSummary {
+  ins: number;
+  outs: number;
+  totalUsd: number;
+  insUsd: number;
+  unpricedCacheWriteTokens: number;
+  includesCardEstimate: boolean;
+}
+
+interface ChartPoint {
   bucketStartMs: number;
-  tokensByType: Record<string, number>;
+  values?: { tokens: number; usd: number }[];
+  insTokens?: number;
+  outsTokens?: number;
+  insUsd?: number;
+  outsUsd?: number;
+}
+
+interface ChartSummary {
+  mode: string;
+  lines: { id: string; label: string }[];
+  points: ChartPoint[];
 }
 
 interface BoardSummary {
@@ -32,27 +51,42 @@ interface BoardSummary {
   page: number;
   pageSize: number;
   cycleHasRows: boolean;
-  seriesLength: number;
-  seriesTypeIds: string[];
   usageTypeIds: string[];
   windowStartMs: number;
   windowEndMs: number;
   bucketMs: number;
   cycleStartMs: number;
   offset: number;
+  totals: TotalsSummary;
+  charts: ChartSummary;
   rows: SummaryRow[];
-  points: SummaryPoint[];
 }
 
 interface Payload {
   bad: { data: BoardSummary | null; error: string | null };
   short: { data: BoardSummary | null; error: string | null };
+  shortSplit: { data: BoardSummary | null; error: string | null };
   cycle: { data: BoardSummary | null; error: string | null };
   page2: { data: BoardSummary | null; error: string | null };
   page99: { data: BoardSummary | null; error: string | null };
   cua: { data: BoardSummary | null; error: string | null };
   empty: { data: BoardSummary | null; error: string | null };
   future: { data: BoardSummary | null; error: string | null };
+}
+
+function byTypeValue(
+  board: BoardSummary,
+  bucketStartMs: number,
+  typeId: string,
+): { tokens: number; usd: number } {
+  assert.equal(board.charts.mode, 'by-type');
+  const index = board.charts.lines.findIndex((line) => line.id === typeId);
+  assert.ok(index >= 0, typeId);
+  const point = board.charts.points.find((entry) => entry.bucketStartMs === bucketStartMs);
+  assert.ok(point, String(bucketStartMs));
+  const value = point.values?.[index];
+  assert.ok(value, typeId);
+  return value;
 }
 
 function requireBoard(
@@ -91,41 +125,64 @@ test('grok bot board prices member rows and leaves cursor models out', () => {
   assert.equal(short.totalRows, 1);
   assert.equal(short.cycleHasRows, true);
   assert.equal(short.bucketMs, 60_000);
-  assert.equal(short.seriesLength, 3);
-  assert.deepEqual(short.seriesTypeIds, [
+  assert.equal(short.charts.mode, 'by-type');
+  assert.equal(short.charts.points.length, 3);
+  assert.deepEqual(short.charts.lines.map((line) => line.id), [
     'grok-bot-default',
     'grok-bot-cua',
     'grok-bot-knowledge-work',
   ]);
-  assert.equal(short.points[0].bucketStartMs, BASE_MS);
-  assert.equal(short.points[1].bucketStartMs, BASE_MS + 60_000);
-  assert.equal(short.points[1].tokensByType['grok-bot-default'], 12);
-  assert.equal(short.points[1].tokensByType['grok-bot-cua'], 0);
-  assert.equal(short.points[2].tokensByType['grok-bot-default'], 0);
+  assert.equal(short.charts.points[0].bucketStartMs, BASE_MS);
+  assert.equal(short.charts.points[1].bucketStartMs, BASE_MS + 60_000);
+  assert.equal(byTypeValue(short, BASE_MS + 60_000, 'grok-bot-default').tokens, 12);
+  assert.equal(byTypeValue(short, BASE_MS + 60_000, 'grok-bot-cua').tokens, 0);
+  assert.equal(byTypeValue(short, BASE_MS + 120_000, 'grok-bot-default').tokens, 0);
+  assert.deepEqual(short.totals, {
+    ins: 12,
+    outs: 0,
+    totalUsd: 12 * 2 / 1_000_000,
+    insUsd: 12 * 2 / 1_000_000,
+    unpricedCacheWriteTokens: 0,
+    includesCardEstimate: true,
+  });
   assert.equal(short.rows.length, 1);
   assert.equal(short.rows[0].usageType, 'grok-bot-default');
   assert.equal(short.rows[0].tokensTotal, 12);
   assert.equal(short.usageTypeIds.includes('cursor-grok-4.7'), false);
+
+  const shortSplit = requireBoard(payload.shortSplit, 'shortSplit');
+  assert.equal(shortSplit.charts.mode, 'ins-outs');
+  assert.equal(shortSplit.charts.lines.length, 0);
+  assert.equal(shortSplit.charts.points.length, 3);
+  assert.deepEqual(shortSplit.totals, short.totals);
+  const splitTokens = shortSplit.charts.points.reduce(
+    (sum, point) => sum + (point.insTokens ?? 0) + (point.outsTokens ?? 0),
+    0,
+  );
+  const splitUsd = shortSplit.charts.points.reduce(
+    (sum, point) => sum + (point.insUsd ?? 0) + (point.outsUsd ?? 0),
+    0,
+  );
+  assert.equal(splitTokens, short.totals.ins + short.totals.outs);
+  assert.equal(splitUsd, short.totals.totalUsd);
+  assert.equal(shortSplit.charts.points[1].insTokens, 12);
+  assert.equal(shortSplit.charts.points[1].outsTokens, 0);
 
   const cycle = requireBoard(payload.cycle, 'cycle');
   assert.equal(cycle.totalRows, 55);
   assert.equal(cycle.pageSize, 50);
   assert.equal(cycle.page, 1);
   assert.equal(cycle.rows.length, 50);
-  assert.equal(cycle.seriesLength, 168);
+  assert.equal(cycle.charts.points.length, 168);
   assert.equal(cycle.bucketMs, HOUR_MS);
   assert.equal(cycle.cycleStartMs, BASE_MS);
   assert.equal(cycle.offset, 0);
   assert.equal(cycle.usageTypeIds.includes('cursor-grok-4.7'), false);
   assert.equal(cycle.rows.every((row) => row.usageType.startsWith('grok-bot-')), true);
-  const dayBucket = cycle.points.find((point) => point.bucketStartMs === BASE_MS + DAY_MS);
-  assert.ok(dayBucket, 'day bucket');
-  assert.equal(dayBucket.tokensByType['grok-bot-default'], 1_000_000 + 4);
-  assert.equal(dayBucket.tokensByType['grok-bot-cua'], 100);
-  assert.equal(dayBucket.tokensByType['grok-bot-knowledge-work'], 8);
-  const firstHour = cycle.points.find((point) => point.bucketStartMs === BASE_MS);
-  assert.ok(firstHour, 'first hour');
-  assert.equal(firstHour.tokensByType['grok-bot-default'], 12);
+  assert.equal(byTypeValue(cycle, BASE_MS + DAY_MS, 'grok-bot-default').tokens, 1_000_000 + 4);
+  assert.equal(byTypeValue(cycle, BASE_MS + DAY_MS, 'grok-bot-cua').tokens, 100);
+  assert.equal(byTypeValue(cycle, BASE_MS + DAY_MS, 'grok-bot-knowledge-work').tokens, 8);
+  assert.equal(byTypeValue(cycle, BASE_MS, 'grok-bot-default').tokens, 12);
 
   const second = requireBoard(payload.page2, 'page2');
   assert.equal(second.page, 2);
@@ -194,27 +251,28 @@ test('grok bot board prices member rows and leaves cursor models out', () => {
     status: 'reported',
     split: { totalUsd: 3.5, insUsd: 3.5 },
   });
-  assert.deepEqual(cua.seriesTypeIds, ['grok-bot-cua']);
+  assert.deepEqual(cua.charts.lines.map((line) => line.id), ['grok-bot-cua']);
 
   const empty = requireBoard(payload.empty, 'empty');
   assert.equal(empty.cycleHasRows, true);
   assert.equal(empty.totalRows, 0);
   assert.equal(empty.page, 1);
   assert.equal(empty.rows.length, 0);
-  assert.deepEqual(empty.seriesTypeIds, [
+  assert.deepEqual(empty.charts.lines.map((line) => line.id), [
     'grok-bot-default',
     'grok-bot-cua',
     'grok-bot-knowledge-work',
   ]);
-  const emptyTokens = empty.points.reduce((sum, point) => (
-    sum + Object.values(point.tokensByType).reduce((inner, value) => inner + value, 0)
+  const emptyTokens = empty.charts.points.reduce((sum, point) => (
+    sum + (point.values ?? []).reduce((inner, value) => inner + value.tokens, 0)
   ), 0);
   assert.equal(emptyTokens, 0);
-  assert.equal(empty.seriesLength, 1);
+  assert.equal(empty.charts.points.length, 1);
 
   const future = requireBoard(payload.future, 'future');
   assert.equal(future.cycleHasRows, false);
   assert.equal(future.totalRows, 0);
   assert.equal(future.cycleStartMs, Date.parse('2026-10-21T03:30:00.000Z'));
-  assert.equal(future.seriesTypeIds.length, 0);
+  assert.equal(future.charts.lines.length, 0);
+  assert.equal(future.charts.points.length, 0);
 });

@@ -23,11 +23,26 @@ import {
 } from '@/lib/grok-bot/cycle';
 import {
   GROK_BOT_INS_LINE,
+  GROK_BOT_MAX_COMPARE,
   GROK_BOT_OUTS_LINE,
   grokBotHref,
 } from '@/lib/grok-bot/href';
-import type { GrokBotCharts } from '@/lib/grok-bot/window';
+import {
+  grokBotCompareDeltas,
+  type GrokBotAlignedCharts,
+} from '@/lib/grok-bot/window';
 import { useChartColors } from '@/lib/use-chart-colors';
+
+const PERIOD_DASH: readonly [undefined, string, string, string] = [
+  undefined,
+  '6 4',
+  '2 3',
+  '8 3 2 3',
+];
+
+if (PERIOD_DASH.length !== GROK_BOT_MAX_COMPARE + 1) {
+  throw new Error('PERIOD_DASH must cover the primary and every compare slot');
+}
 
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
 const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000;
@@ -40,20 +55,22 @@ interface ChartRow {
 }
 
 interface DrawnLine {
-  key: string;
-  name: string;
+  readonly key: string;
+  readonly name: string;
+  readonly colorIndex: number;
+  readonly periodIndex: number;
+  readonly lineIndex: number;
+  readonly side: 'type' | 'ins' | 'outs';
 }
 
 type GrokBotSeriesChartProps = {
-  readonly charts: GrokBotCharts;
+  readonly charts: GrokBotAlignedCharts;
   readonly windowStartMs: number;
   readonly windowEndMs: number;
   readonly timeZone: 'Asia/Hong_Kong';
   readonly usageParam: string | undefined;
-} & (
-  | { readonly measure: 'tokens' }
-  | { readonly measure: 'usd'; readonly dollarsAreEstimates: boolean }
-);
+  readonly measure: 'tokens' | 'usd';
+};
 
 function pad2(value: number): string {
   return String(value).padStart(2, '0');
@@ -89,36 +106,75 @@ function parseWallInput(
 }
 
 function projection(
-  charts: GrokBotCharts,
+  charts: GrokBotAlignedCharts,
   measure: 'tokens' | 'usd',
   spanMs: number,
   timeZone: 'Asia/Hong_Kong',
 ): { rows: ChartRow[]; lines: DrawnLine[] } {
+  const several = charts.periods.length > 1;
   if (charts.mode === 'by-type') {
+    const lines: DrawnLine[] = [];
+    charts.lines.forEach((line, lineIndex) => {
+      charts.periods.forEach((period, periodIndex) => {
+        lines.push({
+          key: several ? `${lineIndex}:${periodIndex}` : line.id,
+          name: several ? `${line.label} · ${period.shortLabel}` : line.label,
+          colorIndex: lineIndex,
+          periodIndex,
+          lineIndex,
+          side: 'type',
+        });
+      });
+    });
     return {
-      lines: charts.lines.map((line) => ({ key: line.id, name: line.label })),
+      lines,
       rows: charts.points.map((point) => {
         const row: ChartRow = {
           label: tickLabel(point.bucketStartMs, spanMs, timeZone),
         };
-        charts.lines.forEach((line, index) => {
-          const value = point.values[index];
-          row[line.id] = measure === 'tokens' ? value.tokens : value.usd;
-        });
+        for (const line of lines) {
+          const cell = point.values[line.lineIndex]?.[line.periodIndex];
+          row[line.key] = measure === 'tokens' ? (cell?.tokens ?? 0) : (cell?.usd ?? 0);
+        }
         return row;
       }),
     };
   }
+
+  const lines: DrawnLine[] = [];
+  (['ins', 'outs'] as const).forEach((side, sideIndex) => {
+    charts.periods.forEach((period, periodIndex) => {
+      const label = side === 'ins' ? GROK_BOT_INS_LINE : GROK_BOT_OUTS_LINE;
+      lines.push({
+        key: several ? `${side}:${periodIndex}` : side,
+        name: several ? `${label} · ${period.shortLabel}` : label,
+        colorIndex: sideIndex,
+        periodIndex,
+        lineIndex: sideIndex,
+        side,
+      });
+    });
+  });
   return {
-    lines: [
-      { key: 'ins', name: GROK_BOT_INS_LINE },
-      { key: 'outs', name: GROK_BOT_OUTS_LINE },
-    ],
-    rows: charts.points.map((point) => ({
-      label: tickLabel(point.bucketStartMs, spanMs, timeZone),
-      ins: measure === 'tokens' ? point.insTokens : point.insUsd,
-      outs: measure === 'tokens' ? point.outsTokens : point.outsUsd,
-    })),
+    lines,
+    rows: charts.points.map((point) => {
+      const row: ChartRow = {
+        label: tickLabel(point.bucketStartMs, spanMs, timeZone),
+      };
+      for (const line of lines) {
+        const side = point.sides[line.periodIndex];
+        if (!side) {
+          row[line.key] = 0;
+          continue;
+        }
+        if (line.side === 'outs') {
+          row[line.key] = measure === 'tokens' ? side.outsTokens : side.outsUsd;
+        } else {
+          row[line.key] = measure === 'tokens' ? side.insTokens : side.insUsd;
+        }
+      }
+      return row;
+    }),
   };
 }
 
@@ -129,9 +185,14 @@ function ChartTooltip({
   formatValue,
 }: {
   active?: boolean;
-  payload?: ReadonlyArray<{ name?: string; value?: number | string; color?: string }>;
+  payload?: ReadonlyArray<{
+    name?: string;
+    value?: number | string;
+    color?: string;
+    dataKey?: string | number;
+  }>;
   label?: string;
-  formatValue: (value: number) => string;
+  formatValue: (value: number, seriesKey: string) => string;
 }) {
   if (!active || !payload?.length) return null;
   return (
@@ -145,7 +206,10 @@ function ChartTooltip({
           />
           <span className="text-muted">{entry.name}:</span>
           <span className="font-medium tabular-nums text-foreground">
-            {formatValue(typeof entry.value === 'number' ? entry.value : 0)}
+            {formatValue(
+              typeof entry.value === 'number' ? entry.value : 0,
+              String(entry.dataKey ?? ''),
+            )}
           </span>
         </div>
       ))}
@@ -162,16 +226,12 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
     usageParam,
     measure,
   } = props;
-  const dollarsAreEstimates = props.measure === 'usd' && props.dollarsAreEstimates;
   const router = useRouter();
   const colors = useChartColors();
   const spanMs = windowEndMs - windowStartMs + 1;
   const selection = useRef<{ startIndex: number; endIndex: number } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const formatAxis = measure === 'usd' ? (value: number) => formatCost(value) : formatTokens;
-  const formatTooltip = measure === 'usd'
-    ? (value: number) => formatCost(value, dollarsAreEstimates)
-    : formatTokens;
   const emptyCopy = measure === 'tokens'
     ? 'No token usage in this window.'
     : 'No spending in this window.';
@@ -190,6 +250,12 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
 
   const palette = [colors.chart1, colors.chart2, colors.chart3, colors.chart4, colors.chart5];
   const drawn = projection(charts, measure, spanMs, timeZone);
+  const formatTooltip = (value: number, seriesKey: string): string => {
+    if (measure !== 'usd') return formatTokens(value);
+    const periodIndex = drawn.lines.find((line) => line.key === seriesKey)?.periodIndex ?? 0;
+    const period = charts.periods[periodIndex] ?? charts.periods[0];
+    return formatCost(value, period.totals.spend.includesCardEstimate);
+  };
   const points = charts.points;
   const bucketMs = points.length > 1
     ? points[1].bucketStartMs - points[0].bucketStartMs
@@ -197,7 +263,13 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
 
   function openRange(startMs: number, endMs: number): void {
     if (startMs === windowStartMs && endMs === windowEndMs) return;
-    router.push(grokBotHref({ startMs, endMs, usage: usageParam, mode: charts.mode }));
+    router.push(grokBotHref({
+      startMs,
+      endMs,
+      usage: usageParam,
+      mode: charts.mode,
+      compareDeltas: grokBotCompareDeltas(charts.periods),
+    }));
   }
 
   function rangeForIndexes(
@@ -306,14 +378,15 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
               itemSorter={null}
               wrapperStyle={{ fontSize: '11px', color: colors.legend }}
             />
-            {drawn.lines.map((line, index) => (
+            {drawn.lines.map((line) => (
               <Line
                 key={line.key}
                 type="monotone"
                 dataKey={line.key}
                 name={line.name}
-                stroke={palette[index % palette.length]}
-                strokeWidth={1.5}
+                stroke={palette[line.colorIndex % palette.length]}
+                strokeWidth={line.periodIndex === 0 ? 1.75 : 1.25}
+                strokeDasharray={PERIOD_DASH[line.periodIndex]}
                 dot={false}
                 isAnimationActive={false}
               />
@@ -336,6 +409,17 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
         {' · '}
         Asia/Hong_Kong
       </p>
+      {charts.periods.length > 1
+        ? charts.periods.slice(1).map((period) => (
+            period.role === 'compare'
+              ? (
+                  <p key={period.delta} className="text-[10px] text-muted">
+                    {period.label}
+                  </p>
+                )
+              : null
+          ))
+        : null}
     </div>
   );
 }

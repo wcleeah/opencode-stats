@@ -2,7 +2,7 @@ import type { JSX } from 'react';
 
 import { formatCost, formatTokens } from '@/lib/format';
 import { grokBotOutsUsd, grokBotTokenTotal } from '@/lib/grok-bot/rates';
-import type { GrokBotWindowTotals } from '@/lib/grok-bot/window';
+import type { GrokBotPeriod, GrokBotPeriodList, GrokBotWindowTotals } from '@/lib/grok-bot/window';
 
 import { StatCard } from '@/components/ui/card';
 
@@ -36,37 +36,85 @@ function formatBalancedUsd(
   };
 }
 
-export function GrokBotWindowStats({
-  totals,
-}: {
-  readonly totals: GrokBotWindowTotals;
-}): JSX.Element {
-  const estimated = totals.spend.includesCardEstimate;
+function spendLine(totals: GrokBotWindowTotals): { readonly total: string; readonly detail: string } {
   const spend = formatBalancedUsd(
     totals.spend.totalUsd,
     totals.spend.insUsd,
-    estimated,
+    totals.spend.includesCardEstimate,
   );
-  const spendParts = [
-    `ins ${spend.ins}`,
-    `outs ${spend.outs}`,
-  ];
-  if (totals.spend.unpricedCacheWriteTokens > 0) {
-    spendParts.push('cache write unpriced');
+  const parts = [`ins ${spend.ins}`, `outs ${spend.outs}`];
+  if (totals.spend.unpricedCacheWriteTokens > 0) parts.push('cache write unpriced');
+  return { total: spend.total, detail: parts.join(' · ') };
+}
+
+function periodKey(period: GrokBotPeriod): string {
+  return period.role === 'compare' ? String(period.delta) : 'primary';
+}
+
+function SpendRows({ periods }: { readonly periods: GrokBotPeriodList }): JSX.Element {
+  return (
+    <div className="space-y-3 font-normal">
+      {periods.map((period) => {
+        const spend = spendLine(period.totals);
+        return (
+          <div key={periodKey(period)}>
+            <div className="text-xs font-normal normal-case tracking-normal text-muted">
+              {period.shortLabel}
+            </div>
+            <div className="font-bold">{spend.total}</div>
+            <div className="text-xs font-normal text-muted">{spend.detail}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function TokenRows({ periods }: { readonly periods: GrokBotPeriodList }): JSX.Element {
+  return (
+    <div className="space-y-3 font-normal">
+      {periods.map((period) => (
+        <div key={periodKey(period)}>
+          <div className="text-xs font-normal normal-case tracking-normal text-muted">
+            {period.shortLabel}
+          </div>
+          <div className="font-bold">{formatTokens(grokBotTokenTotal(period.totals.tokens))}</div>
+          <div className="text-xs font-normal text-muted">
+            {`ins ${formatTokens(period.totals.tokens.ins)} · outs ${formatTokens(period.totals.tokens.outs)}`}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function GrokBotWindowStats(props: {
+  readonly periods: GrokBotPeriodList;
+}): JSX.Element {
+  const { periods } = props;
+  if (periods.length === 1) {
+    const spend = spendLine(periods[0].totals);
+    const totals = periods[0].totals;
+    return (
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <StatCard
+          label="Total Spending (estimated)"
+          value={spend.total}
+          subValue={spend.detail}
+        />
+        <StatCard
+          label="Total tokens"
+          value={formatTokens(grokBotTokenTotal(totals.tokens))}
+          subValue={`ins ${formatTokens(totals.tokens.ins)} · outs ${formatTokens(totals.tokens.outs)}`}
+        />
+      </div>
+    );
   }
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      <StatCard
-        label="Total Spending (estimated)"
-        value={spend.total}
-        subValue={spendParts.join(' · ')}
-      />
-      <StatCard
-        label="Total tokens"
-        value={formatTokens(grokBotTokenTotal(totals.tokens))}
-        subValue={`ins ${formatTokens(totals.tokens.ins)} · outs ${formatTokens(totals.tokens.outs)}`}
-      />
+      <StatCard label="Total Spending (estimated)" value={<SpendRows periods={periods} />} />
+      <StatCard label="Total tokens" value={<TokenRows periods={periods} />} />
     </div>
   );
 }

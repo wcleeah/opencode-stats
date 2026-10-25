@@ -6,10 +6,11 @@ import {
   GROK_BOT_CYCLE_TIME_ZONE,
   grokBotBucketStartSql,
   parseGrokBotCycleClock,
+  projectGrokBotPeriods,
   resolveGrokBotWindow,
   type GrokBotWindowMode,
 } from '@/lib/grok-bot/cycle';
-import { parseGrokBotChartMode } from '@/lib/grok-bot/href';
+import { parseGrokBotChartMode, parseGrokBotCompareDeltas } from '@/lib/grok-bot/href';
 import { grokBotModelSql, isGrokBotModel, normalizeGrokBotModelId } from '@/lib/grok-bot/membership';
 import {
   grokBotUsageCatalog,
@@ -19,10 +20,10 @@ import {
   type GrokBotUsageTypeOption,
 } from '@/lib/grok-bot/rates';
 import {
+  alignGrokBotPeriods,
   foldGrokBotWindow,
-  type GrokBotCharts,
+  type GrokBotAlignedCharts,
   type GrokBotFoldEvent,
-  type GrokBotWindowTotals,
 } from '@/lib/grok-bot/window';
 
 export const GROK_BOT_PAGE_SIZE = 50;
@@ -37,6 +38,7 @@ export interface GrokBotBoardQuery {
   usage?: string;
   page?: string;
   view?: string;
+  cmp?: string;
   now?: Date;
 }
 
@@ -67,8 +69,7 @@ export interface GrokBotBoard {
   usageTypes: readonly GrokBotUsageTypeOption[];
   selectedUsageTypeIds: readonly string[];
   usageParam: string | undefined;
-  totals: GrokBotWindowTotals;
-  charts: GrokBotCharts;
+  charts: GrokBotAlignedCharts;
   rows: readonly GrokBotTableRow[];
   page: number;
   pageSize: number;
@@ -184,15 +185,22 @@ export async function getGrokBotBoard(
   });
   if (!clock) return { data: null, error: 'Invalid grok cycle clock.' };
 
-  const resolved = resolveGrokBotWindow({
+  const now = query.now ?? new Date();
+  const primary = resolveGrokBotWindow({
     clock,
-    now: query.now ?? new Date(),
+    now,
     cycle: query.cycle,
     start: query.start,
     end: query.end,
   });
+  const projected = projectGrokBotPeriods({
+    clock,
+    now,
+    primary,
+    compareDeltas: parseGrokBotCompareDeltas(query.cmp),
+  });
   const membership = grokBotModelSql('model');
-  const cycleArgs = [resolved.cycle.startMs, resolved.cycle.endMs];
+  const cycleArgs = [primary.cycle.startMs, primary.cycle.endMs];
 
   const [modelsResult, cycleProbe] = await Promise.all([
     queryAll<{ model: string }>(
@@ -221,42 +229,48 @@ export async function getGrokBotBoard(
   const seriesTypes = catalog.filter(
     (entry) => selectedIds.has(entry.id) && inCycle.has(entry.id),
   );
-  const filter = eventFilter(
-    resolved.window.startMs,
-    resolved.window.endMs,
-    selection.param === undefined ? undefined : selection.ids,
-  );
+  const explicitIds = selection.param === undefined ? undefined : selection.ids;
+  const seriesLines = seriesTypes.map((entry) => ({ id: entry.id, label: entry.label }));
+  const mode = parseGrokBotChartMode(query.view);
+  const scans = projected.map((period) => {
+    const filter = eventFilter(period.window.startMs, period.window.endMs, explicitIds);
+    return {
+      filter,
+      query: queryAll<SqlScanRow>(
+        `SELECT
+          ${grokBotBucketStartSql('event_at')} AS bucket_start,
+          model,
+          kind,
+          cost_raw,
+          reported_cost,
+          tokens_input,
+          tokens_input_cache_write,
+          tokens_cache_read,
+          tokens_output
+        FROM cursor_usage_events
+        WHERE ${filter.clause}`,
+        [
+          period.window.startMs,
+          period.window.startMs,
+          period.window.bucketMs,
+          period.window.bucketMs,
+          ...filter.args,
+        ],
+      ),
+    };
+  });
+  const primaryFilter = scans[0].filter;
 
-  const scanSql = `
-    SELECT
-      ${grokBotBucketStartSql('event_at')} AS bucket_start,
-      model,
-      kind,
-      cost_raw,
-      reported_cost,
-      tokens_input,
-      tokens_input_cache_write,
-      tokens_cache_read,
-      tokens_output
-    FROM cursor_usage_events
-    WHERE ${filter.clause}
-  `;
-  const scanArgs = [
-    resolved.window.startMs,
-    resolved.window.startMs,
-    resolved.window.bucketMs,
-    resolved.window.bucketMs,
-    ...filter.args,
-  ];
-
-  const [scanResult, countResult] = await Promise.all([
-    queryAll<SqlScanRow>(scanSql, scanArgs),
+  const [scanResults, countResult] = await Promise.all([
+    Promise.all(scans.map((scan) => scan.query)),
     queryOne<{ total: number | bigint }>(
-      `SELECT COUNT(*) AS total FROM cursor_usage_events WHERE ${filter.clause}`,
-      filter.args,
+      `SELECT COUNT(*) AS total FROM cursor_usage_events WHERE ${primaryFilter.clause}`,
+      primaryFilter.args,
     ),
   ]);
-  if (scanResult.error) return { data: null, error: scanResult.error };
+  for (const scanResult of scanResults) {
+    if (scanResult.error) return { data: null, error: scanResult.error };
+  }
   if (countResult.error || !countResult.data) {
     return { data: null, error: countResult.error ?? 'Failed to count Grokbot rows.' };
   }
@@ -281,10 +295,10 @@ export async function getGrokBotBoard(
          tokens_output,
          tokens_total
        FROM cursor_usage_events
-       WHERE ${filter.clause}
+       WHERE ${primaryFilter.clause}
        ORDER BY event_at DESC, id DESC
        LIMIT ? OFFSET ?`,
-      [...filter.args, GROK_BOT_PAGE_SIZE, (page - 1) * GROK_BOT_PAGE_SIZE],
+      [...primaryFilter.args, GROK_BOT_PAGE_SIZE, (page - 1) * GROK_BOT_PAGE_SIZE],
     );
     if (rowResult.error || !rowResult.data) {
       return { data: null, error: rowResult.error ?? 'Failed to load Grokbot rows.' };
@@ -310,31 +324,34 @@ export async function getGrokBotBoard(
       charge: priceGrokBotRow(priced).charge,
     };
   });
-  const folded = foldGrokBotWindow({
-    windowStartMs: resolved.window.startMs,
-    windowEndMs: resolved.window.endMs,
-    bucketMs: resolved.window.bucketMs,
-    seriesTypes: seriesTypes.map((entry) => ({ id: entry.id, label: entry.label })),
-    events: (scanResult.data ?? []).map(foldEvent),
-    mode: parseGrokBotChartMode(query.view),
-  });
+  const folds = projected.map((period, index) => ({
+    projected: period,
+    folded: foldGrokBotWindow({
+      windowStartMs: period.window.startMs,
+      windowEndMs: period.window.endMs,
+      bucketMs: period.window.bucketMs,
+      seriesTypes: seriesLines,
+      events: (scanResults[index].data ?? []).map(foldEvent),
+      mode,
+    }),
+  }));
+  const charts = alignGrokBotPeriods({ seriesTypes: seriesLines, folds });
 
   return {
     data: {
       cycle: {
-        offset: resolved.cycle.offset,
-        startMs: resolved.cycle.startMs,
-        endMs: resolved.cycle.endMs,
-        label: resolved.cycle.label,
+        offset: primary.cycle.offset,
+        startMs: primary.cycle.startMs,
+        endMs: primary.cycle.endMs,
+        label: primary.cycle.label,
       },
-      windowMode: resolved.mode,
-      window: resolved.window,
+      windowMode: primary.mode,
+      window: primary.window,
       timeZone: GROK_BOT_CYCLE_TIME_ZONE,
       usageTypes: catalog,
       selectedUsageTypeIds: selection.ids,
       usageParam: selection.param,
-      totals: folded.totals,
-      charts: folded.charts,
+      charts,
       rows,
       page,
       pageSize: GROK_BOT_PAGE_SIZE,

@@ -8,6 +8,12 @@ export interface CursorSettings {
    */
   cursor_models_included_usd: number;
   billing_cycle_start_day: number;
+  /** Lowercase weekday name. Default `wednesday`. */
+  grok_cycle_weekday: string;
+  /** 0 through 23. Default 11. */
+  grok_cycle_hour: number;
+  /** 0 through 59. Default 30. */
+  grok_cycle_minute: number;
   updated_at: number;
 }
 

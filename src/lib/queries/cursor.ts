@@ -4,6 +4,7 @@ import { execute, executeBatch, queryAll, queryOne } from '@/lib/db';
 import type { CursorCsvEvent } from '@/lib/cursor/csv';
 import { buildCursorEventInsertBatches } from '@/lib/cursor/insert';
 import { ensureCursorSchema } from '@/lib/cursor/schema';
+import type { GrokBotCycleClock } from '@/lib/grok-bot/cycle';
 import {
   cursorAggregateWhere,
   UNBILLED_PREDICATE,
@@ -27,6 +28,9 @@ const DEFAULT_SETTINGS: CursorSettings = {
   included_pool_usd: 400,
   cursor_models_included_usd: 2000,
   billing_cycle_start_day: 1,
+  grok_cycle_weekday: 'wednesday',
+  grok_cycle_hour: 11,
+  grok_cycle_minute: 30,
   updated_at: 0,
 };
 
@@ -55,6 +59,9 @@ export async function getCursorSettings(): Promise<{
         included_pool_usd,
         COALESCE(cursor_models_included_usd, 2000) AS cursor_models_included_usd,
         billing_cycle_start_day,
+        grok_cycle_weekday,
+        grok_cycle_hour,
+        grok_cycle_minute,
         updated_at
       FROM cursor_settings
       WHERE id = 1
@@ -72,6 +79,7 @@ export async function updateCursorSettings(input: {
   includedPoolUsd: number;
   cursorModelsIncludedUsd: number;
   billingCycleStartDay: number;
+  grokCycle: GrokBotCycleClock;
 }): Promise<{ data: CursorSettings | null; error: string | null }> {
   return withSchema(async () => {
     const updatedAt = Date.now();
@@ -81,6 +89,9 @@ export async function updateCursorSettings(input: {
            included_pool_usd = ?,
            cursor_models_included_usd = ?,
            billing_cycle_start_day = ?,
+           grok_cycle_weekday = ?,
+           grok_cycle_hour = ?,
+           grok_cycle_minute = ?,
            updated_at = ?
        WHERE id = 1`,
       [
@@ -88,6 +99,9 @@ export async function updateCursorSettings(input: {
         input.includedPoolUsd,
         input.cursorModelsIncludedUsd,
         input.billingCycleStartDay,
+        input.grokCycle.weekday,
+        input.grokCycle.hour,
+        input.grokCycle.minute,
         updatedAt,
       ],
     );

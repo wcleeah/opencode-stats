@@ -3,8 +3,9 @@
 import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
-import type { CursorSettings } from '@/types/cursor';
+import { GROK_BOT_WEEKDAYS } from '@/lib/grok-bot/cycle';
 import { cn } from '@/lib/utils';
+import type { CursorSettings } from '@/types/cursor';
 
 interface CursorSettingsFormProps {
   settings: CursorSettings;
@@ -23,6 +24,9 @@ export function CursorSettingsForm({ settings }: CursorSettingsFormProps) {
   const [billingCycleStartDay, setBillingCycleStartDay] = useState(
     String(settings.billing_cycle_start_day),
   );
+  const [grokCycleWeekday, setGrokCycleWeekday] = useState(settings.grok_cycle_weekday);
+  const [grokCycleHour, setGrokCycleHour] = useState(String(settings.grok_cycle_hour));
+  const [grokCycleMinute, setGrokCycleMinute] = useState(String(settings.grok_cycle_minute));
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [error, setError] = useState<string | null>(null);
 
@@ -42,6 +46,9 @@ export function CursorSettingsForm({ settings }: CursorSettingsFormProps) {
       includedPoolUsd: Number(includedPoolUsd),
       cursorModelsIncludedUsd: Number(cursorModelsIncludedUsd),
       billingCycleStartDay: Number(billingCycleStartDay),
+      grokCycleWeekday,
+      grokCycleHour: Number(grokCycleHour),
+      grokCycleMinute: Number(grokCycleMinute),
     };
 
     try {
@@ -140,6 +147,46 @@ export function CursorSettingsForm({ settings }: CursorSettingsFormProps) {
           />
           <span className="block text-[10px] text-muted">
             Floor for third-party models (Ultra ≥$400).
+          </span>
+        </label>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <label className="block space-y-1">
+          <span className="text-[10px] uppercase tracking-wide text-muted">
+            Grok cycle weekday
+          </span>
+          <select
+            value={grokCycleWeekday}
+            onChange={(event) => setGrokCycleWeekday(event.target.value)}
+            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+          >
+            {GROK_BOT_WEEKDAYS.map((weekday) => (
+              <option key={weekday} value={weekday}>
+                {weekday.charAt(0).toUpperCase() + weekday.slice(1)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block space-y-1">
+          <span className="text-[10px] uppercase tracking-wide text-muted">
+            Grok cycle time
+          </span>
+          <input
+            type="time"
+            step={60}
+            value={`${grokCycleHour.padStart(2, '0')}:${grokCycleMinute.padStart(2, '0')}`}
+            onChange={(event) => {
+              const match = /^(\d{2}):(\d{2})$/.exec(event.target.value);
+              if (!match) return;
+              setGrokCycleHour(String(Number(match[1])));
+              setGrokCycleMinute(String(Number(match[2])));
+            }}
+            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+          />
+          <span className="block text-[10px] text-muted">
+            The grok cycle is this weekday and time in Asia/Hong_Kong. The cycle day above
+            is the Cursor clock.
           </span>
         </label>
       </div>

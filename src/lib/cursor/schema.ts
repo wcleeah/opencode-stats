@@ -4,6 +4,12 @@ import { execute, executeBatch } from '@/lib/db';
 
 let schemaReady: Promise<void> | null = null;
 
+const GROK_SETTINGS_COLUMNS = [
+  `ALTER TABLE cursor_settings ADD COLUMN grok_cycle_weekday TEXT NOT NULL DEFAULT 'wednesday'`,
+  `ALTER TABLE cursor_settings ADD COLUMN grok_cycle_hour INTEGER NOT NULL DEFAULT 11`,
+  `ALTER TABLE cursor_settings ADD COLUMN grok_cycle_minute INTEGER NOT NULL DEFAULT 30`,
+] as const;
+
 const SCHEMA_STATEMENTS = [
   `CREATE TABLE IF NOT EXISTS cursor_usage_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -46,6 +52,9 @@ const SCHEMA_STATEMENTS = [
     included_pool_usd REAL NOT NULL DEFAULT 400,
     cursor_models_included_usd REAL NOT NULL DEFAULT 2000,
     billing_cycle_start_day INTEGER NOT NULL DEFAULT 1,
+    grok_cycle_weekday TEXT NOT NULL DEFAULT 'wednesday',
+    grok_cycle_hour INTEGER NOT NULL DEFAULT 11,
+    grok_cycle_minute INTEGER NOT NULL DEFAULT 30,
     updated_at INTEGER NOT NULL
   )`,
   `CREATE TABLE IF NOT EXISTS cursor_cycle_pools (
@@ -77,6 +86,17 @@ export async function ensureCursorSchema(): Promise<{ error: string | null }> {
       ) {
         schemaReady = null;
         throw new Error(migrate.error);
+      }
+
+      for (const sql of GROK_SETTINGS_COLUMNS) {
+        const grokColumn = await execute(sql);
+        if (
+          grokColumn.error &&
+          !grokColumn.error.toLowerCase().includes('duplicate column')
+        ) {
+          schemaReady = null;
+          throw new Error(grokColumn.error);
+        }
       }
 
       const seed = await execute(

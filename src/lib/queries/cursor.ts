@@ -4,6 +4,11 @@ import { execute, executeBatch, queryAll, queryOne } from '@/lib/db';
 import type { CursorCsvEvent } from '@/lib/cursor/csv';
 import { buildCursorEventInsertBatches } from '@/lib/cursor/insert';
 import { ensureCursorSchema } from '@/lib/cursor/schema';
+import type { GrokBotCycleClock } from '@/lib/grok-bot/cycle';
+import {
+  cursorAggregateWhere,
+  UNBILLED_PREDICATE,
+} from '@/lib/queries/cursor-event-where';
 import type {
   CursorAgentUsageRow,
   CursorCyclePool,
@@ -16,52 +21,18 @@ import type {
   CursorSettings,
 } from '@/types/cursor';
 
+export { cursorAggregateWhere, cursorEventWhere } from '@/lib/queries/cursor-event-where';
+
 const DEFAULT_SETTINGS: CursorSettings = {
   plan_amount_usd: 200,
   included_pool_usd: 400,
   cursor_models_included_usd: 2000,
   billing_cycle_start_day: 1,
+  grok_cycle_weekday: 'wednesday',
+  grok_cycle_hour: 11,
+  grok_cycle_minute: 30,
   updated_at: 0,
 };
-
-function rangeWhere(
-  column: string,
-  startMs?: number,
-  endMs?: number,
-): { clause: string; args: number[] } {
-  const conditions: string[] = [];
-  const args: number[] = [];
-
-  if (startMs !== undefined) {
-    conditions.push(`${column} >= ?`);
-    args.push(startMs);
-  }
-  if (endMs !== undefined) {
-    conditions.push(`${column} <= ?`);
-    args.push(endMs);
-  }
-
-  return {
-    clause: conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '',
-    args,
-  };
-}
-
-/** Cursor does not bill these rows against usage pools. */
-const UNBILLED_PREDICATE =
-  `(lower(kind) LIKE '%error%' OR lower(ifnull(cost_raw, '')) = 'free' OR lower(kind) = 'free')`;
-
-const BILLABLE_PREDICATE = `NOT ${UNBILLED_PREDICATE}`;
-
-function andWhere(
-  range: { clause: string; args: number[] },
-  extraSql: string,
-): { clause: string; args: number[] } {
-  if (range.clause) {
-    return { clause: `${range.clause} AND ${extraSql}`, args: range.args };
-  }
-  return { clause: `WHERE ${extraSql}`, args: [] };
-}
 
 function billableTokenSum(column: string): string {
   return `COALESCE(SUM(CASE WHEN ${UNBILLED_PREDICATE} THEN 0 ELSE ${column} END), 0)`;
@@ -88,6 +59,9 @@ export async function getCursorSettings(): Promise<{
         included_pool_usd,
         COALESCE(cursor_models_included_usd, 2000) AS cursor_models_included_usd,
         billing_cycle_start_day,
+        grok_cycle_weekday,
+        grok_cycle_hour,
+        grok_cycle_minute,
         updated_at
       FROM cursor_settings
       WHERE id = 1
@@ -105,6 +79,7 @@ export async function updateCursorSettings(input: {
   includedPoolUsd: number;
   cursorModelsIncludedUsd: number;
   billingCycleStartDay: number;
+  grokCycle: GrokBotCycleClock;
 }): Promise<{ data: CursorSettings | null; error: string | null }> {
   return withSchema(async () => {
     const updatedAt = Date.now();
@@ -114,6 +89,9 @@ export async function updateCursorSettings(input: {
            included_pool_usd = ?,
            cursor_models_included_usd = ?,
            billing_cycle_start_day = ?,
+           grok_cycle_weekday = ?,
+           grok_cycle_hour = ?,
+           grok_cycle_minute = ?,
            updated_at = ?
        WHERE id = 1`,
       [
@@ -121,6 +99,9 @@ export async function updateCursorSettings(input: {
         input.includedPoolUsd,
         input.cursorModelsIncludedUsd,
         input.billingCycleStartDay,
+        input.grokCycle.weekday,
+        input.grokCycle.hour,
+        input.grokCycle.minute,
         updatedAt,
       ],
     );
@@ -224,7 +205,7 @@ export async function getCursorGlobalStats(
   endMs?: number,
 ): Promise<{ data: CursorGlobalStats | null; error: string | null }> {
   return withSchema(() => {
-    const range = rangeWhere('event_at', startMs, endMs);
+    const range = cursorAggregateWhere('global', startMs, endMs);
     return queryOne<CursorGlobalStats>(
       `SELECT
          COUNT(*) AS event_count,
@@ -256,7 +237,7 @@ export async function getCursorDailyUsage(
   endMs?: number,
 ): Promise<{ data: CursorDailyUsage[] | null; error: string | null }> {
   return withSchema(() => {
-    const range = andWhere(rangeWhere('event_at', startMs, endMs), BILLABLE_PREDICATE);
+    const range = cursorAggregateWhere('daily', startMs, endMs);
     return queryAll<CursorDailyUsage>(
       `SELECT
          strftime('%Y-%m-%d', event_at / 1000, 'unixepoch') AS day,
@@ -284,7 +265,7 @@ export async function getCursorModelUsage(
   endMs?: number,
 ): Promise<{ data: CursorModelUsageRow[] | null; error: string | null }> {
   return withSchema(() => {
-    const range = andWhere(rangeWhere('event_at', startMs, endMs), BILLABLE_PREDICATE);
+    const range = cursorAggregateWhere('model', startMs, endMs);
     return queryAll<CursorModelUsageRow>(
       `SELECT
          model,
@@ -309,10 +290,7 @@ export async function getCursorAgentUsage(
   limit: number = 25,
 ): Promise<{ data: CursorAgentUsageRow[] | null; error: string | null }> {
   return withSchema(() => {
-    const range = andWhere(rangeWhere('event_at', startMs, endMs), BILLABLE_PREDICATE);
-    const where = range.clause
-      ? `${range.clause} AND cloud_agent_id IS NOT NULL AND cloud_agent_id != ''`
-      : `WHERE cloud_agent_id IS NOT NULL AND cloud_agent_id != ''`;
+    const range = cursorAggregateWhere('agent', startMs, endMs);
     return queryAll<CursorAgentUsageRow>(
       `SELECT
          cloud_agent_id,
@@ -324,7 +302,7 @@ export async function getCursorAgentUsage(
          COALESCE(SUM(tokens_total), 0) AS tokens_total,
          MAX(event_at) AS last_event_at
        FROM cursor_usage_events
-       ${where}
+       ${range.clause}
        GROUP BY cloud_agent_id
        ORDER BY tokens_total DESC
        LIMIT ?`,
@@ -338,7 +316,7 @@ export async function getCursorEventCostRows(
   endMs?: number,
 ): Promise<{ data: CursorEventCostRow[] | null; error: string | null }> {
   return withSchema(() => {
-    const range = andWhere(rangeWhere('event_at', startMs, endMs), BILLABLE_PREDICATE);
+    const range = cursorAggregateWhere('eventCost', startMs, endMs);
     return queryAll<CursorEventCostRow>(
       `SELECT
          model,
@@ -359,7 +337,7 @@ export async function getCursorDailyModelUsage(
   endMs?: number,
 ): Promise<{ data: CursorDailyModelUsageRow[] | null; error: string | null }> {
   return withSchema(() => {
-    const range = andWhere(rangeWhere('event_at', startMs, endMs), BILLABLE_PREDICATE);
+    const range = cursorAggregateWhere('dailyModel', startMs, endMs);
     return queryAll<CursorDailyModelUsageRow>(
       `SELECT
          strftime('%Y-%m-%d', event_at / 1000, 'unixepoch') AS day,

@@ -11,7 +11,8 @@ import {
 } from '@/lib/source-mode';
 
 const CURSOR_NAV = [
-  { href: '/cursor', label: 'Dashboard' },
+  { href: '/cursor', label: 'Agent Usage' },
+  { href: '/cursor/grok', label: 'Grokbot Usage' },
   { href: '/cursor/upload', label: 'Upload' },
 ] as const;
 

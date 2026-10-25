@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { parseGrokBotCycleClock } from '@/lib/grok-bot/cycle';
 import { getCursorSettings, updateCursorSettings } from '@/lib/queries/cursor';
 
 export const runtime = 'nodejs';
@@ -66,11 +67,21 @@ export async function PUT(request: Request): Promise<NextResponse> {
       );
     }
 
+    const clock = parseGrokBotCycleClock({
+      weekday: record.grokCycleWeekday,
+      hour: record.grokCycleHour,
+      minute: record.grokCycleMinute,
+    });
+    if (!clock) {
+      return NextResponse.json({ error: 'Invalid grok cycle clock.' }, { status: 400 });
+    }
+
     const result = await updateCursorSettings({
       planAmountUsd,
       includedPoolUsd,
       cursorModelsIncludedUsd,
       billingCycleStartDay,
+      grokCycle: clock,
     });
 
     if (result.error || !result.data) {

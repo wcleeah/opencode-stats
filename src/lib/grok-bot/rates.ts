@@ -38,7 +38,6 @@ export type GrokBotCharge =
   | {
       readonly status: 'partial';
       readonly split: GrokBotPartition;
-      /** Cache-write tokens omitted from `split.totalUsd`. Count, not dollars. */
       readonly unpricedCacheWriteTokens: number;
     };
 

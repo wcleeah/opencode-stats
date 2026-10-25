@@ -168,7 +168,8 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
   const spanMs = windowEndMs - windowStartMs + 1;
   const selection = useRef<{ startIndex: number; endIndex: number } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const formatValue = measure === 'usd'
+  const formatAxis = measure === 'usd' ? (value: number) => formatCost(value) : formatTokens;
+  const formatTooltip = measure === 'usd'
     ? (value: number) => formatCost(value, dollarsAreEstimates)
     : formatTokens;
   const emptyCopy = measure === 'tokens'
@@ -294,14 +295,17 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
               minTickGap={24}
             />
             <YAxis
-              tickFormatter={formatValue}
+              tickFormatter={formatAxis}
               tick={{ fontSize: 10, fill: colors.axis }}
               tickLine={false}
               axisLine={false}
               width={measure === 'usd' ? 72 : 52}
             />
-            <Tooltip content={<ChartTooltip formatValue={formatValue} />} />
-            <Legend wrapperStyle={{ fontSize: '11px', color: colors.legend }} />
+            <Tooltip content={<ChartTooltip formatValue={formatTooltip} />} />
+            <Legend
+              itemSorter={null}
+              wrapperStyle={{ fontSize: '11px', color: colors.legend }}
+            />
             {drawn.lines.map((line, index) => (
               <Line
                 key={line.key}

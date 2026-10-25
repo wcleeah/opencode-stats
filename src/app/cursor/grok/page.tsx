@@ -7,12 +7,18 @@ import {
   formatGrokBotWallTime,
   grokBotWallTimeFromUtcMs,
 } from '@/lib/grok-bot/cycle';
-import { grokBotHref, toggleGrokBotUsageParam } from '@/lib/grok-bot/href';
+import {
+  GROK_BOT_INS_LINE,
+  GROK_BOT_OUTS_LINE,
+  grokBotHref,
+  toggleGrokBotUsageParam,
+} from '@/lib/grok-bot/href';
 import type { GrokBotCharge } from '@/lib/grok-bot/rates';
 import { getCursorSettings } from '@/lib/queries/cursor';
 import { getGrokBotBoard, type GrokBotBoard } from '@/lib/queries/grok-bot';
 
 import { GrokBotSeriesChart } from '@/components/grok-bot/usage-chart';
+import { GrokBotWindowStats } from '@/components/grok-bot/window-stats';
 import { Card } from '@/components/ui/card';
 import { Pagination } from '@/components/ui/pagination';
 import {
@@ -190,14 +196,27 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
   }
 
   const board = boardResult.data;
+  const mode = board.charts.mode;
   const windowHref = board.windowMode.kind === 'cycle'
     ? { cycle: board.windowMode.offset }
     : { startMs: board.windowMode.startMs, endMs: board.windowMode.endMs };
   const pageBase = grokBotHref({
     ...windowHref,
     usage: board.usageParam,
-    mode: board.charts.mode,
+    mode,
   });
+  const toggleHref = grokBotHref({
+    ...windowHref,
+    usage: board.usageParam,
+    mode: mode === 'by-type' ? 'ins-outs' : 'by-type',
+  });
+  const chartProps = {
+    charts: board.charts,
+    windowStartMs: board.window.startMs,
+    windowEndMs: board.window.endMs,
+    timeZone: board.timeZone,
+    usageParam: board.usageParam,
+  };
   const totalPages = Math.ceil(board.totalRows / board.pageSize);
 
   return (
@@ -207,15 +226,28 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
       <UsageLinks board={board} />
       {board.cycleHasRows ? (
         <>
+          <GrokBotWindowStats totals={board.totals} />
+          <Link
+            href={toggleHref}
+            aria-pressed={mode === 'ins-outs'}
+            className={
+              mode === 'ins-outs'
+                ? 'rounded-md border border-foreground px-2 py-1 text-xs text-foreground'
+                : 'rounded-md border border-border px-2 py-1 text-xs text-muted hover:text-foreground'
+            }
+          >
+            {GROK_BOT_INS_LINE} / {GROK_BOT_OUTS_LINE}
+          </Link>
           <Card>
             <div className="mb-3 text-xs text-muted uppercase tracking-wider">Tokens</div>
+            <GrokBotSeriesChart {...chartProps} measure="tokens" />
+          </Card>
+          <Card>
+            <div className="mb-3 text-xs text-muted uppercase tracking-wider">Spending</div>
             <GrokBotSeriesChart
-              charts={board.charts}
-              measure="tokens"
-              windowStartMs={board.window.startMs}
-              windowEndMs={board.window.endMs}
-              timeZone={board.timeZone}
-              usageParam={board.usageParam}
+              {...chartProps}
+              measure="usd"
+              dollarsAreEstimates={board.totals.spend.includesCardEstimate}
             />
           </Card>
           {board.totalRows === 0 ? (

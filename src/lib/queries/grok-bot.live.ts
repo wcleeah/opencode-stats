@@ -1,5 +1,6 @@
 import { execute } from '@/lib/db';
 import { ensureCursorSchema } from '@/lib/cursor/schema';
+import type { GrokBotCharts, GrokBotWindowTotals } from '@/lib/grok-bot/window';
 import {
   getGrokBotBoard,
   type GrokBotBoard,
@@ -65,40 +66,88 @@ function summarizeRow(row: GrokBotTableRow): {
   };
 }
 
+function summarizeCharts(charts: GrokBotCharts): {
+  mode: GrokBotCharts['mode'];
+  lines: Array<{ id: string; label: string }>;
+  points: Array<{
+    bucketStartMs: number;
+    values?: Array<{ tokens: number; usd: number }>;
+    insTokens?: number;
+    outsTokens?: number;
+    insUsd?: number;
+    outsUsd?: number;
+  }>;
+} {
+  if (charts.mode === 'by-type') {
+    return {
+      mode: charts.mode,
+      lines: charts.lines.map((line) => ({ id: line.id, label: line.label })),
+      points: charts.points.map((point) => ({
+        bucketStartMs: point.bucketStartMs,
+        values: point.values.map((value) => ({ tokens: value.tokens, usd: value.usd })),
+      })),
+    };
+  }
+  return {
+    mode: charts.mode,
+    lines: [],
+    points: charts.points.map((point) => ({
+      bucketStartMs: point.bucketStartMs,
+      insTokens: point.insTokens,
+      outsTokens: point.outsTokens,
+      insUsd: point.insUsd,
+      outsUsd: point.outsUsd,
+    })),
+  };
+}
+
+function summarizeTotals(totals: GrokBotWindowTotals): {
+  ins: number;
+  outs: number;
+  totalUsd: number;
+  insUsd: number;
+  unpricedCacheWriteTokens: number;
+  includesCardEstimate: boolean;
+} {
+  return {
+    ins: totals.tokens.ins,
+    outs: totals.tokens.outs,
+    totalUsd: totals.spend.totalUsd,
+    insUsd: totals.spend.insUsd,
+    unpricedCacheWriteTokens: totals.spend.unpricedCacheWriteTokens,
+    includesCardEstimate: totals.spend.includesCardEstimate,
+  };
+}
+
 function summarizeBoard(board: GrokBotBoard): {
   totalRows: number;
   page: number;
   pageSize: number;
   cycleHasRows: boolean;
-  seriesLength: number;
-  seriesTypeIds: string[];
   usageTypeIds: string[];
   windowStartMs: number;
   windowEndMs: number;
   bucketMs: number;
   cycleStartMs: number;
   offset: number;
+  totals: ReturnType<typeof summarizeTotals>;
+  charts: ReturnType<typeof summarizeCharts>;
   rows: ReturnType<typeof summarizeRow>[];
-  points: Array<{ bucketStartMs: number; tokensByType: Readonly<Record<string, number>> }>;
 } {
   return {
     totalRows: board.totalRows,
     page: board.page,
     pageSize: board.pageSize,
     cycleHasRows: board.cycleHasRows,
-    seriesLength: board.series.length,
-    seriesTypeIds: board.seriesTypes.map((entry) => entry.id),
     usageTypeIds: board.usageTypes.map((entry) => entry.id),
     windowStartMs: board.window.startMs,
     windowEndMs: board.window.endMs,
     bucketMs: board.window.bucketMs,
     cycleStartMs: board.cycle.startMs,
     offset: board.cycle.offset,
+    totals: summarizeTotals(board.totals),
+    charts: summarizeCharts(board.charts),
     rows: board.rows.map(summarizeRow),
-    points: board.series.map((point) => ({
-      bucketStartMs: point.bucketStartMs,
-      tokensByType: point.tokensByType,
-    })),
   };
 }
 
@@ -108,6 +157,7 @@ async function load(query: {
   end?: string;
   usage?: string;
   page?: string;
+  view?: string;
   weekday?: string;
 }): Promise<{ data: ReturnType<typeof summarizeBoard> | null; error: string | null }> {
   const result = await getGrokBotBoard({
@@ -119,6 +169,7 @@ async function load(query: {
     end: query.end,
     usage: query.usage,
     page: query.page,
+    view: query.view,
     now: NOW,
   });
   if (result.error || !result.data) return { data: null, error: result.error };
@@ -229,9 +280,10 @@ async function main(): Promise<void> {
 
   const shortEnd = BASE_MS + 180_000 - 1;
   const emptyStart = BASE_MS + 3 * DAY_MS;
-  const [bad, short, cycle, page2, page99, cua, empty, future] = await Promise.all([
+  const [bad, short, shortSplit, cycle, page2, page99, cua, empty, future] = await Promise.all([
     load({ weekday: 'funday' }),
     load({ start: String(BASE_MS), end: String(shortEnd) }),
+    load({ start: String(BASE_MS), end: String(shortEnd), view: 'ins-outs' }),
     load({}),
     load({ page: '2' }),
     load({ page: '99' }),
@@ -243,6 +295,7 @@ async function main(): Promise<void> {
   console.log(JSON.stringify({
     bad,
     short,
+    shortSplit,
     cycle,
     page2,
     page99,

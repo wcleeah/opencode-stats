@@ -374,48 +374,10 @@ export function grokBotBucketMs(spanMs: number): number {
   return HOUR_MS;
 }
 
-export interface GrokBotSeriesPoint {
-  bucketStartMs: number;
-  tokensByType: Readonly<Record<string, number>>;
-}
-
 export function grokBotBucketStartSql(column: string = 'event_at'): string {
   if (!SQL_COLUMN.test(column)) {
     throw new Error(`Unsafe SQL column: ${column}`);
   }
   // CAST keeps SQLite on integer division when the driver binds JS numbers as reals.
   return `(CAST(? AS INTEGER) + ((CAST(${column} AS INTEGER) - CAST(? AS INTEGER)) / CAST(? AS INTEGER)) * CAST(? AS INTEGER))`;
-}
-
-export function fillGrokBotSeries(input: {
-  windowStartMs: number;
-  windowEndMs: number;
-  bucketMs: number;
-  typeIds: readonly string[];
-  sums: readonly { bucketStartMs: number; usageType: string; tokensTotal: number }[];
-}): GrokBotSeriesPoint[] {
-  if (input.bucketMs <= 0 || input.windowEndMs < input.windowStartMs) return [];
-
-  const zeros: Record<string, number> = {};
-  for (const id of input.typeIds) zeros[id] = 0;
-
-  const byBucket = new Map<number, Record<string, number>>();
-  const typeIds = new Set(input.typeIds);
-  for (const sum of input.sums) {
-    if (!typeIds.has(sum.usageType)) continue;
-    const existing = byBucket.get(sum.bucketStartMs);
-    const row = existing ?? { ...zeros };
-    row[sum.usageType] = (row[sum.usageType] ?? 0) + sum.tokensTotal;
-    if (!existing) byBucket.set(sum.bucketStartMs, row);
-  }
-
-  const points: GrokBotSeriesPoint[] = [];
-  for (let bucket = input.windowStartMs; bucket <= input.windowEndMs; bucket += input.bucketMs) {
-    const counts = byBucket.get(bucket);
-    points.push({
-      bucketStartMs: bucket,
-      tokensByType: counts ? { ...counts } : { ...zeros },
-    });
-  }
-  return points;
 }

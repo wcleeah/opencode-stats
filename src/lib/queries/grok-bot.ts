@@ -5,19 +5,25 @@ import { ensureCursorSchema } from '@/lib/cursor/schema';
 import {
   GROK_BOT_CYCLE_TIME_ZONE,
   grokBotBucketStartSql,
-  fillGrokBotSeries,
   parseGrokBotCycleClock,
   resolveGrokBotWindow,
-  type GrokBotSeriesPoint,
   type GrokBotWindowMode,
 } from '@/lib/grok-bot/cycle';
+import { parseGrokBotChartMode } from '@/lib/grok-bot/href';
 import { grokBotModelSql, isGrokBotModel, normalizeGrokBotModelId } from '@/lib/grok-bot/membership';
 import {
   grokBotUsageCatalog,
   priceGrokBotRow,
   type GrokBotCharge,
+  type GrokBotPriceInput,
   type GrokBotUsageTypeOption,
 } from '@/lib/grok-bot/rates';
+import {
+  foldGrokBotWindow,
+  type GrokBotCharts,
+  type GrokBotFoldEvent,
+  type GrokBotWindowTotals,
+} from '@/lib/grok-bot/window';
 
 export const GROK_BOT_PAGE_SIZE = 50;
 
@@ -30,6 +36,7 @@ export interface GrokBotBoardQuery {
   end?: string;
   usage?: string;
   page?: string;
+  view?: string;
   now?: Date;
 }
 
@@ -60,8 +67,8 @@ export interface GrokBotBoard {
   usageTypes: readonly GrokBotUsageTypeOption[];
   selectedUsageTypeIds: readonly string[];
   usageParam: string | undefined;
-  seriesTypes: readonly GrokBotUsageTypeOption[];
-  series: readonly GrokBotSeriesPoint[];
+  totals: GrokBotWindowTotals;
+  charts: GrokBotCharts;
   rows: readonly GrokBotTableRow[];
   page: number;
   pageSize: number;
@@ -69,9 +76,7 @@ export interface GrokBotBoard {
   cycleHasRows: boolean;
 }
 
-interface SqlEventRow {
-  id: number | bigint;
-  event_at: number | bigint;
+interface SqlPriceFields {
   model: string;
   kind: string;
   cost_raw: string;
@@ -80,7 +85,16 @@ interface SqlEventRow {
   tokens_input_cache_write: number | bigint;
   tokens_cache_read: number | bigint;
   tokens_output: number | bigint;
+}
+
+interface SqlEventRow extends SqlPriceFields {
+  id: number | bigint;
+  event_at: number | bigint;
   tokens_total: number | bigint;
+}
+
+interface SqlScanRow extends SqlPriceFields {
+  bucket_start: number | bigint;
 }
 
 function asNumber(value: number | bigint): number {
@@ -90,6 +104,27 @@ function asNumber(value: number | bigint): number {
 function asNullableNumber(value: number | bigint | null): number | null {
   if (value === null) return null;
   return asNumber(value);
+}
+
+function priceInput(row: SqlPriceFields): GrokBotPriceInput {
+  return {
+    model: row.model,
+    kind: row.kind,
+    costRaw: row.cost_raw,
+    reportedCost: asNullableNumber(row.reported_cost),
+    tokensInput: asNumber(row.tokens_input),
+    tokensInputCacheWrite: asNumber(row.tokens_input_cache_write),
+    tokensCacheRead: asNumber(row.tokens_cache_read),
+    tokensOutput: asNumber(row.tokens_output),
+  };
+}
+
+function foldEvent(row: SqlScanRow): GrokBotFoldEvent {
+  return {
+    bucketStartMs: asNumber(row.bucket_start),
+    usageType: normalizeGrokBotModelId(row.model),
+    priced: priceGrokBotRow(priceInput(row)),
+  };
 }
 
 function parsePage(page: string | undefined): number {
@@ -192,16 +227,21 @@ export async function getGrokBotBoard(
     selection.param === undefined ? undefined : selection.ids,
   );
 
-  const seriesSql = `
+  const scanSql = `
     SELECT
       ${grokBotBucketStartSql('event_at')} AS bucket_start,
       model,
-      COALESCE(SUM(tokens_total), 0) AS tokens_total
+      kind,
+      cost_raw,
+      reported_cost,
+      tokens_input,
+      tokens_input_cache_write,
+      tokens_cache_read,
+      tokens_output
     FROM cursor_usage_events
     WHERE ${filter.clause}
-    GROUP BY bucket_start, model
   `;
-  const seriesArgs = [
+  const scanArgs = [
     resolved.window.startMs,
     resolved.window.startMs,
     resolved.window.bucketMs,
@@ -209,18 +249,14 @@ export async function getGrokBotBoard(
     ...filter.args,
   ];
 
-  const [seriesResult, countResult] = await Promise.all([
-    queryAll<{
-      bucket_start: number | bigint;
-      model: string;
-      tokens_total: number | bigint;
-    }>(seriesSql, seriesArgs),
+  const [scanResult, countResult] = await Promise.all([
+    queryAll<SqlScanRow>(scanSql, scanArgs),
     queryOne<{ total: number | bigint }>(
       `SELECT COUNT(*) AS total FROM cursor_usage_events WHERE ${filter.clause}`,
       filter.args,
     ),
   ]);
-  if (seriesResult.error) return { data: null, error: seriesResult.error };
+  if (scanResult.error) return { data: null, error: scanResult.error };
   if (countResult.error || !countResult.data) {
     return { data: null, error: countResult.error ?? 'Failed to count Grokbot rows.' };
   }
@@ -256,46 +292,31 @@ export async function getGrokBotBoard(
     sqlRows = rowResult.data;
   }
 
-  const sums = new Map<string, { bucketStartMs: number; usageType: string; tokensTotal: number }>();
-  for (const row of seriesResult.data ?? []) {
-    const usageType = normalizeGrokBotModelId(row.model);
-    const bucketStartMs = asNumber(row.bucket_start);
-    const key = `${bucketStartMs}:${usageType}`;
-    const tokensTotal = asNumber(row.tokens_total);
-    const existing = sums.get(key);
-    if (existing) existing.tokensTotal += tokensTotal;
-    else sums.set(key, { bucketStartMs, usageType, tokensTotal });
-  }
-
   const labels = new Map(catalog.map((entry) => [entry.id, entry.label]));
   const rows: GrokBotTableRow[] = sqlRows.map((row) => {
     const usageType = normalizeGrokBotModelId(row.model);
-    const tokensInput = asNumber(row.tokens_input);
-    const tokensCacheWrite = asNumber(row.tokens_input_cache_write);
-    const tokensCacheRead = asNumber(row.tokens_cache_read);
-    const tokensOutput = asNumber(row.tokens_output);
+    const priced = priceInput(row);
     return {
       id: asNumber(row.id),
       eventAt: asNumber(row.event_at),
       usageType,
       label: labels.get(usageType) ?? usageType,
       kind: row.kind,
-      tokensInput,
-      tokensCacheWrite,
-      tokensCacheRead,
-      tokensOutput,
+      tokensInput: priced.tokensInput,
+      tokensCacheWrite: priced.tokensInputCacheWrite,
+      tokensCacheRead: priced.tokensCacheRead,
+      tokensOutput: priced.tokensOutput,
       tokensTotal: asNumber(row.tokens_total),
-      charge: priceGrokBotRow({
-        model: row.model,
-        kind: row.kind,
-        costRaw: row.cost_raw,
-        reportedCost: asNullableNumber(row.reported_cost),
-        tokensInput,
-        tokensInputCacheWrite: tokensCacheWrite,
-        tokensCacheRead,
-        tokensOutput,
-      }).charge,
+      charge: priceGrokBotRow(priced).charge,
     };
+  });
+  const folded = foldGrokBotWindow({
+    windowStartMs: resolved.window.startMs,
+    windowEndMs: resolved.window.endMs,
+    bucketMs: resolved.window.bucketMs,
+    seriesTypes: seriesTypes.map((entry) => ({ id: entry.id, label: entry.label })),
+    events: (scanResult.data ?? []).map(foldEvent),
+    mode: parseGrokBotChartMode(query.view),
   });
 
   return {
@@ -312,14 +333,8 @@ export async function getGrokBotBoard(
       usageTypes: catalog,
       selectedUsageTypeIds: selection.ids,
       usageParam: selection.param,
-      seriesTypes,
-      series: fillGrokBotSeries({
-        windowStartMs: resolved.window.startMs,
-        windowEndMs: resolved.window.endMs,
-        bucketMs: resolved.window.bucketMs,
-        typeIds: seriesTypes.map((entry) => entry.id),
-        sums: [...sums.values()],
-      }),
+      totals: folded.totals,
+      charts: folded.charts,
       rows,
       page,
       pageSize: GROK_BOT_PAGE_SIZE,

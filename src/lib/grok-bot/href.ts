@@ -1,5 +1,10 @@
 export const GROK_BOT_PATH = '/cursor/grok';
 
+export type GrokBotChartMode = 'by-type' | 'ins-outs';
+
+export const GROK_BOT_INS_LINE = 'Ins';
+export const GROK_BOT_OUTS_LINE = 'Outs';
+
 export interface GrokBotHrefParams {
   /** Whole-cycle link. Omit `startMs` and `endMs` when this is set. */
   cycle?: number;
@@ -8,6 +13,11 @@ export interface GrokBotHrefParams {
   /** Undefined means all usage types. */
   usage?: string;
   page?: number;
+  mode: GrokBotChartMode;
+}
+
+export function parseGrokBotChartMode(raw: string | undefined): GrokBotChartMode {
+  return raw === 'ins-outs' ? 'ins-outs' : 'by-type';
 }
 
 export function grokBotHref(params: GrokBotHrefParams): string {
@@ -23,6 +33,9 @@ export function grokBotHref(params: GrokBotHrefParams): string {
   }
   if (params.page !== undefined && params.page !== 1) {
     search.set('page', String(params.page));
+  }
+  if (params.mode === 'ins-outs') {
+    search.set('view', 'ins-outs');
   }
   const query = search.toString();
   return query.length > 0 ? `${GROK_BOT_PATH}?${query}` : GROK_BOT_PATH;

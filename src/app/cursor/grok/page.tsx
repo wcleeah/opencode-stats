@@ -12,7 +12,7 @@ import type { GrokBotCharge } from '@/lib/grok-bot/rates';
 import { getCursorSettings } from '@/lib/queries/cursor';
 import { getGrokBotBoard, type GrokBotBoard } from '@/lib/queries/grok-bot';
 
-import { GrokBotUsageChart } from '@/components/grok-bot/usage-chart';
+import { GrokBotSeriesChart } from '@/components/grok-bot/usage-chart';
 import { Card } from '@/components/ui/card';
 import { Pagination } from '@/components/ui/pagination';
 import {
@@ -30,6 +30,7 @@ interface GrokPageProps {
     end?: string;
     usage?: string;
     page?: string;
+    view?: string;
   }>;
 }
 
@@ -69,15 +70,18 @@ function eventTime(utcMs: number): string {
 }
 
 function CycleLinks({ board }: { board: GrokBotBoard }) {
+  const mode = board.charts.mode;
   const previousHref = grokBotHref({
     cycle: board.cycle.offset - 1,
     usage: board.usageParam,
+    mode,
   });
   const nextHref = grokBotHref({
     cycle: board.cycle.offset + 1,
     usage: board.usageParam,
+    mode,
   });
-  const thisHref = grokBotHref({ cycle: 0, usage: board.usageParam });
+  const thisHref = grokBotHref({ cycle: 0, usage: board.usageParam, mode });
   const linkClass = 'px-2 py-1 text-xs text-muted hover:text-foreground transition-colors';
 
   return (
@@ -117,6 +121,7 @@ function UsageLinks({ board }: { board: GrokBotBoard }) {
     : { startMs: board.windowMode.startMs, endMs: board.windowMode.endMs };
   const catalogIds = board.usageTypes.map((entry) => entry.id);
   const selected = new Set(board.selectedUsageTypeIds);
+  const mode = board.charts.mode;
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -125,6 +130,7 @@ function UsageLinks({ board }: { board: GrokBotBoard }) {
         const href = grokBotHref({
           ...windowHref,
           usage: toggleGrokBotUsageParam(catalogIds, board.usageParam, type.id),
+          mode,
         });
         const on = selected.has(type.id);
         return (
@@ -170,6 +176,7 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
     end: params.end,
     usage: params.usage,
     page: params.page,
+    view: params.view,
   });
   if (boardResult.error || !boardResult.data) {
     return (
@@ -186,7 +193,11 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
   const windowHref = board.windowMode.kind === 'cycle'
     ? { cycle: board.windowMode.offset }
     : { startMs: board.windowMode.startMs, endMs: board.windowMode.endMs };
-  const pageBase = grokBotHref({ ...windowHref, usage: board.usageParam });
+  const pageBase = grokBotHref({
+    ...windowHref,
+    usage: board.usageParam,
+    mode: board.charts.mode,
+  });
   const totalPages = Math.ceil(board.totalRows / board.pageSize);
 
   return (
@@ -198,9 +209,9 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
         <>
           <Card>
             <div className="mb-3 text-xs text-muted uppercase tracking-wider">Tokens</div>
-            <GrokBotUsageChart
-              seriesTypes={board.seriesTypes}
-              points={board.series}
+            <GrokBotSeriesChart
+              charts={board.charts}
+              measure="tokens"
               windowStartMs={board.window.startMs}
               windowEndMs={board.window.endMs}
               timeZone={board.timeZone}

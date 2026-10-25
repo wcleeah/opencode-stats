@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type JSX } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Brush,
@@ -14,16 +14,19 @@ import {
   YAxis,
 } from 'recharts';
 
-import { formatTokens } from '@/lib/format';
+import { formatCost, formatTokens } from '@/lib/format';
 import {
   formatGrokBotWallTime,
   grokBotWallTimeFromUtcMs,
   grokBotWallTimeToUtcMs,
-  type GrokBotSeriesPoint,
   type GrokBotWallTime,
 } from '@/lib/grok-bot/cycle';
-import { grokBotHref } from '@/lib/grok-bot/href';
-import type { GrokBotUsageTypeOption } from '@/lib/grok-bot/rates';
+import {
+  GROK_BOT_INS_LINE,
+  GROK_BOT_OUTS_LINE,
+  grokBotHref,
+} from '@/lib/grok-bot/href';
+import type { GrokBotCharts } from '@/lib/grok-bot/window';
 import { useChartColors } from '@/lib/use-chart-colors';
 
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
@@ -31,19 +34,26 @@ const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
 const CHART_HEIGHT = 448;
 
-interface GrokBotUsageChartProps {
-  seriesTypes: readonly GrokBotUsageTypeOption[];
-  points: readonly GrokBotSeriesPoint[];
-  windowStartMs: number;
-  windowEndMs: number;
-  timeZone: 'Asia/Hong_Kong';
-  usageParam: string | undefined;
-}
-
 interface ChartRow {
   label: string;
-  [usageType: string]: string | number;
+  [seriesKey: string]: string | number;
 }
+
+interface DrawnLine {
+  key: string;
+  name: string;
+}
+
+type GrokBotSeriesChartProps = {
+  readonly charts: GrokBotCharts;
+  readonly windowStartMs: number;
+  readonly windowEndMs: number;
+  readonly timeZone: 'Asia/Hong_Kong';
+  readonly usageParam: string | undefined;
+} & (
+  | { readonly measure: 'tokens' }
+  | { readonly measure: 'usd'; readonly dollarsAreEstimates: boolean }
+);
 
 function pad2(value: number): string {
   return String(value).padStart(2, '0');
@@ -78,14 +88,50 @@ function parseWallInput(
   };
 }
 
+function projection(
+  charts: GrokBotCharts,
+  measure: 'tokens' | 'usd',
+  spanMs: number,
+  timeZone: 'Asia/Hong_Kong',
+): { rows: ChartRow[]; lines: DrawnLine[] } {
+  if (charts.mode === 'by-type') {
+    return {
+      lines: charts.lines.map((line) => ({ key: line.id, name: line.label })),
+      rows: charts.points.map((point) => {
+        const row: ChartRow = {
+          label: tickLabel(point.bucketStartMs, spanMs, timeZone),
+        };
+        charts.lines.forEach((line, index) => {
+          const value = point.values[index];
+          row[line.id] = measure === 'tokens' ? value.tokens : value.usd;
+        });
+        return row;
+      }),
+    };
+  }
+  return {
+    lines: [
+      { key: 'ins', name: GROK_BOT_INS_LINE },
+      { key: 'outs', name: GROK_BOT_OUTS_LINE },
+    ],
+    rows: charts.points.map((point) => ({
+      label: tickLabel(point.bucketStartMs, spanMs, timeZone),
+      ins: measure === 'tokens' ? point.insTokens : point.insUsd,
+      outs: measure === 'tokens' ? point.outsTokens : point.outsUsd,
+    })),
+  };
+}
+
 function ChartTooltip({
   active,
   payload,
   label,
+  formatValue,
 }: {
   active?: boolean;
   payload?: ReadonlyArray<{ name?: string; value?: number | string; color?: string }>;
   label?: string;
+  formatValue: (value: number) => string;
 }) {
   if (!active || !payload?.length) return null;
   return (
@@ -99,7 +145,7 @@ function ChartTooltip({
           />
           <span className="text-muted">{entry.name}:</span>
           <span className="font-medium tabular-nums text-foreground">
-            {formatTokens(typeof entry.value === 'number' ? entry.value : 0)}
+            {formatValue(typeof entry.value === 'number' ? entry.value : 0)}
           </span>
         </div>
       ))}
@@ -107,49 +153,50 @@ function ChartTooltip({
   );
 }
 
-export function GrokBotUsageChart({
-  seriesTypes,
-  points,
-  windowStartMs,
-  windowEndMs,
-  timeZone,
-  usageParam,
-}: GrokBotUsageChartProps) {
+export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element {
+  const {
+    charts,
+    windowStartMs,
+    windowEndMs,
+    timeZone,
+    usageParam,
+    measure,
+  } = props;
+  const dollarsAreEstimates = props.measure === 'usd' && props.dollarsAreEstimates;
   const router = useRouter();
   const colors = useChartColors();
   const spanMs = windowEndMs - windowStartMs + 1;
   const selection = useRef<{ startIndex: number; endIndex: number } | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const formatValue = measure === 'usd'
+    ? (value: number) => formatCost(value, dollarsAreEstimates)
+    : formatTokens;
+  const emptyCopy = measure === 'tokens'
+    ? 'No token usage in this window.'
+    : 'No spending in this window.';
 
   useEffect(() => () => {
     if (timer.current !== null) clearTimeout(timer.current);
   }, []);
 
-  if (points.length === 0 || seriesTypes.length === 0) {
+  if (charts.points.length === 0) {
     return (
       <div className="flex h-[28rem] items-center justify-center text-sm text-muted">
-        No token usage in this window.
+        {emptyCopy}
       </div>
     );
   }
 
   const palette = [colors.chart1, colors.chart2, colors.chart3, colors.chart4, colors.chart5];
-  const data: ChartRow[] = points.map((point) => {
-    const row: ChartRow = {
-      label: tickLabel(point.bucketStartMs, spanMs, timeZone),
-    };
-    for (const type of seriesTypes) {
-      row[type.id] = point.tokensByType[type.id] ?? 0;
-    }
-    return row;
-  });
+  const drawn = projection(charts, measure, spanMs, timeZone);
+  const points = charts.points;
   const bucketMs = points.length > 1
     ? points[1].bucketStartMs - points[0].bucketStartMs
     : spanMs;
 
   function openRange(startMs: number, endMs: number): void {
     if (startMs === windowStartMs && endMs === windowEndMs) return;
-    router.push(grokBotHref({ startMs, endMs, usage: usageParam }));
+    router.push(grokBotHref({ startMs, endMs, usage: usageParam, mode: charts.mode }));
   }
 
   function rangeForIndexes(
@@ -237,7 +284,7 @@ export function GrokBotUsageChart({
           height={CHART_HEIGHT}
           initialDimension={{ width: 720, height: CHART_HEIGHT }}
         >
-          <LineChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+          <LineChart data={drawn.rows} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
             <XAxis
               dataKey="label"
@@ -247,20 +294,20 @@ export function GrokBotUsageChart({
               minTickGap={24}
             />
             <YAxis
-              tickFormatter={formatTokens}
+              tickFormatter={formatValue}
               tick={{ fontSize: 10, fill: colors.axis }}
               tickLine={false}
               axisLine={false}
-              width={52}
+              width={measure === 'usd' ? 72 : 52}
             />
-            <Tooltip content={<ChartTooltip />} />
+            <Tooltip content={<ChartTooltip formatValue={formatValue} />} />
             <Legend wrapperStyle={{ fontSize: '11px', color: colors.legend }} />
-            {seriesTypes.map((type, index) => (
+            {drawn.lines.map((line, index) => (
               <Line
-                key={type.id}
+                key={line.key}
                 type="monotone"
-                dataKey={type.id}
-                name={type.label}
+                dataKey={line.key}
+                name={line.name}
                 stroke={palette[index % palette.length]}
                 strokeWidth={1.5}
                 dot={false}

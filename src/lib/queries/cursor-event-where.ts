@@ -1,6 +1,5 @@
 import { grokBotModelSql } from '@/lib/grok-bot/membership';
 
-/** Cursor does not bill these rows against usage pools. */
 export const UNBILLED_PREDICATE =
   `(lower(kind) LIKE '%error%' OR lower(ifnull(cost_raw, '')) = 'free' OR lower(kind) = 'free')`;
 
@@ -50,7 +49,6 @@ function andWhere(
   return { clause: `WHERE ${extraSql}`, args: [] };
 }
 
-/** Time range plus the negated grok-bot membership test. This is the only exclusion. */
 export function cursorEventWhere(
   startMs?: number,
   endMs?: number,
@@ -61,7 +59,6 @@ export function cursorEventWhere(
   );
 }
 
-/** WHERE text each agent-board aggregate runs. Global stats skip the billable predicate. */
 export function cursorAggregateWhere(
   aggregate: CursorEventAggregate,
   startMs?: number,

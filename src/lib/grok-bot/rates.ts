@@ -2,10 +2,6 @@ import { isUnbilledCursorEvent } from '@/lib/cursor/csv';
 
 import { isGrokBotModel, normalizeGrokBotModelId } from '@/lib/grok-bot/membership';
 
-/**
- * Dollars per million tokens for the three known terms.
- * No cache-write field. An unknown rate stays absent.
- */
 interface GrokBotTokenRates {
   inputPerMillion: number;
   cacheReadPerMillion: number;

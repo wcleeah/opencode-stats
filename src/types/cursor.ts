@@ -1,3 +1,5 @@
+import type { GrokBotWeekday } from '@/lib/grok-bot/cycle';
+
 export interface CursorSettings {
   plan_amount_usd: number;
   /** Other Models included floor (at least $) */
@@ -8,8 +10,7 @@ export interface CursorSettings {
    */
   cursor_models_included_usd: number;
   billing_cycle_start_day: number;
-  /** Lowercase weekday name. Default `wednesday`. */
-  grok_cycle_weekday: string;
+  grok_cycle_weekday: GrokBotWeekday;
   /** 0 through 23. Default 11. */
   grok_cycle_hour: number;
   /** 0 through 59. Default 30. */

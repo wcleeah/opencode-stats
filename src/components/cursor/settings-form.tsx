@@ -158,7 +158,10 @@ export function CursorSettingsForm({ settings }: CursorSettingsFormProps) {
           </span>
           <select
             value={grokCycleWeekday}
-            onChange={(event) => setGrokCycleWeekday(event.target.value)}
+            onChange={(event) => {
+              const weekday = GROK_BOT_WEEKDAYS.find((item) => item === event.target.value);
+              if (weekday) setGrokCycleWeekday(weekday);
+            }}
             className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
           >
             {GROK_BOT_WEEKDAYS.map((weekday) => (

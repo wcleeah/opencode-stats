@@ -5,7 +5,6 @@ import { createClient } from '@libsql/client';
 
 import {
   DEFAULT_GROK_BOT_CYCLE,
-  fillGrokBotSeries,
   grokBotBucketMs,
   grokBotBucketStartSql,
   grokBotCycleBounds,
@@ -122,22 +121,9 @@ test('bucket width steps from one minute to one hour', () => {
   assert.equal(grokBotBucketMs(48 * 60 * 60 * 1000 + 1), 60 * 60 * 1000);
   const week = 7 * 24 * 60 * 60 * 1000;
   assert.equal(grokBotBucketMs(week), 60 * 60 * 1000);
-
-  const points = fillGrokBotSeries({
-    windowStartMs: 0,
-    windowEndMs: week - 1,
-    bucketMs: grokBotBucketMs(week),
-    typeIds: ['grok-bot-default', 'grok-bot-cua'],
-    sums: [],
-  });
-  assert.equal(points.length, 168);
-  assert.equal(points[0].bucketStartMs, 0);
-  assert.equal(points[167].bucketStartMs, 167 * 60 * 60 * 1000);
-  assert.equal(points[0].tokensByType['grok-bot-default'], 0);
-  assert.equal(points[0].tokensByType['grok-bot-cua'], 0);
 });
 
-test('sqlite groups an event into the same bucket fill uses', async () => {
+test('sqlite groups an event into the window bucket', async () => {
   const windowStartMs = 1_700_000_000_000;
   const bucketMs = 60_000;
   const eventAt = windowStartMs + 90_000;
@@ -154,17 +140,4 @@ test('sqlite groups an event into the same bucket fill uses', async () => {
     args: [windowStartMs, windowStartMs, bucketMs, bucketMs],
   });
   assert.equal(Number(result.rows[0].bucket), expected);
-
-  const filled = fillGrokBotSeries({
-    windowStartMs,
-    windowEndMs: windowStartMs + 3 * bucketMs - 1,
-    bucketMs,
-    typeIds: ['grok-bot-default'],
-    sums: [{ bucketStartMs: expected, usageType: 'grok-bot-default', tokensTotal: 12 }],
-  });
-  assert.equal(filled.length, 3);
-  assert.equal(filled[0].tokensByType['grok-bot-default'], 0);
-  assert.equal(filled[1].bucketStartMs, expected);
-  assert.equal(filled[1].tokensByType['grok-bot-default'], 12);
-  assert.equal(filled[2].tokensByType['grok-bot-default'], 0);
 });

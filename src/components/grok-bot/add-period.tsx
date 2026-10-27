@@ -21,8 +21,7 @@ const TIME_ZONE = 'Asia/Hong_Kong' as const;
 
 interface GrokBotAddPeriodProps {
   readonly hrefParams: GrokBotHrefParams;
-  /** board.window.endMs - board.window.startMs. The end preview is chosenStart + spanMs. */
-  readonly spanMs: number;
+  readonly primaryDurationMs: number;
 }
 
 function pad2(value: number): string {
@@ -56,7 +55,9 @@ export function GrokBotAddPeriod(props: GrokBotAddPeriodProps): JSX.Element {
   const [error, setError] = useState<string | null>(null);
   const wall = parseWallInput(startValue);
   const chosenStartMs = wall === null ? null : grokBotWallTimeToUtcMs(wall, TIME_ZONE);
-  const chosenEndMs = chosenStartMs === null ? null : chosenStartMs + props.spanMs;
+  const chosenEndMs = chosenStartMs === null
+    ? null
+    : chosenStartMs + props.primaryDurationMs;
   const compareStarts = props.hrefParams.compareStarts ?? [];
   const duplicate = chosenStartMs !== null && (
     chosenStartMs === props.hrefParams.primaryStartMs || compareStarts.includes(chosenStartMs)

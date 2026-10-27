@@ -167,7 +167,7 @@ function PeriodStrip({ board }: { board: GrokBotBoard }) {
       })}
       <GrokBotAddPeriod
         hrefParams={hrefParams}
-        spanMs={board.window.endMs - board.window.startMs}
+        primaryDurationMs={board.window.endMs - board.window.startMs}
       />
     </>
   );

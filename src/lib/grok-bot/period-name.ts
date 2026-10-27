@@ -155,7 +155,6 @@ export function moveGrokBotPeriodName(
 ): GrokBotPeriodNames {
   if (fromStartMs === toStartMs) return names;
   const source = names.find((item) => item.startMs === fromStartMs);
-  // An unnamed brush must not wipe a name already stored on the destination.
   if (source === undefined) return names;
   const next = names.filter(
     (item) => item.startMs !== fromStartMs && item.startMs !== toStartMs,

@@ -94,7 +94,6 @@ export function grokBotHref(params: GrokBotHrefParams): string {
   ) {
     search.set('focus', String(params.focusStartMs));
   }
-  // `names` is encoded here. `cmp` is appended after toString so its commas stay literal.
   const namesParam = serializeGrokBotPeriodNames(params.periodNames);
   if (namesParam !== undefined) search.set('names', namesParam);
   let query = search.toString();

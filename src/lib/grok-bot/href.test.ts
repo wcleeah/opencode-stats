@@ -2,13 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  addGrokBotCompareDelta,
   grokBotHref,
   parseGrokBotChartMode,
-  parseGrokBotCompareDeltas,
-  removeGrokBotCompareDelta,
+  parseGrokBotCompareStarts,
+  parseGrokBotFocusStart,
+  removeGrokBotCompareStart,
   toggleGrokBotUsageParam,
-  type GrokBotNegativeCycleDelta,
 } from './href';
 
 const CATALOG = [
@@ -84,10 +83,6 @@ test('ins-outs sets view and every other value stays by-type', () => {
   assert.equal(parseGrokBotChartMode('ins-outs'), 'ins-outs');
 });
 
-function delta(value: number): GrokBotNegativeCycleDelta {
-  return value as GrokBotNegativeCycleDelta;
-}
-
 test('an absent or empty cmp still prints today\'s query string', () => {
   const today = grokBotHref({
     cycle: -1,
@@ -97,60 +92,72 @@ test('an absent or empty cmp still prints today\'s query string', () => {
   });
   assert.equal(today, '/cursor/grok?cycle=-1&usage=grok-bot-default');
   assert.equal(paramsOf(today).has('cmp'), false);
+  assert.equal(paramsOf(today).has('focus'), false);
   assert.equal(
     grokBotHref({
       cycle: -1,
       usage: 'grok-bot-default',
       page: 1,
       mode: 'by-type',
-      compareDeltas: [],
+      compareStarts: [],
     }),
     today,
   );
   assert.equal(grokBotHref({ mode: 'by-type' }), '/cursor/grok');
 });
 
-test('cmp keeps the given order and drops junk down to the three nearest weeks', () => {
-  const parsed = parseGrokBotCompareDeltas('-8,-1,0,nope,-3,-2,-1,53,-53,-52');
-  assert.deepEqual(parsed, [-1, -2, -3]);
-  assert.deepEqual(parseGrokBotCompareDeltas(parsed.join(',')), parsed);
-  assert.deepEqual(parseGrokBotCompareDeltas('-52'), [-52]);
-  assert.deepEqual(parseGrokBotCompareDeltas('-53'), []);
-  assert.deepEqual(parseGrokBotCompareDeltas('1'), []);
-  assert.deepEqual(parseGrokBotCompareDeltas('0'), []);
-  assert.deepEqual(parseGrokBotCompareDeltas(undefined), []);
+test('cmp keeps start order and drops duplicates, the primary, and junk', () => {
+  const primary = 1_700_000_000_000;
+  const later = primary - 86_400_000;
+  const earlier = primary - 8 * 86_400_000;
+  const fourth = primary - 4 * 86_400_000;
+  const parsed = parseGrokBotCompareStarts(
+    `${later},nope,-1,${primary},${earlier},${later},0,${fourth}`,
+    primary,
+  );
+  assert.deepEqual(parsed, [later, earlier, 0, fourth]);
+  assert.deepEqual(parseGrokBotCompareStarts(parsed.join(','), primary), parsed);
+  assert.deepEqual(parseGrokBotCompareStarts(String(primary), primary), []);
+  assert.deepEqual(parseGrokBotCompareStarts('-1,-8', primary), []);
+  assert.deepEqual(parseGrokBotCompareStarts(undefined, primary), []);
 
   const written = grokBotHref({
-    startMs: 1_700_000_000_000,
-    endMs: 1_700_086_400_000,
+    startMs: primary,
+    endMs: primary + 86_400_000,
     usage: 'grok-bot-automation',
     mode: 'ins-outs',
-    compareDeltas: [delta(-8), delta(-1)],
+    compareStarts: [earlier, later],
+    focusStartMs: later,
   });
   assert.equal(
     written,
-    '/cursor/grok?start=1700000000000&end=1700086400000&usage=grok-bot-automation&view=ins-outs&cmp=-8,-1',
+    `/cursor/grok?start=${primary}&end=${primary + 86_400_000}&usage=grok-bot-automation&view=ins-outs&focus=${later}&cmp=${earlier},${later}`,
   );
-  assert.equal(paramsOf(written).get('cmp'), '-8,-1');
+  assert.equal(paramsOf(written).get('cmp'), `${earlier},${later}`);
+  assert.equal(paramsOf(written).get('focus'), String(later));
+  assert.equal(
+    grokBotHref({
+      mode: 'by-type',
+      focusStartMs: primary,
+      primaryStartMs: primary,
+      compareStarts: [later],
+    }),
+    `/cursor/grok?cmp=${later}`,
+  );
 });
 
-test('add fills the nearest hole and remove keeps the remaining order', () => {
-  assert.deepEqual(addGrokBotCompareDelta([]), [-1]);
-  assert.deepEqual(addGrokBotCompareDelta(parseGrokBotCompareDeltas('-8')), [-1, -8]);
-  const gapped = parseGrokBotCompareDeltas('-1,-3');
-  const filled = addGrokBotCompareDelta(gapped);
-  assert.deepEqual(filled, [-1, -2, -3]);
-  assert.deepEqual(addGrokBotCompareDelta(gapped), filled);
-  assert.equal(addGrokBotCompareDelta(parseGrokBotCompareDeltas('-1,-2,-3')), undefined);
+test('focus falls back unless it names a drawn period, and remove keeps order', () => {
+  const primary = 1_700_000_000_000;
+  const starts = parseGrokBotCompareStarts(`${primary - 2},${primary - 1},${primary - 3}`, primary);
+  assert.equal(parseGrokBotFocusStart(undefined, [primary, ...starts]), primary);
+  assert.equal(parseGrokBotFocusStart('nope', [primary, ...starts]), primary);
+  assert.equal(parseGrokBotFocusStart(String(primary), [primary, ...starts]), primary);
+  assert.equal(parseGrokBotFocusStart(String(starts[2]), [primary, ...starts]), starts[2]);
+  assert.equal(parseGrokBotFocusStart(String(primary - 9), [primary, ...starts]), primary);
 
-  const three = parseGrokBotCompareDeltas('-1,-3,-8');
-  const removed = removeGrokBotCompareDelta(three, three[1]);
-  assert.deepEqual(removed, [-1, -8]);
-  const absent = parseGrokBotCompareDeltas('-2')[0];
-  assert.ok(absent);
-  assert.deepEqual(removeGrokBotCompareDelta(removed, absent), [-1, -8]);
-  const unsorted = [delta(-8), delta(-1), delta(-3)];
-  assert.deepEqual(removeGrokBotCompareDelta(unsorted, unsorted[0]), [delta(-1), delta(-3)]);
+  const removed = removeGrokBotCompareStart(starts, starts[1]);
+  assert.deepEqual(removed, [starts[0], starts[2]]);
+  assert.deepEqual(removeGrokBotCompareStart(removed, primary - 9), removed);
 });
 
 test('toggleGrokBotUsageParam drops one id and returns all by clearing the last', () => {

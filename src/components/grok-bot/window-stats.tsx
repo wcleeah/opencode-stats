@@ -2,7 +2,12 @@ import type { JSX } from 'react';
 
 import { formatCost, formatTokens } from '@/lib/format';
 import { grokBotOutsUsd, grokBotTokenTotal } from '@/lib/grok-bot/rates';
-import type { GrokBotPeriod, GrokBotPeriodList, GrokBotWindowTotals } from '@/lib/grok-bot/window';
+import {
+  grokBotPeriodCaption,
+  type GrokBotPeriod,
+  type GrokBotPeriodList,
+  type GrokBotWindowTotals,
+} from '@/lib/grok-bot/window';
 
 import { StatCard } from '@/components/ui/card';
 
@@ -48,19 +53,43 @@ function spendLine(totals: GrokBotWindowTotals): { readonly total: string; reado
 }
 
 function periodKey(period: GrokBotPeriod): string {
-  return period.role === 'compare' ? String(period.delta) : 'primary';
+  return String(period.startMs);
 }
 
-function SpendRows({ periods }: { readonly periods: GrokBotPeriodList }): JSX.Element {
+function PeriodLabel(props: {
+  readonly period: GrokBotPeriod;
+  readonly periods: GrokBotPeriodList;
+  readonly focusStartMs?: number;
+}): JSX.Element {
+  const focused = props.focusStartMs === props.period.startMs;
+  return (
+    <div
+      className={
+        focused
+          ? 'text-xs font-medium normal-case tracking-normal text-foreground'
+          : 'text-xs font-normal normal-case tracking-normal text-muted'
+      }
+    >
+      {grokBotPeriodCaption(props.period, props.periods)}
+    </div>
+  );
+}
+
+function SpendRows(props: {
+  readonly periods: GrokBotPeriodList;
+  readonly focusStartMs?: number;
+}): JSX.Element {
   return (
     <div className="space-y-3 font-normal">
-      {periods.map((period) => {
+      {props.periods.map((period) => {
         const spend = spendLine(period.totals);
         return (
           <div key={periodKey(period)}>
-            <div className="text-xs font-normal normal-case tracking-normal text-muted">
-              {period.shortLabel}
-            </div>
+            <PeriodLabel
+              period={period}
+              periods={props.periods}
+              focusStartMs={props.focusStartMs}
+            />
             <div className="font-bold">{spend.total}</div>
             <div className="text-xs font-normal text-muted">{spend.detail}</div>
           </div>
@@ -70,14 +99,19 @@ function SpendRows({ periods }: { readonly periods: GrokBotPeriodList }): JSX.El
   );
 }
 
-function TokenRows({ periods }: { readonly periods: GrokBotPeriodList }): JSX.Element {
+function TokenRows(props: {
+  readonly periods: GrokBotPeriodList;
+  readonly focusStartMs?: number;
+}): JSX.Element {
   return (
     <div className="space-y-3 font-normal">
-      {periods.map((period) => (
+      {props.periods.map((period) => (
         <div key={periodKey(period)}>
-          <div className="text-xs font-normal normal-case tracking-normal text-muted">
-            {period.shortLabel}
-          </div>
+          <PeriodLabel
+            period={period}
+            periods={props.periods}
+            focusStartMs={props.focusStartMs}
+          />
           <div className="font-bold">{formatTokens(grokBotTokenTotal(period.totals.tokens))}</div>
           <div className="text-xs font-normal text-muted">
             {`ins ${formatTokens(period.totals.tokens.ins)} · outs ${formatTokens(period.totals.tokens.outs)}`}
@@ -90,8 +124,9 @@ function TokenRows({ periods }: { readonly periods: GrokBotPeriodList }): JSX.El
 
 export function GrokBotWindowStats(props: {
   readonly periods: GrokBotPeriodList;
+  readonly focusStartMs?: number;
 }): JSX.Element {
-  const { periods } = props;
+  const { periods, focusStartMs } = props;
   if (periods.length === 1) {
     const spend = spendLine(periods[0].totals);
     const totals = periods[0].totals;
@@ -113,8 +148,14 @@ export function GrokBotWindowStats(props: {
 
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      <StatCard label="Total Spending (estimated)" value={<SpendRows periods={periods} />} />
-      <StatCard label="Total tokens" value={<TokenRows periods={periods} />} />
+      <StatCard
+        label="Total Spending (estimated)"
+        value={<SpendRows periods={periods} focusStartMs={focusStartMs} />}
+      />
+      <StatCard
+        label="Total tokens"
+        value={<TokenRows periods={periods} focusStartMs={focusStartMs} />}
+      />
     </div>
   );
 }

@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import { parseGrokBotCompareDeltas } from '@/lib/grok-bot/href';
 import type { GrokBotPeriodList, GrokBotWindowTotals } from '@/lib/grok-bot/window';
 
 import { GrokBotWindowStats } from './window-stats';
@@ -11,6 +10,7 @@ import { GrokBotWindowStats } from './window-stats';
 function onePeriod(totals: GrokBotWindowTotals): GrokBotPeriodList {
   return [{
     role: 'primary',
+    startMs: 0,
     label: 'Wed 14 Oct 2026 11:30 to Wed 21 Oct 2026 11:29',
     shortLabel: 'Wed 14 Oct 2026',
     totals,
@@ -73,12 +73,11 @@ test('a stored on-demand window prints spending without a tilde', () => {
 });
 
 test('two periods round alone and keep the primary outs remainder', () => {
-  const delta = parseGrokBotCompareDeltas('-1')[0];
-  assert.ok(delta);
   const html = renderToStaticMarkup(createElement(GrokBotWindowStats, {
     periods: [
       {
         role: 'primary',
+        startMs: 100,
         label: 'Wed 14 Oct 2026 11:30 to Wed 21 Oct 2026 11:29',
         shortLabel: 'Wed 14 Oct 2026',
         totals: {
@@ -93,7 +92,7 @@ test('two periods round alone and keep the primary outs remainder', () => {
       },
       {
         role: 'compare',
-        delta,
+        startMs: 200,
         label: 'Wed 7 Oct 2026 11:30 to Wed 14 Oct 2026 11:29',
         shortLabel: 'Wed 7 Oct 2026',
         totals: {

@@ -1,4 +1,5 @@
 import {
+  moveGrokBotPeriodName,
   serializeGrokBotPeriodNames,
   type GrokBotPeriodNames,
 } from '@/lib/grok-bot/period-name';
@@ -102,6 +103,29 @@ export function grokBotHref(params: GrokBotHrefParams): string {
     query = query.length > 0 ? `${query}&${cmp}` : cmp;
   }
   return query.length > 0 ? `${GROK_BOT_PATH}?${query}` : GROK_BOT_PATH;
+}
+
+export function grokBotRangeHref(
+  current: GrokBotHrefParams,
+  startMs: number,
+  endMs: number,
+): string {
+  const oldPrimary = current.primaryStartMs;
+  const periodNames = oldPrimary === undefined
+    ? current.periodNames
+    : moveGrokBotPeriodName(current.periodNames, oldPrimary, startMs);
+  const focusWasPrimary = current.focusStartMs === undefined
+    || current.focusStartMs === oldPrimary;
+  return grokBotHref({
+    ...current,
+    cycle: undefined,
+    page: undefined,
+    startMs,
+    endMs,
+    focusStartMs: focusWasPrimary ? startMs : current.focusStartMs,
+    primaryStartMs: startMs,
+    periodNames,
+  });
 }
 
 function explicitSelection(

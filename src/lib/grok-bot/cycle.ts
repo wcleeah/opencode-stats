@@ -204,6 +204,31 @@ function pad2(value: number): string {
   return String(value).padStart(2, '0');
 }
 
+/** `YYYY-MM-DDTHH:mm` in Asia/Hong_Kong. */
+export function formatGrokBotWallInput(utcMs: number): string {
+  const wall = grokBotWallTimeFromUtcMs(utcMs, GROK_BOT_CYCLE_TIME_ZONE);
+  return `${wall.year}-${pad2(wall.month)}-${pad2(wall.day)}T${pad2(wall.hour)}:${pad2(wall.minute)}`;
+}
+
+export function parseGrokBotWallInput(
+  value: string,
+): Pick<GrokBotWallTime, 'year' | 'month' | 'day' | 'hour' | 'minute'> | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  if (month < 1 || month > 12 || day < 1 || day > 31 || hour > 23 || minute > 59) return null;
+  return {
+    year: Number(match[1]),
+    month,
+    day,
+    hour,
+    minute,
+  };
+}
+
 function weekdayAbbrev(weekday: GrokBotWeekday): string {
   return weekday.charAt(0).toUpperCase() + weekday.slice(1, 3);
 }
@@ -280,6 +305,19 @@ export function grokBotCycleBounds(
   };
 }
 
+export function grokBotCycleLinkLabels(
+  clock: GrokBotCycleClock,
+  now: Date,
+  viewedOffset: number,
+): { readonly previous: string; readonly current: string; readonly next: string } {
+  return {
+    previous: grokBotCycleBounds(clock, now, viewedOffset - 1).label,
+    // This cycle always opens offset 0, including on a custom range.
+    current: grokBotCycleBounds(clock, now, 0).label,
+    next: grokBotCycleBounds(clock, now, viewedOffset + 1).label,
+  };
+}
+
 function rangeLabel(
   startMs: number,
   endMs: number,
@@ -349,6 +387,14 @@ export function grokBotProgressLabel(offsetMs: number, bucketMs: number): string
     return `hour ${Math.floor(offsetMs / HOUR_MS) + 1}`;
   }
   return `minute ${Math.floor(offsetMs / MINUTE_MS) + 1}`;
+}
+
+export function focusedBucketWallMs(
+  primaryBucketStartMs: number,
+  primaryStartMs: number,
+  focusStartMs: number,
+): number {
+  return focusStartMs + (primaryBucketStartMs - primaryStartMs);
 }
 
 export function grokBotBucketTickLabel(
@@ -448,27 +494,90 @@ export function resolveGrokBotWindow(input: {
     return windowForCycle(input.clock, input.now, 0);
   }
 
-  let startMs = start;
-  let endMs = end;
+  const clipped = clipGrokBotWindow(start, end);
+  const span = clipped.endMs - clipped.startMs + 1;
+  return {
+    mode: { kind: 'range', startMs: clipped.startMs, endMs: clipped.endMs },
+    window: {
+      startMs: clipped.startMs,
+      endMs: clipped.endMs,
+      bucketMs: grokBotBucketMs(span),
+    },
+    cycle: cycleContaining(input.clock, input.now, clipped.startMs),
+  };
+}
+
+export function clipGrokBotWindow(
+  startMs: number,
+  endMs: number,
+): { readonly startMs: number; readonly endMs: number } {
+  let start = startMs;
+  let end = endMs;
+  if (end < start) {
+    const swap = start;
+    start = end;
+    end = swap;
+  }
+  const span = end - start + 1;
+  if (span > WEEK_MS) {
+    end = start + WEEK_MS - 1;
+  } else if (span < MIN_SPAN_MS) {
+    end = start + MIN_SPAN_MS - 1;
+  }
+  return { startMs: start, endMs: end };
+}
+
+export type GrokDraftClipReason = 'swapped' | 'max-span' | 'min-span';
+
+export type GrokDraftRange =
+  | {
+      readonly ok: true;
+      readonly startMs: number;
+      readonly endMs: number;
+      readonly reasons: readonly GrokDraftClipReason[];
+    }
+  | { readonly ok: false; readonly reason: 'incomplete' | 'invalid' };
+
+export function parseGrokDraftRange(
+  startValue: string,
+  endValue: string,
+): GrokDraftRange {
+  if (startValue === '' || endValue === '') return { ok: false, reason: 'incomplete' };
+  const startWall = parseGrokBotWallInput(startValue);
+  const endWall = parseGrokBotWallInput(endValue);
+  if (startWall === null || endWall === null) return { ok: false, reason: 'invalid' };
+  let startMs = grokBotWallTimeToUtcMs(startWall, GROK_BOT_CYCLE_TIME_ZONE);
+  // The typed end minute includes its last millisecond.
+  let endMs = grokBotWallTimeToUtcMs(endWall, GROK_BOT_CYCLE_TIME_ZONE) + MINUTE_MS - 1;
+  const reasons: GrokDraftClipReason[] = [];
   if (endMs < startMs) {
+    reasons.push('swapped');
     const swap = startMs;
     startMs = endMs;
     endMs = swap;
   }
-  let span = endMs - startMs + 1;
-  if (span > WEEK_MS) {
-    endMs = startMs + WEEK_MS - 1;
-    span = WEEK_MS;
-  } else if (span < MIN_SPAN_MS) {
-    endMs = startMs + MIN_SPAN_MS - 1;
-    span = MIN_SPAN_MS;
-  }
-
+  const before = endMs - startMs;
+  const clipped = clipGrokBotWindow(startMs, endMs);
+  const after = clipped.endMs - clipped.startMs;
+  if (after < before) reasons.push('max-span');
+  else if (after > before) reasons.push('min-span');
   return {
-    mode: { kind: 'range', startMs, endMs },
-    window: { startMs, endMs, bucketMs: grokBotBucketMs(span) },
-    cycle: cycleContaining(input.clock, input.now, startMs),
+    ok: true,
+    startMs: clipped.startMs,
+    endMs: clipped.endMs,
+    reasons,
   };
+}
+
+const DRAFT_HINTS: Record<GrokDraftClipReason, string> = {
+  swapped: 'Apply swaps the two times.',
+  'max-span': 'Apply keeps the first 7 days.',
+  'min-span': 'Apply keeps at least one minute.',
+};
+
+export function grokBotDraftHint(range: GrokDraftRange): string | null {
+  if (!range.ok || range.reasons.length === 0) return null;
+  return range.reasons.map((reason) => DRAFT_HINTS[reason]).join(' ');
 }
 
 export function grokBotBucketMs(spanMs: number): number {

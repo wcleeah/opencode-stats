@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   grokBotHref,
+  grokBotRangeHref,
   parseGrokBotChartMode,
   parseGrokBotCompareStarts,
   parseGrokBotFocusStart,
@@ -196,6 +197,67 @@ test('names stays one parameter and cmp stays comma-separated integers', () => {
   assert.equal(paramsOf(empty).has('names'), false);
   assert.equal(empty.includes('names='), false);
   assert.equal(paramsOf(empty).get('cmp'), String(earlier));
+});
+
+test('grokBotRangeHref writes the clipped window and moves the primary name', () => {
+  const primary = 1_700_000_000_000;
+  const compare = primary - 86_400_000;
+  const nextStart = primary + 3_600_000;
+  const nextEnd = nextStart + 86_400_000;
+  const named = setGrokBotPeriodName([], primary, 'Launch');
+  assert.equal(named.ok, true);
+  if (!named.ok) return;
+  const both = setGrokBotPeriodName(named.names, compare, 'Older');
+  assert.equal(both.ok, true);
+  if (!both.ok) return;
+
+  const followed = grokBotRangeHref({
+    cycle: -2,
+    page: 3,
+    startMs: primary,
+    endMs: primary + 1_000,
+    usage: 'grok-bot-default',
+    mode: 'by-type',
+    compareStarts: [compare],
+    focusStartMs: primary,
+    primaryStartMs: primary,
+    periodNames: both.names,
+  }, nextStart, nextEnd);
+  const followedParams = paramsOf(followed);
+  assert.equal(followedParams.get('start'), String(nextStart));
+  assert.equal(followedParams.get('end'), String(nextEnd));
+  assert.equal(followedParams.has('cycle'), false);
+  assert.equal(followedParams.has('page'), false);
+  assert.equal(followedParams.has('focus'), false);
+  assert.equal(followedParams.get('usage'), 'grok-bot-default');
+  assert.equal(followedParams.get('cmp'), String(compare));
+  assert.deepEqual(JSON.parse(followedParams.get('names') ?? 'null'), [
+    [compare, 'Older'],
+    [nextStart, 'Launch'],
+  ]);
+
+  const kept = grokBotRangeHref({
+    mode: 'ins-outs',
+    compareStarts: [compare],
+    focusStartMs: compare,
+    primaryStartMs: primary,
+    periodNames: both.names,
+  }, nextStart, nextEnd);
+  const keptParams = paramsOf(kept);
+  assert.equal(keptParams.get('focus'), String(compare));
+  assert.equal(keptParams.get('view'), 'ins-outs');
+  assert.equal(keptParams.has('cycle'), false);
+  assert.equal(keptParams.has('page'), false);
+
+  const missing = grokBotRangeHref({
+    mode: 'by-type',
+    primaryStartMs: primary,
+    periodNames: named.names,
+  }, nextStart, nextEnd);
+  assert.equal(paramsOf(missing).has('focus'), false);
+  assert.deepEqual(JSON.parse(paramsOf(missing).get('names') ?? 'null'), [
+    [nextStart, 'Launch'],
+  ]);
 });
 
 test('toggleGrokBotUsageParam drops one id and returns all by clearing the last', () => {

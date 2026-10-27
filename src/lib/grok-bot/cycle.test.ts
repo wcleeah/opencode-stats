@@ -13,9 +13,16 @@ import {
   grokBotWallTimeFromUtcMs,
   grokBotWallTimeToUtcMs,
   parseGrokBotCycleClock,
+  clipGrokBotWindow,
+  focusedBucketWallMs,
+  formatGrokBotWallInput,
   grokBotBucketTickLabel,
+  grokBotCycleLinkLabels,
   grokBotDayTickIndexes,
+  grokBotDraftHint,
   grokBotProgressLabel,
+  parseGrokBotWallInput,
+  parseGrokDraftRange,
   projectGrokBotPeriods,
   resolveGrokBotWindow,
 } from './cycle';
@@ -235,6 +242,120 @@ test('a solo week axis names the selected calendar day and minute', () => {
     0, 24, 48, 72, 96, 120, 144, 167,
   ]);
   assert.equal(grokBotDayTickIndexes(96, 15 * 60 * 1000, 24 * 60 * 60 * 1000), null);
+});
+
+test('clip swaps a reversed pair and keeps the span between one minute and seven days', () => {
+  const week = 7 * 24 * 60 * 60 * 1000;
+  assert.deepEqual(clipGrokBotWindow(200_000, 10), { startMs: 10, endMs: 200_000 });
+  assert.deepEqual(clipGrokBotWindow(100, 100 + week + 5), {
+    startMs: 100,
+    endMs: 100 + week - 1,
+  });
+  assert.deepEqual(clipGrokBotWindow(100, 100 + week - 1), {
+    startMs: 100,
+    endMs: 100 + week - 1,
+  });
+  assert.deepEqual(clipGrokBotWindow(100, 100 + 1_000), {
+    startMs: 100,
+    endMs: 100 + 60_000 - 1,
+  });
+  assert.deepEqual(clipGrokBotWindow(100, 100 + 60_000 - 1), {
+    startMs: 100,
+    endMs: 100 + 60_000 - 1,
+  });
+});
+
+test('wall input is a Hong Kong minute and the draft end includes that minute', () => {
+  assert.equal(formatGrokBotWallInput(DEFAULT_START), '2026-10-14T11:30');
+  assert.equal(formatGrokBotWallInput(DEFAULT_START + 60_000 - 1), '2026-10-14T11:30');
+  assert.deepEqual(parseGrokBotWallInput('2026-10-14T11:30'), {
+    year: 2026,
+    month: 10,
+    day: 14,
+    hour: 11,
+    minute: 30,
+  });
+  assert.equal(parseGrokBotWallInput('2026-10-14 11:30'), null);
+  assert.equal(parseGrokBotWallInput('2026-13-14T11:30'), null);
+
+  const sameMinute = parseGrokDraftRange('2026-10-14T11:30', '2026-10-14T11:30');
+  assert.equal(sameMinute.ok, true);
+  if (!sameMinute.ok) return;
+  assert.deepEqual(sameMinute.reasons, []);
+  assert.equal(sameMinute.startMs, DEFAULT_START);
+  assert.equal(sameMinute.endMs, DEFAULT_START + 60_000 - 1);
+  assert.equal(grokBotDraftHint(sameMinute), null);
+
+  const hourLater = Date.parse('2026-10-14T04:30:00.000Z');
+  const hour = parseGrokDraftRange('2026-10-14T11:30', '2026-10-14T12:30');
+  assert.equal(hour.ok, true);
+  if (!hour.ok) return;
+  assert.deepEqual(hour.reasons, []);
+  assert.equal(hour.startMs, DEFAULT_START);
+  assert.equal(hour.endMs, hourLater + 60_000 - 1);
+
+  const reversed = parseGrokDraftRange('2026-10-14T15:00', '2026-10-14T11:30');
+  assert.equal(reversed.ok, true);
+  if (!reversed.ok) return;
+  assert.deepEqual(reversed.reasons, ['swapped']);
+  assert.equal(reversed.startMs, DEFAULT_START + 60_000 - 1);
+  assert.equal(reversed.endMs, Date.parse('2026-10-14T07:00:00.000Z'));
+  assert.equal(grokBotDraftHint(reversed), 'Apply swaps the two times.');
+
+  const week = 7 * 24 * 60 * 60 * 1000;
+  const tooLong = parseGrokDraftRange('2026-10-14T11:30', '2026-10-22T11:30');
+  assert.equal(tooLong.ok, true);
+  if (!tooLong.ok) return;
+  assert.deepEqual(tooLong.reasons, ['max-span']);
+  assert.equal(tooLong.startMs, DEFAULT_START);
+  assert.equal(tooLong.endMs, DEFAULT_START + week - 1);
+  assert.equal(grokBotDraftHint(tooLong), 'Apply keeps the first 7 days.');
+
+  const tooShort = parseGrokDraftRange('2026-10-14T11:31', '2026-10-14T11:30');
+  assert.equal(tooShort.ok, true);
+  if (!tooShort.ok) return;
+  const swappedStart = DEFAULT_START + 60_000 - 1;
+  assert.deepEqual(tooShort.reasons, ['swapped', 'min-span']);
+  assert.equal(tooShort.startMs, swappedStart);
+  assert.equal(tooShort.endMs, swappedStart + 60_000 - 1);
+  assert.equal(
+    grokBotDraftHint(tooShort),
+    'Apply swaps the two times. Apply keeps at least one minute.',
+  );
+
+  assert.deepEqual(parseGrokDraftRange('', '2026-10-14T11:30'), {
+    ok: false,
+    reason: 'incomplete',
+  });
+  assert.deepEqual(parseGrokDraftRange('2026-10-14T11:30', ''), {
+    ok: false,
+    reason: 'incomplete',
+  });
+  assert.deepEqual(parseGrokDraftRange('yesterday', '2026-10-14T11:30'), {
+    ok: false,
+    reason: 'invalid',
+  });
+  assert.equal(grokBotDraftHint({ ok: false, reason: 'invalid' }), null);
+});
+
+test('cycle link labels keep This cycle on offset 0', () => {
+  const now = new Date(DEFAULT_START);
+  const labels = grokBotCycleLinkLabels(DEFAULT_GROK_BOT_CYCLE, now, -3);
+  assert.equal(labels.current, 'Wed 14 Oct 2026 11:30 to Wed 21 Oct 2026 11:29');
+  assert.equal(
+    labels.previous,
+    grokBotCycleBounds(DEFAULT_GROK_BOT_CYCLE, now, -4).label,
+  );
+  assert.equal(
+    labels.next,
+    grokBotCycleBounds(DEFAULT_GROK_BOT_CYCLE, now, -2).label,
+  );
+  assert.notEqual(labels.current, grokBotCycleBounds(DEFAULT_GROK_BOT_CYCLE, now, -3).label);
+});
+
+test('focused bucket wall time shifts by the focus start', () => {
+  assert.equal(focusedBucketWallMs(500, 100, 100), 500);
+  assert.equal(focusedBucketWallMs(500, 100, 1_000), 1_400);
 });
 
 test('progress labels count hours on hourly buckets and minutes otherwise', () => {

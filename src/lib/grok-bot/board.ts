@@ -26,12 +26,37 @@ import {
 
 const GROK_BOT_PAGE_SIZE = 50;
 
+export class OrderedGrokBotEvents {
+  private readonly items: readonly GrokBotLedgerEvent[];
+
+  private constructor(items: readonly GrokBotLedgerEvent[]) {
+    this.items = items;
+  }
+
+  static from(events: readonly GrokBotLedgerEvent[]): OrderedGrokBotEvents {
+    return new OrderedGrokBotEvents([...events].sort((left, right) => (
+      left.eventAt - right.eventAt || left.id - right.id
+    )));
+  }
+
+  get length(): number {
+    return this.items.length;
+  }
+
+  eventAt(index: number): number {
+    return this.items[index].eventAt;
+  }
+
+  slice(start: number, end: number): readonly GrokBotLedgerEvent[] {
+    return this.items.slice(start, end);
+  }
+}
+
 export interface GrokBotLedger {
   readonly clock: GrokBotCycleClock;
   /** Snapshot instant. Projection uses this instead of the live clock. */
   readonly loadedAtMs: number;
-  /** Sorted by (eventAt ASC, id ASC). The table is this order reversed. */
-  readonly events: readonly GrokBotLedgerEvent[];
+  readonly events: OrderedGrokBotEvents;
 }
 
 export interface GrokBotLedgerEvent {
@@ -126,30 +151,30 @@ interface PreparedLens {
   readonly cycleEvents: readonly GrokBotLedgerEvent[];
 }
 
-function lowerBound(events: readonly GrokBotLedgerEvent[], timeMs: number): number {
+function lowerBound(events: OrderedGrokBotEvents, timeMs: number): number {
   let lo = 0;
   let hi = events.length;
   while (lo < hi) {
     const mid = Math.floor((lo + hi) / 2);
-    if (events[mid].eventAt < timeMs) lo = mid + 1;
+    if (events.eventAt(mid) < timeMs) lo = mid + 1;
     else hi = mid;
   }
   return lo;
 }
 
-function upperBound(events: readonly GrokBotLedgerEvent[], timeMs: number): number {
+function upperBound(events: OrderedGrokBotEvents, timeMs: number): number {
   let lo = 0;
   let hi = events.length;
   while (lo < hi) {
     const mid = Math.floor((lo + hi) / 2);
-    if (events[mid].eventAt <= timeMs) lo = mid + 1;
+    if (events.eventAt(mid) <= timeMs) lo = mid + 1;
     else hi = mid;
   }
   return lo;
 }
 
 function sliceByTime(
-  events: readonly GrokBotLedgerEvent[],
+  events: OrderedGrokBotEvents,
   startMs: number,
   endMs: number,
 ): readonly GrokBotLedgerEvent[] {

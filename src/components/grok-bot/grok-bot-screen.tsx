@@ -69,6 +69,15 @@ function sameLens(left: GrokBotLens, right: GrokBotLens): boolean {
   return false;
 }
 
+function clampedHrefAfterLedger(
+  ledger: GrokBotLedger,
+  lens: GrokBotLens,
+  next: GrokBotLens,
+): string | null {
+  if (next.page === lens.page && next.usage === lens.usage) return null;
+  return grokBotHrefForLens(ledger, next);
+}
+
 function useGrokBotBoard(ledger: GrokBotLedger, initialLens: GrokBotLens): {
   board: GrokBotBoard;
   anchor: (command: GrokBotLensCommand) => GrokAnchor;
@@ -77,16 +86,15 @@ function useGrokBotBoard(ledger: GrokBotLedger, initialLens: GrokBotLens): {
 } {
   const [lens, setLens] = useState(initialLens);
   const [seenLedger, setSeenLedger] = useState(ledger);
-  const [urlFix, setUrlFix] = useState<string | null>(null);
+  const [clampedHref, setClampedHref] = useState<string | null>(null);
   const router = useRouter();
 
   if (seenLedger !== ledger) {
     const next = grokBotLensFromSearch(ledger, grokBotHrefForLens(ledger, lens));
     setSeenLedger(ledger);
     if (!sameLens(next, lens)) setLens(next);
-    if (next.page !== lens.page || next.usage !== lens.usage) {
-      setUrlFix(grokBotHrefForLens(ledger, next));
-    }
+    const href = clampedHrefAfterLedger(ledger, lens, next);
+    if (href !== null) setClampedHref(href);
   }
 
   const board = projectGrokBotBoard(ledger, lens);
@@ -100,9 +108,9 @@ function useGrokBotBoard(ledger: GrokBotLedger, initialLens: GrokBotLens): {
   }, [ledger]);
 
   useEffect(() => {
-    if (urlFix === null) return;
-    window.history.replaceState(null, '', urlFix);
-  }, [urlFix]);
+    if (clampedHref === null) return;
+    window.history.replaceState(null, '', clampedHref);
+  }, [clampedHref]);
 
   function commit(command: GrokBotLensCommand): void {
     const next = applyGrokBotLens(ledger, lens, command);

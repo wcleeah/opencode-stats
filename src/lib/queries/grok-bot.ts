@@ -2,7 +2,11 @@ import 'server-only';
 
 import { queryAll } from '@/lib/db';
 import { ensureCursorSchema } from '@/lib/cursor/schema';
-import type { GrokBotLedger, GrokBotLedgerEvent } from '@/lib/grok-bot/board';
+import {
+  OrderedGrokBotEvents,
+  type GrokBotLedger,
+  type GrokBotLedgerEvent,
+} from '@/lib/grok-bot/board';
 import type { GrokBotCycleClock } from '@/lib/grok-bot/cycle';
 import { grokBotModelSql, normalizeGrokBotModelId } from '@/lib/grok-bot/membership';
 import { priceGrokBotRow, type GrokBotPriceInput } from '@/lib/grok-bot/rates';
@@ -73,5 +77,8 @@ export async function loadGrokBotLedger(
       priced: priceGrokBotRow(pricedInput),
     };
   });
-  return { data: { clock, loadedAtMs: now.getTime(), events }, error: null };
+  return {
+    data: { clock, loadedAtMs: now.getTime(), events: OrderedGrokBotEvents.from(events) },
+    error: null,
+  };
 }

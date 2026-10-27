@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, type JSX } from 'react';
-import { useRouter } from 'next/navigation';
 
 import {
   formatGrokBotWallTime,
@@ -9,7 +8,6 @@ import {
   grokBotWallTimeToUtcMs,
   type GrokBotWallTime,
 } from '@/lib/grok-bot/cycle';
-import { grokBotHref, type GrokBotChartMode } from '@/lib/grok-bot/href';
 
 const TIME_ZONE = 'Asia/Hong_Kong' as const;
 
@@ -17,12 +15,7 @@ interface GrokBotAddPeriodProps {
   readonly primaryStartMs: number;
   readonly primaryEndMs: number;
   readonly compareStarts: readonly number[];
-  readonly cycle?: number;
-  readonly startMs?: number;
-  readonly endMs?: number;
-  readonly usage?: string;
-  readonly mode: GrokBotChartMode;
-  readonly focusStartMs?: number;
+  readonly onAdd: (startMs: number) => void;
 }
 
 function pad2(value: number): string {
@@ -49,7 +42,6 @@ function parseWallInput(
 }
 
 export function GrokBotAddPeriod(props: GrokBotAddPeriodProps): JSX.Element {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [startValue, setStartValue] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -73,17 +65,7 @@ export function GrokBotAddPeriod(props: GrokBotAddPeriodProps): JSX.Element {
       setError('That period is already on the graph.');
       return;
     }
-    const windowPart = props.cycle !== undefined
-      ? { cycle: props.cycle }
-      : { startMs: props.startMs, endMs: props.endMs };
-    router.push(grokBotHref({
-      ...windowPart,
-      usage: props.usage,
-      mode: props.mode,
-      compareStarts: [...props.compareStarts, chosenStartMs],
-      focusStartMs: props.focusStartMs,
-      primaryStartMs: props.primaryStartMs,
-    }));
+    props.onAdd(chosenStartMs);
     close();
   }
 

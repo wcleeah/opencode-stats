@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, type JSX } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   Brush,
   CartesianGrid,
@@ -25,7 +24,6 @@ import {
 import {
   GROK_BOT_INS_LINE,
   GROK_BOT_OUTS_LINE,
-  grokBotHref,
 } from '@/lib/grok-bot/href';
 import {
   grokBotPeriodCaption,
@@ -69,12 +67,11 @@ type GrokBotSeriesChartProps = {
   readonly windowStartMs: number;
   readonly windowEndMs: number;
   readonly timeZone: 'Asia/Hong_Kong';
-  readonly usageParam: string | undefined;
   readonly measure: 'tokens' | 'usd';
   readonly bucketMs: number;
   readonly focusStartMs: number;
-  readonly compareStarts: readonly number[];
-  readonly cycleOffset?: number;
+  readonly onWindow: (startMs: number, endMs: number) => void;
+  readonly onFocus: (startMs: number) => void;
 };
 
 function pad2(value: number): string {
@@ -238,14 +235,12 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
     windowStartMs,
     windowEndMs,
     timeZone,
-    usageParam,
     measure,
     bucketMs,
     focusStartMs,
-    compareStarts,
-    cycleOffset,
+    onWindow,
+    onFocus,
   } = props;
-  const router = useRouter();
   const colors = useChartColors();
   const spanMs = windowEndMs - windowStartMs + 1;
   const selection = useRef<{ startIndex: number; endIndex: number } | null>(null);
@@ -271,23 +266,6 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
   const drawn = projection(charts, measure, spanMs, timeZone, windowStartMs, bucketMs);
   const several = charts.periods.length > 1;
 
-  function navigationHref(next: { startMs?: number; endMs?: number; focusStartMs: number }): string {
-    const ranged = next.startMs !== undefined && next.endMs !== undefined;
-    const windowPart = ranged
-      ? { startMs: next.startMs, endMs: next.endMs }
-      : cycleOffset !== undefined
-        ? { cycle: cycleOffset }
-        : { startMs: windowStartMs, endMs: windowEndMs };
-    const primaryStart = ranged ? next.startMs : windowStartMs;
-    return grokBotHref({
-      ...windowPart,
-      usage: usageParam,
-      mode: charts.mode,
-      compareStarts,
-      focusStartMs: next.focusStartMs,
-      primaryStartMs: primaryStart,
-    });
-  }
   const formatTooltip = (value: number, seriesKey: string): string => {
     if (measure !== 'usd') return formatTokens(value);
     const periodIndex = drawn.lines.find((line) => line.key === seriesKey)?.periodIndex ?? 0;
@@ -301,12 +279,12 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
 
   function openRange(startMs: number, endMs: number): void {
     if (startMs === windowStartMs && endMs === windowEndMs) return;
-    router.push(navigationHref({ startMs, endMs, focusStartMs }));
+    onWindow(startMs, endMs);
   }
 
   function highlightPeriod(startMs: number): void {
     if (!several || startMs === focusStartMs) return;
-    router.push(navigationHref({ focusStartMs: startMs }));
+    onFocus(startMs);
   }
 
   function rangeForIndexes(

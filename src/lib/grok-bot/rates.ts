@@ -1,4 +1,4 @@
-import { isUnbilledCursorEvent } from '@/lib/cursor/csv';
+import { isUnbilledCursorEvent } from '@/lib/cursor/unbilled';
 
 import { isGrokBotModel, normalizeGrokBotModelId } from '@/lib/grok-bot/membership';
 

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { hashCursorEvent, isUnbilledCursorEvent, parseCursorUsageCsv } from './csv';
+import { hashCursorEvent, parseCursorUsageCsv } from './csv';
+import { isUnbilledCursorEvent } from './unbilled';
 
 const SAMPLE_CSV = `Date,Cloud Agent ID,Automation ID,Kind,Model,Max Mode,Input (w/ Cache Write),Input (w/o Cache Write),Cache Read,Output Tokens,Total Tokens,Cost
 "2026-08-05T06:44:42.863Z","bc-019fc2ca-4ef7-7e58-86dd-610781f37064","","Included","cursor-grok-4.5-high-fast","No","9541","117382","1383578","13232","1523733","Included"

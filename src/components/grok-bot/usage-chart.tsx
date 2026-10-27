@@ -24,15 +24,13 @@ import {
   grokBotWallTimeToUtcMs,
   type GrokBotWallTime,
 } from '@/lib/grok-bot/cycle';
+import { grokBotPeriodCaption } from '@/lib/grok-bot/caption';
 import {
   GROK_BOT_INS_LINE,
   GROK_BOT_OUTS_LINE,
   grokBotHref,
 } from '@/lib/grok-bot/href';
-import {
-  grokBotPeriodCaption,
-  type GrokBotAlignedCharts,
-} from '@/lib/grok-bot/window';
+import type { GrokBotAlignedCharts } from '@/lib/grok-bot/window';
 import { useChartColors } from '@/lib/use-chart-colors';
 
 const PERIOD_DASH: readonly (string | undefined)[] = [

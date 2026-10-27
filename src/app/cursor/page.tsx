@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic';
 
 import { readCursorAgentEnv } from '@/lib/cursor/agent';
 import { resolveCursorDashboardQuery } from '@/lib/cursor/billing-cycle';
+import { fillCursorDailyUsage } from '@/lib/cursor/daily-axis';
 import {
   estimateCursorCost,
   getCursorUsagePool,
@@ -115,7 +116,7 @@ export default async function CursorDashboardPage({ searchParams }: CursorPagePr
   }
 
   const stats = statsResult.data;
-  const daily = dailyResult.data ?? [];
+  const daily = fillCursorDailyUsage(queryStartMs, queryEndMs, dailyResult.data ?? []);
   const models = modelsResult.data ?? [];
   const agents = agentsResult.data ?? [];
   const dailyModels = dailyModelResult.data ?? [];

@@ -1,3 +1,6 @@
+import { type GrokBotUsageTypeOption } from '@/lib/grok-bot/catalog';
+import { isGrokBotModel, normalizeGrokBotModelId } from '@/lib/grok-bot/membership';
+
 export const GROK_BOT_PATH = '/cursor/grok';
 
 export type GrokBotChartMode = 'by-type' | 'ins-outs';
@@ -110,6 +113,27 @@ function explicitSelection(
   const picked = catalogIds.filter((id) => wanted.has(id));
   if (picked.length === 0) return undefined;
   return picked;
+}
+
+export function selectUsage(
+  catalog: readonly GrokBotUsageTypeOption[],
+  usage: string | undefined,
+): { ids: readonly string[]; param: string | undefined } {
+  const ids = catalog.map((entry) => entry.id);
+  if (usage === undefined || usage.trim() === '') {
+    return { ids, param: undefined };
+  }
+  const wanted = new Set(
+    usage
+      .split(',')
+      .map((part) => normalizeGrokBotModelId(part))
+      .filter((part) => isGrokBotModel(part)),
+  );
+  const picked = ids.filter((id) => wanted.has(id));
+  if (picked.length === 0 || picked.length === ids.length) {
+    return { ids, param: undefined };
+  }
+  return { ids: picked, param: picked.join(',') };
 }
 
 export function toggleGrokBotUsageParam(

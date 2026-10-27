@@ -4,8 +4,14 @@ import Link from 'next/link';
 
 import { formatCost, formatTokens } from '@/lib/format';
 import {
+  grokBotLensFromSearch,
+  projectGrokBotBoard,
+  type GrokBotBoard,
+} from '@/lib/grok-bot/board';
+import {
   formatGrokBotWallTime,
   grokBotWallTimeFromUtcMs,
+  parseGrokBotCycleClock,
 } from '@/lib/grok-bot/cycle';
 import {
   GROK_BOT_INS_LINE,
@@ -19,7 +25,7 @@ import {
 import type { GrokBotCharge } from '@/lib/grok-bot/charge';
 import { grokBotCompareStarts, grokBotPeriodCaption } from '@/lib/grok-bot/window';
 import { getCursorSettings } from '@/lib/queries/cursor';
-import { getGrokBotBoard, type GrokBotBoard } from '@/lib/queries/grok-bot';
+import { loadGrokBotLedger } from '@/lib/queries/grok-bot';
 
 import { GrokBotAddPeriod } from '@/components/grok-bot/add-period';
 import { GrokBotSeriesChart } from '@/components/grok-bot/usage-chart';
@@ -255,31 +261,35 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
   }
 
   const settings = settingsResult.data;
-  const boardResult = await getGrokBotBoard({
+  const clock = parseGrokBotCycleClock({
     weekday: settings.grok_cycle_weekday,
     hour: settings.grok_cycle_hour,
     minute: settings.grok_cycle_minute,
-    cycle: params.cycle,
-    start: params.start,
-    end: params.end,
-    usage: params.usage,
-    page: params.page,
-    view: params.view,
-    cmp: params.cmp,
-    focus: params.focus,
   });
-  if (boardResult.error || !boardResult.data) {
+  if (!clock) {
+    return (
+      <div className="space-y-6">
+        <GrokHeader />
+        <p className="text-sm text-error">Invalid grok cycle clock.</p>
+      </div>
+    );
+  }
+  const loaded = await loadGrokBotLedger(clock, new Date());
+  if (loaded.error || !loaded.data) {
     return (
       <div className="space-y-6">
         <GrokHeader />
         <p className="text-sm text-error">
-          {boardResult.error ?? 'Failed to load Grokbot usage.'}
+          {loaded.error ?? 'Failed to load Grokbot usage.'}
         </p>
       </div>
     );
   }
 
-  const board = boardResult.data;
+  const board = projectGrokBotBoard(
+    loaded.data,
+    grokBotLensFromSearch(loaded.data, params),
+  );
   const mode: GrokBotChartMode = board.charts.mode;
   const pageBase = hrefFor(board);
   const toggleHref = hrefFor(board, {

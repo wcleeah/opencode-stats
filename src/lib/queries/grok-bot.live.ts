@@ -1,11 +1,16 @@
 import { execute } from '@/lib/db';
 import { ensureCursorSchema } from '@/lib/cursor/schema';
-import type { GrokBotAlignedCharts, GrokBotWindowTotals } from '@/lib/grok-bot/window';
 import {
-  getGrokBotBoard,
+  grokBotLensFromSearch,
+  projectGrokBotBoard,
   type GrokBotBoard,
+  type GrokBotLedger,
+  type GrokBotSearchRaw,
   type GrokBotTableRow,
-} from '@/lib/queries/grok-bot';
+} from '@/lib/grok-bot/board';
+import { parseGrokBotCycleClock } from '@/lib/grok-bot/cycle';
+import type { GrokBotAlignedCharts, GrokBotWindowTotals } from '@/lib/grok-bot/window';
+import { loadGrokBotLedger } from '@/lib/queries/grok-bot';
 
 const BASE_MS = Date.parse('2026-10-14T03:30:00.000Z');
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -168,33 +173,14 @@ function summarizeBoard(board: GrokBotBoard): {
   };
 }
 
-async function load(query: {
-  cycle?: string;
-  start?: string;
-  end?: string;
-  usage?: string;
-  page?: string;
-  view?: string;
-  cmp?: string;
-  focus?: string;
-  weekday?: string;
-}): Promise<{ data: ReturnType<typeof summarizeBoard> | null; error: string | null }> {
-  const result = await getGrokBotBoard({
-    weekday: query.weekday ?? CLOCK.weekday,
-    hour: CLOCK.hour,
-    minute: CLOCK.minute,
-    cycle: query.cycle,
-    start: query.start,
-    end: query.end,
-    usage: query.usage,
-    page: query.page,
-    view: query.view,
-    cmp: query.cmp,
-    focus: query.focus,
-    now: NOW,
-  });
-  if (result.error || !result.data) return { data: null, error: result.error };
-  return { data: summarizeBoard(result.data), error: null };
+function project(
+  ledger: GrokBotLedger,
+  raw: GrokBotSearchRaw,
+): { data: ReturnType<typeof summarizeBoard>; error: null } {
+  return {
+    data: summarizeBoard(projectGrokBotBoard(ledger, grokBotLensFromSearch(ledger, raw))),
+    error: null,
+  };
 }
 
 async function main(): Promise<void> {
@@ -312,34 +298,56 @@ async function main(): Promise<void> {
   }
   for (const row of rows) await insertRow(row);
 
+  const badClock = parseGrokBotCycleClock({
+    weekday: 'funday',
+    hour: CLOCK.hour,
+    minute: CLOCK.minute,
+  });
+  if (badClock) throw new Error('funday parsed as a grok cycle clock');
+  const bad = { data: null, error: 'Invalid grok cycle clock.' };
+
+  const clock = parseGrokBotCycleClock(CLOCK);
+  if (!clock) throw new Error('fixture clock did not parse');
+  const loaded = await loadGrokBotLedger(clock, NOW);
+  if (loaded.error || !loaded.data) {
+    throw new Error(loaded.error ?? 'Failed to load Grokbot rows.');
+  }
+  const ledger = loaded.data;
+
   const shortEnd = BASE_MS + 180_000 - 1;
   const emptyStart = BASE_MS + 3 * DAY_MS;
   const compareStart = BASE_MS - 7 * DAY_MS;
-  const [bad, short, shortSplit, cycle, page2, page99, cua, empty, future, compare, focused, junk] = (
-    await Promise.all([
-      load({ weekday: 'funday' }),
-      load({ start: String(BASE_MS), end: String(shortEnd) }),
-      load({ start: String(BASE_MS), end: String(shortEnd), view: 'ins-outs' }),
-      load({}),
-      load({ page: '2' }),
-      load({ page: '99' }),
-      load({ usage: 'grok-bot-cua' }),
-      load({ start: String(emptyStart), end: String(emptyStart + 60_000 - 1) }),
-      load({ cycle: '1' }),
-      load({ start: String(BASE_MS), end: String(shortEnd), cmp: String(compareStart) }),
-      load({
-        start: String(BASE_MS),
-        end: String(shortEnd),
-        cmp: String(compareStart),
-        focus: String(compareStart),
-      }),
-      load({
-        start: String(BASE_MS),
-        end: String(shortEnd),
-        cmp: `nope,-1,${BASE_MS}`,
-      }),
-    ])
-  );
+  const short = project(ledger, { start: String(BASE_MS), end: String(shortEnd) });
+  const shortSplit = project(ledger, {
+    start: String(BASE_MS),
+    end: String(shortEnd),
+    view: 'ins-outs',
+  });
+  const cycle = project(ledger, {});
+  const page2 = project(ledger, { page: '2' });
+  const page99 = project(ledger, { page: '99' });
+  const cua = project(ledger, { usage: 'grok-bot-cua' });
+  const empty = project(ledger, {
+    start: String(emptyStart),
+    end: String(emptyStart + 60_000 - 1),
+  });
+  const future = project(ledger, { cycle: '1' });
+  const compare = project(ledger, {
+    start: String(BASE_MS),
+    end: String(shortEnd),
+    cmp: String(compareStart),
+  });
+  const focused = project(ledger, {
+    start: String(BASE_MS),
+    end: String(shortEnd),
+    cmp: String(compareStart),
+    focus: String(compareStart),
+  });
+  const junk = project(ledger, {
+    start: String(BASE_MS),
+    end: String(shortEnd),
+    cmp: `nope,-1,${BASE_MS}`,
+  });
 
   console.log(JSON.stringify({
     bad,

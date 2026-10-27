@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, type JSX } from 'react';
-import { useRouter } from 'next/navigation';
 import {
   Brush,
   CartesianGrid,
@@ -17,26 +16,15 @@ import {
 import { formatCost, formatTokens } from '@/lib/format';
 import {
   focusedBucketWallMs,
-  formatGrokBotWallTime,
   grokBotBucketTickLabel,
   grokBotDayTickIndexes,
-  grokBotWallTimeFromUtcMs,
-  grokBotWallTimeToUtcMs,
-  type GrokBotWallTime,
 } from '@/lib/grok-bot/cycle';
-import {
-  GROK_BOT_INS_LINE,
-  GROK_BOT_OUTS_LINE,
-  grokBotHref,
-} from '@/lib/grok-bot/href';
-import {
-  grokBotPeriodNames,
-  moveGrokBotPeriodName,
-} from '@/lib/grok-bot/period-name';
+import { GROK_BOT_INS_LINE, GROK_BOT_OUTS_LINE } from '@/lib/grok-bot/href';
 import { grokBotPeriodTitle } from '@/lib/grok-bot/period-title';
 import type { GrokBotAlignedCharts } from '@/lib/grok-bot/window';
 import { useChartColors } from '@/lib/use-chart-colors';
 
+import { useGrokRangeCommit } from '@/components/grok-bot/window-editor';
 import { PendingAnchor } from '@/components/pending-anchor';
 
 const PERIOD_DASH: readonly (string | undefined)[] = [
@@ -51,7 +39,6 @@ function periodDash(periodIndex: number, several: boolean): string | undefined {
   return PERIOD_DASH[periodIndex % PERIOD_DASH.length];
 }
 
-const MINUTE_MS = 60 * 1000;
 const CHART_HEIGHT = 448;
 
 interface ChartRow {
@@ -79,37 +66,11 @@ type GrokBotSeriesChartProps = {
   readonly windowStartMs: number;
   readonly windowEndMs: number;
   readonly timeZone: 'Asia/Hong_Kong';
-  readonly usageParam: string | undefined;
   readonly measure: 'tokens' | 'usd';
   readonly bucketMs: number;
   readonly focusStartMs: number;
   readonly focusTargets: readonly GrokFocusTarget[];
-  readonly compareStarts: readonly number[];
-  readonly cycleOffset?: number;
 };
-
-function pad2(value: number): string {
-  return String(value).padStart(2, '0');
-}
-
-function wallInputValue(utcMs: number, timeZone: 'Asia/Hong_Kong'): string {
-  const wall = grokBotWallTimeFromUtcMs(utcMs, timeZone);
-  return `${wall.year}-${pad2(wall.month)}-${pad2(wall.day)}T${pad2(wall.hour)}:${pad2(wall.minute)}`;
-}
-
-function parseWallInput(
-  value: string,
-): Pick<GrokBotWallTime, 'year' | 'month' | 'day' | 'hour' | 'minute'> | null {
-  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(value);
-  if (!match) return null;
-  return {
-    year: Number(match[1]),
-    month: Number(match[2]),
-    day: Number(match[3]),
-    hour: Number(match[4]),
-    minute: Number(match[5]),
-  };
-}
 
 function seriesName(
   usageLabel: string,
@@ -258,15 +219,12 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
     windowStartMs,
     windowEndMs,
     timeZone,
-    usageParam,
     measure,
     bucketMs,
     focusStartMs,
     focusTargets,
-    compareStarts,
-    cycleOffset,
   } = props;
-  const router = useRouter();
+  const rangeCommit = useGrokRangeCommit();
   const focusAnchors = useRef(new Map<number, HTMLAnchorElement>());
   const colors = useChartColors();
   const spanMs = windowEndMs - windowStartMs + 1;
@@ -296,29 +254,6 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
     ?.map((index) => drawn.rows[index]?.label)
     .filter((label): label is string => label !== undefined);
 
-  function navigationHref(next: { startMs?: number; endMs?: number; focusStartMs: number }): string {
-    const ranged = next.startMs !== undefined && next.endMs !== undefined;
-    const windowPart = ranged
-      ? { startMs: next.startMs, endMs: next.endMs }
-      : cycleOffset !== undefined
-        ? { cycle: cycleOffset }
-        : { startMs: windowStartMs, endMs: windowEndMs };
-    const primaryStart = ranged ? next.startMs : windowStartMs;
-    const currentNames = grokBotPeriodNames(charts.periods);
-    const nextStartMs = next.startMs;
-    const periodNames = ranged && nextStartMs !== undefined
-      ? moveGrokBotPeriodName(currentNames, windowStartMs, nextStartMs)
-      : currentNames;
-    return grokBotHref({
-      ...windowPart,
-      usage: usageParam,
-      mode: charts.mode,
-      compareStarts,
-      focusStartMs: next.focusStartMs,
-      primaryStartMs: primaryStart,
-      periodNames,
-    });
-  }
   const formatTooltip = (value: number, seriesKey: string): string => {
     if (measure !== 'usd') return formatTokens(value);
     const periodIndex = drawn.lines.find((line) => line.key === seriesKey)?.periodIndex ?? 0;
@@ -329,11 +264,6 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
   const pointGapMs = points.length > 1
     ? points[1].bucketStartMs - points[0].bucketStartMs
     : spanMs;
-
-  function openRange(startMs: number, endMs: number): void {
-    if (startMs === windowStartMs && endMs === windowEndMs) return;
-    router.push(navigationHref({ startMs, endMs, focusStartMs }));
-  }
 
   function activateFocus(startMs: number): void {
     if (!several || startMs === focusStartMs) return;
@@ -355,7 +285,7 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
   }
 
   // onChange fires for each drag pixel, and onDragEnd reports the controlled
-  // indexes rather than that selection. Remember the latest indexes and open
+  // indexes rather than that selection. Remember the latest indexes and commit
   // that range once the drag settles.
   function rememberBrush(next: { startIndex?: number; endIndex?: number }): void {
     if (next.startIndex === undefined || next.endIndex === undefined) return;
@@ -366,7 +296,7 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
       const chosen = selection.current;
       if (!chosen) return;
       const range = rangeForIndexes(chosen.startIndex, chosen.endIndex);
-      if (range) openRange(range.startMs, range.endMs);
+      if (range) rangeCommit.commitRange(range.startMs, range.endMs);
     }, 300);
   }
 
@@ -378,47 +308,11 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
     const chosen = selection.current;
     if (!chosen) return;
     const range = rangeForIndexes(chosen.startIndex, chosen.endIndex);
-    if (range) openRange(range.startMs, range.endMs);
+    if (range) rangeCommit.commitRange(range.startMs, range.endMs);
   }
-
-  function applyMinutes(startValue: string, endValue: string): void {
-    const startWall = parseWallInput(startValue);
-    const endWall = parseWallInput(endValue);
-    if (!startWall || !endWall) return;
-    const startMs = grokBotWallTimeToUtcMs(startWall, timeZone);
-    const endMinuteMs = grokBotWallTimeToUtcMs(endWall, timeZone);
-    openRange(startMs, endMinuteMs + MINUTE_MS - 1);
-  }
-
-  const startValue = wallInputValue(windowStartMs, timeZone);
-  const endValue = wallInputValue(windowEndMs, timeZone);
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="block space-y-1">
-          <span className="text-[10px] uppercase tracking-wide text-muted">Start</span>
-          <input
-            type="datetime-local"
-            step={60}
-            value={startValue}
-            aria-label="Window start"
-            onChange={(event) => applyMinutes(event.target.value, endValue)}
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-          />
-        </label>
-        <label className="block space-y-1">
-          <span className="text-[10px] uppercase tracking-wide text-muted">End</span>
-          <input
-            type="datetime-local"
-            step={60}
-            value={endValue}
-            aria-label="Window end"
-            onChange={(event) => applyMinutes(startValue, event.target.value)}
-            className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-          />
-        </label>
-      </div>
       <div className="w-full">
         <ResponsiveContainer
           width="100%"
@@ -498,13 +392,6 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
           {'The brush changes the first period\'s window. Compares keep their starts.'}
         </p>
       ) : null}
-      <p className="text-[10px] text-muted">
-        {formatGrokBotWallTime(grokBotWallTimeFromUtcMs(windowStartMs, timeZone))}
-        {' to '}
-        {formatGrokBotWallTime(grokBotWallTimeFromUtcMs(windowEndMs, timeZone))}
-        {' · '}
-        Asia/Hong_Kong
-      </p>
       {several
         ? charts.periods.map((period, index) => {
             const title = grokBotPeriodTitle(index, charts.periods);

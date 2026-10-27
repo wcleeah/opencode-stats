@@ -24,6 +24,7 @@ import { getGrokBotBoard, type GrokBotBoard } from '@/lib/queries/grok-bot';
 import { GrokBotAddPeriod } from '@/components/grok-bot/add-period';
 import { GrokBotPeriodNameField } from '@/components/grok-bot/period-name-field';
 import { GrokBotSeriesChart } from '@/components/grok-bot/usage-chart';
+import { GrokWindowEditor } from '@/components/grok-bot/window-editor';
 import { GrokBotWindowStats } from '@/components/grok-bot/window-stats';
 import { PendingAnchor } from '@/components/pending-anchor';
 import { Card } from '@/components/ui/card';
@@ -314,12 +315,9 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
     windowStartMs: board.window.startMs,
     windowEndMs: board.window.endMs,
     timeZone: board.timeZone,
-    usageParam: board.usageParam,
     bucketMs: board.window.bucketMs,
     focusStartMs: board.focusStartMs,
     focusTargets,
-    compareStarts: grokBotCompareStarts(board.charts.periods),
-    cycleOffset: board.windowMode.kind === 'cycle' ? board.windowMode.offset : undefined,
   };
   const totalPages = Math.ceil(board.totalRows / board.pageSize);
 
@@ -346,14 +344,21 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
           >
             {GROK_BOT_INS_LINE} / {GROK_BOT_OUTS_LINE}
           </PendingAnchor>
-          <Card>
-            <div className="mb-3 text-xs text-muted uppercase tracking-wider">Tokens</div>
-            <GrokBotSeriesChart {...chartProps} measure="tokens" />
-          </Card>
-          <Card>
-            <div className="mb-3 text-xs text-muted uppercase tracking-wider">Spending</div>
-            <GrokBotSeriesChart {...chartProps} measure="usd" />
-          </Card>
+          <GrokWindowEditor
+            windowStartMs={board.window.startMs}
+            windowEndMs={board.window.endMs}
+            timeZone={board.timeZone}
+            hrefParams={linkParams(board)}
+          >
+            <Card>
+              <div className="mb-3 text-xs text-muted uppercase tracking-wider">Tokens</div>
+              <GrokBotSeriesChart {...chartProps} measure="tokens" />
+            </Card>
+            <Card>
+              <div className="mb-3 text-xs text-muted uppercase tracking-wider">Spending</div>
+              <GrokBotSeriesChart {...chartProps} measure="usd" />
+            </Card>
+          </GrokWindowEditor>
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <div className="text-xs text-muted uppercase tracking-wider">Events</div>

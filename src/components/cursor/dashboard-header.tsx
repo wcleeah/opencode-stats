@@ -1,6 +1,5 @@
-import Link from 'next/link';
-
 import { UpdatePricingButton } from '@/components/cursor/update-pricing-button';
+import { PendingAnchor } from '@/components/pending-anchor';
 
 interface CursorDashboardHeaderProps {
   canLaunchPricingAgent: boolean;
@@ -19,12 +18,13 @@ export function CursorDashboardHeader({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <UpdatePricingButton configured={canLaunchPricingAgent} />
-        <Link
+        <PendingAnchor
           href="/cursor/upload"
+          history="push"
           className="rounded-md border border-border px-3 py-1.5 text-xs uppercase tracking-wide hover:bg-surface-alt"
         >
           Upload CSV
-        </Link>
+        </PendingAnchor>
       </div>
     </div>
   );

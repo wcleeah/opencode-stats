@@ -99,8 +99,6 @@ function useGrokBotBoard(ledger: GrokBotLedger, initialLens: GrokBotLens): {
     return () => window.removeEventListener('popstate', onPop);
   }, [ledger]);
 
-  // First mount leaves urlFix null, so a dirty incoming URL stays.
-  // replaceState does not add a history entry.
   useEffect(() => {
     if (urlFix === null) return;
     window.history.replaceState(null, '', urlFix);

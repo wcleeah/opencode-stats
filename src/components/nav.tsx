@@ -1,14 +1,15 @@
-import Link from 'next/link';
 import { cookies } from 'next/headers';
 
-import { ThemeToggle } from '@/components/theme-toggle';
-import { SourceToggle } from '@/components/source-toggle';
 import {
   parseStatsSource,
   sourceBrandLabel,
   sourceHome,
   STATS_SOURCE_COOKIE,
 } from '@/lib/source-mode';
+
+import { PendingAnchor } from '@/components/pending-anchor';
+import { SourceToggle } from '@/components/source-toggle';
+import { ThemeToggle } from '@/components/theme-toggle';
 
 const CURSOR_NAV = [
   { href: '/cursor', label: 'Agent Usage' },
@@ -28,21 +29,23 @@ export async function Nav() {
   return (
     <header className="border-b border-border bg-background">
       <div className="mx-auto flex max-w-[120rem] flex-wrap items-center gap-3 px-4 py-3 sm:gap-6">
-        <Link
+        <PendingAnchor
           href={sourceHome(source)}
+          history="push"
           className="text-sm font-semibold text-foreground hover:text-muted transition-colors"
         >
           {sourceBrandLabel(source)}
-        </Link>
+        </PendingAnchor>
         <nav className="flex flex-wrap items-center gap-3 sm:gap-4">
           {items.map((item) => (
-            <Link
+            <PendingAnchor
               key={item.href}
               href={item.href}
+              history="push"
               className="text-xs text-muted hover:text-foreground transition-colors"
             >
               {item.label}
-            </Link>
+            </PendingAnchor>
           ))}
         </nav>
         <div className="ml-auto flex items-center gap-3">

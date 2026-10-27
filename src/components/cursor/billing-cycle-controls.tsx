@@ -1,13 +1,15 @@
 'use client';
 
 import { useMemo } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 import {
   getBillingCycleBounds,
   matchBillingCycleOffset,
 } from '@/lib/cursor/billing-cycle';
 import { cn } from '@/lib/utils';
+
+import { PendingAnchor } from '@/components/pending-anchor';
 
 interface BillingCycleControlsProps {
   billingCycleStartDay: number;
@@ -22,7 +24,6 @@ export function BillingCycleControls({
   to,
   className,
 }: BillingCycleControlsProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -38,16 +39,17 @@ export function BillingCycleControls({
     return getBillingCycleBounds(billingCycleStartDay, new Date(), activeOffset).label;
   }, [activeOffset, billingCycleStartDay]);
 
-  function goToOffset(offset: number): void {
+  function cycleHref(offset: number): string {
     const cycle = getBillingCycleBounds(billingCycleStartDay, new Date(), offset);
     const params = new URLSearchParams(searchParams.toString());
     params.set('from', cycle.from);
     params.set('to', cycle.to);
     params.delete('page');
-    router.replace(`${pathname}?${params.toString()}`);
+    return `${pathname}?${params.toString()}`;
   }
 
   const displayOffset = activeOffset ?? 0;
+  const linkClass = 'px-2 py-1 text-xs text-muted hover:text-foreground transition-colors';
 
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
@@ -55,17 +57,19 @@ export function BillingCycleControls({
         Billing cycle · 16:00 HKT
       </span>
       <div className="inline-flex items-center rounded-md border border-border">
-        <button
-          type="button"
-          onClick={() => goToOffset(displayOffset - 1)}
-          className="px-2 py-1 text-xs text-muted hover:text-foreground transition-colors"
-          aria-label="Previous billing cycle"
+        <PendingAnchor
+          href={cycleHref(displayOffset - 1)}
+          history="replace"
+          className={linkClass}
+          ariaLabel="Previous billing cycle"
+          title={getBillingCycleBounds(billingCycleStartDay, new Date(), displayOffset - 1).label}
         >
           ←
-        </button>
-        <button
-          type="button"
-          onClick={() => goToOffset(0)}
+        </PendingAnchor>
+        <PendingAnchor
+          href={cycleHref(0)}
+          history="replace"
+          title={getBillingCycleBounds(billingCycleStartDay, new Date(), 0).label}
           className={cn(
             'border-x border-border px-2 py-1 text-[10px] uppercase tracking-wide transition-colors',
             activeOffset === 0
@@ -74,15 +78,16 @@ export function BillingCycleControls({
           )}
         >
           This cycle
-        </button>
-        <button
-          type="button"
-          onClick={() => goToOffset(displayOffset + 1)}
-          className="px-2 py-1 text-xs text-muted hover:text-foreground transition-colors"
-          aria-label="Next billing cycle"
+        </PendingAnchor>
+        <PendingAnchor
+          href={cycleHref(displayOffset + 1)}
+          history="replace"
+          className={linkClass}
+          ariaLabel="Next billing cycle"
+          title={getBillingCycleBounds(billingCycleStartDay, new Date(), displayOffset + 1).label}
         >
           →
-        </button>
+        </PendingAnchor>
       </div>
       <span className="text-xs text-foreground tabular-nums">{currentLabel}</span>
       {activeOffset === null && (from || to) && (

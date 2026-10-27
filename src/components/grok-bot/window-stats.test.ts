@@ -34,6 +34,7 @@ test('spending card marks a card estimate and names unpriced cache writes', () =
   assert.match(html, /ins ~\$2\.00 · outs ~\$0\.00 · cache write unpriced/);
   assert.match(html, /Total tokens/);
   assert.match(html, /ins 2\.00M · outs 500/);
+  assert.equal(html.includes('>Period<'), false);
 });
 
 test('rounded spending lines still add to the rounded total', () => {
@@ -107,8 +108,14 @@ test('two periods round alone and keep the primary outs remainder', () => {
       },
     ],
   }));
-  assert.match(html, /Wed 14 Oct 2026/);
-  assert.match(html, /Wed 7 Oct 2026/);
+  assert.match(
+    html,
+    /title="Wed 14 Oct 2026 11:30 to Wed 21 Oct 2026 11:29"[^>]*>Period</,
+  );
+  assert.match(
+    html,
+    /title="Wed 7 Oct 2026 11:30 to Wed 14 Oct 2026 11:29"[^>]*>Period 2</,
+  );
   assert.match(html, /~\$929\.58/);
   assert.match(html, /ins ~\$848\.66 · outs ~\$80\.92/);
   assert.equal(html.includes('~$80.91'), false);

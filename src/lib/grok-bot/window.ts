@@ -269,8 +269,6 @@ export function grokBotCompareStarts(
   return starts;
 }
 
-export { grokBotPeriodCaption } from '@/lib/grok-bot/caption';
-
 export interface GrokBotMeasureCell {
   readonly tokens: number;
   readonly usd: number;

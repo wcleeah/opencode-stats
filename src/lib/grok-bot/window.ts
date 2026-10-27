@@ -1,6 +1,7 @@
-import type {
-  GrokBotProjectedCompare,
-  GrokBotProjectedPrimary,
+import {
+  grokBotBucketStartMs,
+  type GrokBotProjectedCompare,
+  type GrokBotProjectedPrimary,
 } from '@/lib/grok-bot/cycle';
 import type { GrokBotChartMode } from '@/lib/grok-bot/href';
 import {
@@ -9,7 +10,7 @@ import {
   type GrokBotCharge,
   type GrokBotPricedRow,
   type GrokBotTokenSides,
-} from '@/lib/grok-bot/rates';
+} from '@/lib/grok-bot/charge';
 
 export interface GrokBotSpendParts {
   readonly totalUsd: number;
@@ -54,7 +55,7 @@ export type GrokBotCharts =
     };
 
 export interface GrokBotFoldEvent {
-  readonly bucketStartMs: number;
+  readonly eventAt: number;
   readonly usageType: string;
   readonly priced: GrokBotPricedRow;
 }
@@ -153,8 +154,13 @@ export function foldGrokBotWindow(input: {
   }
 
   for (const event of input.events) {
-    if (!typeIds.has(event.usageType) || !isEmittedBucket(event.bucketStartMs)) continue;
-    const key = `${event.bucketStartMs}:${event.usageType}`;
+    const bucketStartMs = grokBotBucketStartMs(
+      event.eventAt,
+      input.windowStartMs,
+      input.bucketMs,
+    );
+    if (!typeIds.has(event.usageType) || !isEmittedBucket(bucketStartMs)) continue;
+    const key = `${bucketStartMs}:${event.usageType}`;
     const existing = cells.get(key);
     const cell = existing ?? {
       insTokens: 0,

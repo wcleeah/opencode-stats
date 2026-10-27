@@ -4,7 +4,6 @@ import { queryAll, queryOne } from '@/lib/db';
 import { ensureCursorSchema } from '@/lib/cursor/schema';
 import {
   GROK_BOT_CYCLE_TIME_ZONE,
-  grokBotBucketStartSql,
   parseGrokBotCycleClock,
   projectGrokBotPeriods,
   resolveGrokBotWindow,
@@ -16,13 +15,9 @@ import {
   parseGrokBotFocusStart,
 } from '@/lib/grok-bot/href';
 import { grokBotModelSql, isGrokBotModel, normalizeGrokBotModelId } from '@/lib/grok-bot/membership';
-import {
-  grokBotUsageCatalog,
-  priceGrokBotRow,
-  type GrokBotCharge,
-  type GrokBotPriceInput,
-  type GrokBotUsageTypeOption,
-} from '@/lib/grok-bot/rates';
+import { grokBotUsageCatalog, type GrokBotUsageTypeOption } from '@/lib/grok-bot/catalog';
+import type { GrokBotCharge } from '@/lib/grok-bot/charge';
+import { priceGrokBotRow, type GrokBotPriceInput } from '@/lib/grok-bot/rates';
 import {
   alignGrokBotPeriods,
   foldGrokBotWindow,
@@ -101,7 +96,7 @@ interface SqlEventRow extends SqlPriceFields {
 }
 
 interface SqlScanRow extends SqlPriceFields {
-  bucket_start: number | bigint;
+  event_at: number | bigint;
 }
 
 function asNumber(value: number | bigint): number {
@@ -128,7 +123,7 @@ function priceInput(row: SqlPriceFields): GrokBotPriceInput {
 
 function foldEvent(row: SqlScanRow): GrokBotFoldEvent {
   return {
-    bucketStartMs: asNumber(row.bucket_start),
+    eventAt: asNumber(row.event_at),
     usageType: normalizeGrokBotModelId(row.model),
     priced: priceGrokBotRow(priceInput(row)),
   };
@@ -248,7 +243,7 @@ export async function getGrokBotBoard(
       filter,
       query: queryAll<SqlScanRow>(
         `SELECT
-          ${grokBotBucketStartSql('event_at')} AS bucket_start,
+          event_at,
           model,
           kind,
           cost_raw,
@@ -259,13 +254,7 @@ export async function getGrokBotBoard(
           tokens_output
         FROM cursor_usage_events
         WHERE ${filter.clause}`,
-        [
-          period.window.startMs,
-          period.window.startMs,
-          period.window.bucketMs,
-          period.window.bucketMs,
-          ...filter.args,
-        ],
+        filter.args,
       ),
     };
   });

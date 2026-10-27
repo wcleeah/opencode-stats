@@ -1,6 +1,16 @@
 import { isUnbilledCursorEvent } from '@/lib/cursor/csv';
 
-import { isGrokBotModel, normalizeGrokBotModelId } from '@/lib/grok-bot/membership';
+import type {
+  GrokBotCharge,
+  GrokBotPartition,
+  GrokBotPricedRow,
+  GrokBotTokenSides,
+} from '@/lib/grok-bot/charge';
+import {
+  GROK_BOT_KNOWN_USAGE,
+  type GrokBotKnownUsageId,
+} from '@/lib/grok-bot/catalog';
+import { normalizeGrokBotModelId } from '@/lib/grok-bot/membership';
 
 interface GrokBotTokenRates {
   inputPerMillion: number;
@@ -19,39 +29,6 @@ export interface GrokBotPriceInput {
   tokensOutput: number;
 }
 
-export interface GrokBotTokenSides {
-  readonly ins: number;
-  readonly outs: number;
-}
-
-export interface GrokBotPartition {
-  readonly totalUsd: number;
-  readonly insUsd: number;
-}
-
-export type GrokBotCharge =
-  | { readonly status: 'unbilled' }
-  | { readonly status: 'reported-missing' }
-  | { readonly status: 'unpriced' }
-  | { readonly status: 'reported'; readonly split: GrokBotPartition }
-  | { readonly status: 'rated'; readonly split: GrokBotPartition }
-  | {
-      readonly status: 'partial';
-      readonly split: GrokBotPartition;
-      readonly unpricedCacheWriteTokens: number;
-    };
-
-export interface GrokBotPricedRow {
-  readonly tokens: GrokBotTokenSides;
-  readonly charge: GrokBotCharge;
-}
-
-export interface GrokBotUsageTypeOption {
-  id: string;
-  label: string;
-  priced: boolean;
-}
-
 const STANDARD_RATES: GrokBotTokenRates = {
   inputPerMillion: 2,
   cacheReadPerMillion: 0.5,
@@ -64,16 +41,16 @@ const CUA_RATES: GrokBotTokenRates = {
   outputPerMillion: 1.2,
 };
 
-const USAGE_TYPES: readonly {
-  id: string;
-  label: string;
-  rates: GrokBotTokenRates | null;
-}[] = [
-  { id: 'grok-bot-default', label: 'Default', rates: STANDARD_RATES },
-  { id: 'grok-bot-automation', label: 'Automation', rates: STANDARD_RATES },
-  { id: 'grok-bot-cua', label: 'CUA', rates: CUA_RATES },
-  { id: 'grok-bot-knowledge-work', label: 'Knowledge work', rates: STANDARD_RATES },
-];
+const RATES: { [Id in GrokBotKnownUsageId]: GrokBotTokenRates } = {
+  'grok-bot-default': STANDARD_RATES,
+  'grok-bot-automation': STANDARD_RATES,
+  'grok-bot-cua': CUA_RATES,
+  'grok-bot-knowledge-work': STANDARD_RATES,
+};
+
+function isKnownUsageId(id: string): id is GrokBotKnownUsageId {
+  return GROK_BOT_KNOWN_USAGE.some((entry) => entry.id === id);
+}
 
 function normalizeKind(kind: string): string {
   return kind.trim().toLowerCase().replace(/[\s_]+/g, '-');
@@ -81,10 +58,8 @@ function normalizeKind(kind: string): string {
 
 function ratesFor(model: string): GrokBotTokenRates | null {
   const id = normalizeGrokBotModelId(model);
-  for (const type of USAGE_TYPES) {
-    if (type.id === id) return type.rates;
-  }
-  return null;
+  if (!isKnownUsageId(id)) return null;
+  return RATES[id];
 }
 
 function tokenSides(row: GrokBotPriceInput): GrokBotTokenSides {
@@ -127,14 +102,6 @@ function chargeFromCard(row: GrokBotPriceInput, rates: GrokBotTokenRates): GrokB
   return { status: 'rated', split };
 }
 
-export function grokBotTokenTotal(tokens: GrokBotTokenSides): number {
-  return tokens.ins + tokens.outs;
-}
-
-export function grokBotOutsUsd(totalUsd: number, insUsd: number): number {
-  return totalUsd - insUsd;
-}
-
 export function priceGrokBotRow(row: GrokBotPriceInput): GrokBotPricedRow {
   const tokens = tokenSides(row);
   if (isUnbilledCursorEvent(row.kind, row.costRaw)) {
@@ -163,25 +130,4 @@ export function priceGrokBotRow(row: GrokBotPriceInput): GrokBotPricedRow {
     };
   }
   return { tokens, charge: { status: 'unpriced' } };
-}
-
-export function grokBotUsageCatalog(
-  extraModelIds: readonly string[],
-): readonly GrokBotUsageTypeOption[] {
-  const known: GrokBotUsageTypeOption[] = USAGE_TYPES.map((type) => ({
-    id: type.id,
-    label: type.label,
-    priced: type.rates !== null,
-  }));
-  const knownIds = new Set(known.map((type) => type.id));
-  const extras = new Set<string>();
-  for (const modelId of extraModelIds) {
-    const id = normalizeGrokBotModelId(modelId);
-    if (!isGrokBotModel(id) || knownIds.has(id)) continue;
-    extras.add(id);
-  }
-  const extraOptions = [...extras]
-    .sort((a, b) => a.localeCompare(b))
-    .map((id) => ({ id, label: id, priced: false }));
-  return [...known, ...extraOptions];
 }

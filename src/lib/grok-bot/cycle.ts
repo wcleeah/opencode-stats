@@ -450,6 +450,15 @@ export function grokBotBucketMs(spanMs: number): number {
   return HOUR_MS;
 }
 
+export function grokBotBucketStartMs(
+  eventAt: number,
+  windowStartMs: number,
+  bucketMs: number,
+): number {
+  const steps = Math.trunc((eventAt - windowStartMs) / bucketMs);
+  return windowStartMs + steps * bucketMs;
+}
+
 export function grokBotBucketStartSql(column: string = 'event_at'): string {
   if (!SQL_COLUMN.test(column)) {
     throw new Error(`Unsafe SQL column: ${column}`);

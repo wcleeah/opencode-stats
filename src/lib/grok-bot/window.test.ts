@@ -3,9 +3,8 @@ import assert from 'node:assert/strict';
 
 import type { GrokBotProjectedCompare, GrokBotProjectedPrimary } from './cycle';
 import { grokBotBucketMs } from './cycle';
+import { grokBotOutsUsd, grokBotTokenTotal } from './charge';
 import {
-  grokBotOutsUsd,
-  grokBotTokenTotal,
   priceGrokBotRow,
   type GrokBotPriceInput,
 } from './rates';
@@ -84,7 +83,7 @@ function sumInsOuts(charts: Extract<GrokBotCharts, { mode: 'ins-outs' }>): {
 test('ins outs lines match by-type totals and the window cards', () => {
   const events: readonly GrokBotFoldEvent[] = [
     {
-      bucketStartMs: 0,
+      eventAt: 0,
       usageType: 'grok-bot-default',
       priced: priceGrokBotRow(row({
         kind: 'On-Demand',
@@ -95,7 +94,7 @@ test('ins outs lines match by-type totals and the window cards', () => {
       })),
     },
     {
-      bucketStartMs: 0,
+      eventAt: 0,
       usageType: 'grok-bot-knowledge-work',
       priced: priceGrokBotRow(row({
         model: 'grok-bot-knowledge-work',
@@ -104,7 +103,7 @@ test('ins outs lines match by-type totals and the window cards', () => {
       })),
     },
     {
-      bucketStartMs: 0,
+      eventAt: 0,
       usageType: 'grok-bot-automation',
       priced: priceGrokBotRow(row({
         model: 'grok-bot-automation',
@@ -113,7 +112,7 @@ test('ins outs lines match by-type totals and the window cards', () => {
       })),
     },
     {
-      bucketStartMs: BUCKET_MS * 4,
+      eventAt: BUCKET_MS * 4,
       usageType: 'grok-bot-default',
       priced: priceGrokBotRow(row({
         kind: 'On-Demand',
@@ -198,7 +197,7 @@ test('a reported window does not mark the spend as a card estimate', () => {
     bucketMs: BUCKET_MS,
     seriesTypes: [{ id: 'grok-bot-default', label: 'Default' }],
     events: [{
-      bucketStartMs: 0,
+      eventAt: 0,
       usageType: 'grok-bot-default',
       priced: priceGrokBotRow(row({
         kind: 'On-Demand',
@@ -253,7 +252,7 @@ test('fold zero-fills buckets around one event', () => {
     bucketMs: BUCKET_MS,
     seriesTypes: [{ id: 'grok-bot-default', label: 'Default' }],
     events: [{
-      bucketStartMs: expected,
+      eventAt: windowStartMs + 90_000,
       usageType: 'grok-bot-default',
       priced: priceGrokBotRow(row({ tokensInput: 12 })),
     }],
@@ -517,7 +516,7 @@ test('an empty primary fold keeps period totals and draws no points', () => {
 
 test('an empty series list keeps the requested mode and drops events', () => {
   const events: readonly GrokBotFoldEvent[] = [{
-    bucketStartMs: 0,
+    eventAt: 0,
     usageType: 'grok-bot-default',
     priced: priceGrokBotRow(row({ tokensInput: 1_000_000 })),
   }];

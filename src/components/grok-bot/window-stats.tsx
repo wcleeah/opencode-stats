@@ -1,7 +1,7 @@
 import type { JSX } from 'react';
 
 import { formatCost, formatTokens } from '@/lib/format';
-import { grokBotOutsUsd, grokBotTokenTotal } from '@/lib/grok-bot/rates';
+import { grokBotOutsUsd, grokBotTokenTotal } from '@/lib/grok-bot/charge';
 import {
   grokBotPeriodCaption,
   type GrokBotPeriod,

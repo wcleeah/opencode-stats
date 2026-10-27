@@ -1,12 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { grokBotUsageCatalog } from './catalog';
+import { grokBotOutsUsd, type GrokBotPricedRow } from './charge';
 import {
-  grokBotOutsUsd,
-  grokBotUsageCatalog,
   priceGrokBotRow,
   type GrokBotPriceInput,
-  type GrokBotPricedRow,
 } from './rates';
 
 function row(overrides: Partial<GrokBotPriceInput>): GrokBotPriceInput {

@@ -16,7 +16,7 @@ import {
   type GrokBotChartMode,
   type GrokBotHrefParams,
 } from '@/lib/grok-bot/href';
-import type { GrokBotCharge } from '@/lib/grok-bot/rates';
+import type { GrokBotCharge } from '@/lib/grok-bot/charge';
 import { grokBotCompareStarts, grokBotPeriodCaption } from '@/lib/grok-bot/window';
 import { getCursorSettings } from '@/lib/queries/cursor';
 import { getGrokBotBoard, type GrokBotBoard } from '@/lib/queries/grok-bot';

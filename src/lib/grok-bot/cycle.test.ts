@@ -8,6 +8,7 @@ import {
   formatGrokBotWallDate,
   formatGrokBotWallTime,
   grokBotBucketMs,
+  grokBotBucketStartMs,
   grokBotBucketStartSql,
   grokBotCycleBounds,
   grokBotWallTimeFromUtcMs,
@@ -230,4 +231,12 @@ test('sqlite groups an event into the window bucket', async () => {
     args: [windowStartMs, windowStartMs, bucketMs, bucketMs],
   });
   assert.equal(Number(result.rows[0].bucket), expected);
+});
+
+test('javascript bucket start matches the sqlite +90s case', () => {
+  const windowStartMs = 1_700_000_000_000;
+  const bucketMs = 60_000;
+  const eventAt = windowStartMs + 90_000;
+  const expected = windowStartMs + 60_000;
+  assert.equal(grokBotBucketStartMs(eventAt, windowStartMs, bucketMs), expected);
 });

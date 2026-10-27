@@ -3,6 +3,7 @@ import type {
   GrokBotProjectedPrimary,
 } from '@/lib/grok-bot/cycle';
 import type { GrokBotChartMode } from '@/lib/grok-bot/href';
+import type { GrokBotPeriodName, GrokBotPeriodNames } from '@/lib/grok-bot/period-name';
 import {
   grokBotOutsUsd,
   grokBotTokenTotal,
@@ -238,6 +239,7 @@ export interface GrokBotPrimaryPeriod {
   readonly startMs: number;
   readonly label: string;
   readonly shortLabel: string;
+  readonly name?: GrokBotPeriodName;
   readonly totals: GrokBotWindowTotals;
 }
 
@@ -246,6 +248,7 @@ export interface GrokBotComparePeriod {
   readonly startMs: number;
   readonly label: string;
   readonly shortLabel: string;
+  readonly name?: GrokBotPeriodName;
   readonly totals: GrokBotWindowTotals;
 }
 
@@ -322,8 +325,10 @@ interface AlignedFold {
   };
 }
 
-function toPeriod(fold: AlignedFold): GrokBotPeriod {
+function toPeriod(fold: AlignedFold, names: GrokBotPeriodNames): GrokBotPeriod {
   const { projected } = fold;
+  const found = names.find((item) => item.startMs === projected.window.startMs)?.name;
+  const nameField = found === undefined ? {} : { name: found };
   if (projected.role === 'primary') {
     return {
       role: 'primary',
@@ -331,6 +336,7 @@ function toPeriod(fold: AlignedFold): GrokBotPeriod {
       label: projected.label,
       shortLabel: projected.shortLabel,
       totals: fold.folded.totals,
+      ...nameField,
     };
   }
   return {
@@ -339,17 +345,21 @@ function toPeriod(fold: AlignedFold): GrokBotPeriod {
     label: projected.label,
     shortLabel: projected.shortLabel,
     totals: fold.folded.totals,
+    ...nameField,
   };
 }
 
-function asPeriodList(folds: readonly AlignedFold[]): GrokBotPeriodList {
-  const primary = folds[0] === undefined ? undefined : toPeriod(folds[0]);
+function asPeriodList(
+  folds: readonly AlignedFold[],
+  names: GrokBotPeriodNames,
+): GrokBotPeriodList {
+  const primary = folds[0] === undefined ? undefined : toPeriod(folds[0], names);
   if (primary === undefined || primary.role !== 'primary') {
     throw new Error('alignGrokBotPeriods requires a primary fold');
   }
   const compared: GrokBotComparePeriod[] = [];
   for (const fold of folds.slice(1)) {
-    const period = toPeriod(fold);
+    const period = toPeriod(fold, names);
     if (period.role !== 'compare') {
       throw new Error('alignGrokBotPeriods tail must be compare periods');
     }
@@ -384,8 +394,9 @@ function sideAt(fold: AlignedFold, pointIndex: number): GrokBotInsOutsSide {
 export function alignGrokBotPeriods(input: {
   readonly seriesTypes: readonly GrokBotTypeLine[];
   readonly folds: readonly AlignedFold[];
+  readonly names: GrokBotPeriodNames;
 }): GrokBotAlignedCharts {
-  const periods = asPeriodList(input.folds);
+  const periods = asPeriodList(input.folds, input.names);
   const primaryCharts = input.folds[0].folded.charts;
   if (primaryCharts.points.length === 0) {
     if (primaryCharts.mode === 'by-type') {

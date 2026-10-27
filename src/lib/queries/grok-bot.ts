@@ -15,6 +15,7 @@ import {
   parseGrokBotCompareStarts,
   parseGrokBotFocusStart,
 } from '@/lib/grok-bot/href';
+import { parseGrokBotPeriodNames } from '@/lib/grok-bot/period-name';
 import { grokBotModelSql, isGrokBotModel, normalizeGrokBotModelId } from '@/lib/grok-bot/membership';
 import {
   grokBotUsageCatalog,
@@ -44,6 +45,7 @@ export interface GrokBotBoardQuery {
   view?: string;
   cmp?: string;
   focus?: string;
+  names?: string;
   now?: Date;
 }
 
@@ -349,7 +351,11 @@ export async function getGrokBotBoard(
       mode,
     }),
   }));
-  const charts = alignGrokBotPeriods({ seriesTypes: seriesLines, folds });
+  const names = parseGrokBotPeriodNames(
+    query.names,
+    projected.map((period) => period.window.startMs),
+  );
+  const charts = alignGrokBotPeriods({ seriesTypes: seriesLines, folds, names });
 
   return {
     data: {

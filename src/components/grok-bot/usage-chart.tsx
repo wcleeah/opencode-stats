@@ -30,6 +30,11 @@ import {
   GROK_BOT_OUTS_LINE,
   grokBotHref,
 } from '@/lib/grok-bot/href';
+import {
+  grokBotPeriodNames,
+  moveGrokBotPeriodName,
+  type GrokBotPeriodName,
+} from '@/lib/grok-bot/period-name';
 import type { GrokBotAlignedCharts } from '@/lib/grok-bot/window';
 import { useChartColors } from '@/lib/use-chart-colors';
 
@@ -98,6 +103,23 @@ function parseWallInput(
   };
 }
 
+function seriesName(
+  usageLabel: string,
+  period: {
+    readonly name?: GrokBotPeriodName;
+    readonly shortLabel: string;
+    readonly label: string;
+  },
+  periods: readonly {
+    readonly name?: GrokBotPeriodName;
+    readonly shortLabel: string;
+    readonly label: string;
+  }[],
+): string {
+  if (periods.length === 1 && period.name === undefined) return usageLabel;
+  return `${usageLabel} · ${grokBotPeriodCaption(period, periods)}`;
+}
+
 function projection(
   charts: GrokBotAlignedCharts,
   measure: 'tokens' | 'usd',
@@ -117,9 +139,7 @@ function projection(
       charts.periods.forEach((period, periodIndex) => {
         lines.push({
           key: several ? `${lineIndex}:${periodIndex}` : line.id,
-          name: several
-            ? `${line.label} · ${grokBotPeriodCaption(period, charts.periods)}`
-            : line.label,
+          name: seriesName(line.label, period, charts.periods),
           colorIndex: lineIndex,
           periodIndex,
           lineIndex,
@@ -148,9 +168,7 @@ function projection(
       const label = side === 'ins' ? GROK_BOT_INS_LINE : GROK_BOT_OUTS_LINE;
       lines.push({
         key: several ? `${side}:${periodIndex}` : side,
-        name: several
-          ? `${label} · ${grokBotPeriodCaption(period, charts.periods)}`
-          : label,
+        name: seriesName(label, period, charts.periods),
         colorIndex: sideIndex,
         periodIndex,
         lineIndex: sideIndex,
@@ -202,7 +220,7 @@ function ChartTooltip({
     <div className="rounded-sm border border-border bg-surface px-3 py-2 text-xs">
       <div className="mb-1 text-muted">{label}</div>
       {payload.map((entry) => (
-        <div key={entry.name} className="flex items-center gap-2">
+        <div key={String(entry.dataKey ?? entry.name)} className="flex items-center gap-2">
           <span
             className="inline-block h-2 w-2 rounded-full"
             style={{ backgroundColor: entry.color }}
@@ -272,6 +290,11 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
         ? { cycle: cycleOffset }
         : { startMs: windowStartMs, endMs: windowEndMs };
     const primaryStart = ranged ? next.startMs : windowStartMs;
+    const currentNames = grokBotPeriodNames(charts.periods);
+    const nextStartMs = next.startMs;
+    const periodNames = ranged && nextStartMs !== undefined
+      ? moveGrokBotPeriodName(currentNames, windowStartMs, nextStartMs)
+      : currentNames;
     return grokBotHref({
       ...windowPart,
       usage: usageParam,
@@ -279,6 +302,7 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
       compareStarts,
       focusStartMs: next.focusStartMs,
       primaryStartMs: primaryStart,
+      periodNames,
     });
   }
   const formatTooltip = (value: number, seriesKey: string): string => {

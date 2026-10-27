@@ -5,6 +5,7 @@ import { ensureCursorSchema } from '@/lib/cursor/schema';
 import {
   GROK_BOT_CYCLE_TIME_ZONE,
   grokBotBucketStartSql,
+  grokBotCycleLinkLabels,
   parseGrokBotCycleClock,
   projectGrokBotPeriods,
   resolveGrokBotWindow,
@@ -69,6 +70,11 @@ export interface GrokBotBoard {
     startMs: number;
     endMs: number;
     label: string;
+  };
+  cycleLinkLabels: {
+    readonly previous: string;
+    readonly current: string;
+    readonly next: string;
   };
   windowMode: GrokBotWindowMode;
   window: { startMs: number; endMs: number; bucketMs: number };
@@ -365,6 +371,7 @@ export async function getGrokBotBoard(
         endMs: primary.cycle.endMs,
         label: primary.cycle.label,
       },
+      cycleLinkLabels: grokBotCycleLinkLabels(clock, now, primary.cycle.offset),
       windowMode: primary.mode,
       window: primary.window,
       timeZone: GROK_BOT_CYCLE_TIME_ZONE,

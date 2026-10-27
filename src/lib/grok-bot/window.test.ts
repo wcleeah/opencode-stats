@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import type { GrokBotProjectedCompare, GrokBotProjectedPrimary } from './cycle';
 import { grokBotBucketMs } from './cycle';
 import { setGrokBotPeriodName } from './period-name';
+import { grokBotPeriodTitle } from './period-title';
 import {
   grokBotOutsUsd,
   grokBotTokenTotal,
@@ -14,7 +15,6 @@ import {
   alignGrokBotPeriods,
   foldGrokBotWindow,
   grokBotCompareStarts,
-  grokBotPeriodCaption,
   type GrokBotCharts,
   type GrokBotFoldEvent,
   type GrokBotTypeLine,
@@ -381,7 +381,7 @@ test('alignment uses the primary bucket and zeros a missing compared point', () 
   assert.equal(aligned.periods[1].startMs, 10);
   assert.equal(aligned.periods[1].shortLabel, 'Wed 7 Oct 2026');
   assert.deepEqual(grokBotCompareStarts(aligned.periods), [10, 20]);
-  assert.equal(grokBotPeriodCaption(aligned.periods[1], aligned.periods), 'Wed 7 Oct 2026');
+  assert.equal(grokBotPeriodTitle(1, aligned.periods), 'Period 2');
   assert.equal(Object.hasOwn(aligned.periods[0], 'name'), false);
   assert.equal(Object.hasOwn(aligned.periods[1], 'name'), false);
 });
@@ -592,18 +592,9 @@ test('align copies a shared name onto each matching start', () => {
   });
   assert.equal(aligned.periods[0].name, 'Launch');
   assert.equal(aligned.periods[1].name, 'Launch');
-  assert.equal(
-    grokBotPeriodCaption(aligned.periods[0], [aligned.periods[0]]),
-    'Launch',
-  );
-  assert.equal(
-    grokBotPeriodCaption(aligned.periods[0], aligned.periods),
-    'Launch · Wed 14 Oct 2026 11:30',
-  );
-  assert.equal(
-    grokBotPeriodCaption(aligned.periods[1], aligned.periods),
-    'Launch · Wed 21 Oct 2026 11:30',
-  );
+  assert.equal(grokBotPeriodTitle(0, [aligned.periods[0]]), 'Launch');
+  assert.equal(grokBotPeriodTitle(0, aligned.periods), 'Launch · 1');
+  assert.equal(grokBotPeriodTitle(1, aligned.periods), 'Launch · 2');
   assert.equal(aligned.periods[0].name, 'Launch');
   assert.equal(aligned.periods.some((period) => period.name === 'Hidden'), false);
 });

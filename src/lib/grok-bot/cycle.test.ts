@@ -20,7 +20,6 @@ import {
   grokBotCycleLinkLabels,
   grokBotDayTickIndexes,
   grokBotDraftHint,
-  grokBotProgressLabel,
   parseGrokBotWallInput,
   parseGrokDraftRange,
   projectGrokBotPeriods,
@@ -356,15 +355,6 @@ test('cycle link labels keep This cycle on offset 0', () => {
 test('focused bucket wall time shifts by the focus start', () => {
   assert.equal(focusedBucketWallMs(500, 100, 100), 500);
   assert.equal(focusedBucketWallMs(500, 100, 1_000), 1_400);
-});
-
-test('progress labels count hours on hourly buckets and minutes otherwise', () => {
-  const hourMs = 60 * 60 * 1000;
-  assert.equal(grokBotProgressLabel(0, hourMs), 'hour 1');
-  assert.equal(grokBotProgressLabel(4 * hourMs, hourMs), 'hour 5');
-  assert.equal(grokBotProgressLabel(0, 60_000), 'minute 1');
-  assert.equal(grokBotProgressLabel(15 * 60_000, 15 * 60_000), 'minute 16');
-  assert.equal(grokBotProgressLabel(0, 15 * 60_000), 'minute 1');
 });
 
 test('sqlite groups an event into the window bucket', async () => {

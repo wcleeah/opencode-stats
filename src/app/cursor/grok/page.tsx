@@ -15,8 +15,9 @@ import {
   type GrokBotHrefParams,
 } from '@/lib/grok-bot/href';
 import { grokBotPeriodNames } from '@/lib/grok-bot/period-name';
+import { grokBotPeriodTitle } from '@/lib/grok-bot/period-title';
 import type { GrokBotCharge } from '@/lib/grok-bot/rates';
-import { grokBotCompareStarts, grokBotPeriodCaption } from '@/lib/grok-bot/window';
+import { grokBotCompareStarts } from '@/lib/grok-bot/window';
 import { getCursorSettings } from '@/lib/queries/cursor';
 import { getGrokBotBoard, type GrokBotBoard } from '@/lib/queries/grok-bot';
 
@@ -76,6 +77,10 @@ function hrefFor(
   });
 }
 
+function focusHref(board: GrokBotBoard, startMs: number): string {
+  return hrefFor(board, { focusStartMs: startMs, page: undefined });
+}
+
 function GrokHeader() {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -122,8 +127,8 @@ function PeriodStrip({ board }: { board: GrokBotBoard }) {
 
   return (
     <>
-      {periods.map((period) => {
-        const caption = grokBotPeriodCaption(period, periods);
+      {periods.map((period, index) => {
+        const title = grokBotPeriodTitle(index, periods);
         const focused = period.startMs === board.focusStartMs;
         const removeHref = showChips && period.role === 'compare'
           ? hrefFor(board, {
@@ -137,21 +142,21 @@ function PeriodStrip({ board }: { board: GrokBotBoard }) {
           <span key={period.startMs} className="inline-flex items-center gap-1">
             {showChips ? (
               <span title={period.label} className={focused ? chipOn : chipOff}>
-                <PendingAnchor
-                  href={hrefFor(board, {
-                    focusStartMs: period.startMs,
-                    page: undefined,
-                  })}
-                  history="push"
-                  ariaCurrent={focused ? 'page' : undefined}
-                >
-                  {caption}
-                </PendingAnchor>
+                {focused ? (
+                  <span aria-current="page">{title}</span>
+                ) : (
+                  <PendingAnchor
+                    href={focusHref(board, period.startMs)}
+                    history="push"
+                  >
+                    {title}
+                  </PendingAnchor>
+                )}
                 {removeHref === undefined ? null : (
                   <PendingAnchor
                     href={removeHref}
                     history="push"
-                    ariaLabel={`Remove ${caption}`}
+                    ariaLabel={`Remove ${title}`}
                     className="text-muted hover:text-foreground"
                   >
                     ×
@@ -162,6 +167,7 @@ function PeriodStrip({ board }: { board: GrokBotBoard }) {
             <GrokBotPeriodNameField
               startMs={period.startMs}
               name={period.name}
+              title={title}
               hrefParams={hrefParams}
             />
           </span>
@@ -192,12 +198,14 @@ function CycleLinks({ board }: { board: GrokBotBoard }) {
           history="push"
           className={linkClass}
           ariaLabel="Previous cycle"
+          title={board.cycleLinkLabels.previous}
         >
           ←
         </PendingAnchor>
         <PendingAnchor
           href={thisHref}
           history="push"
+          title={board.cycleLinkLabels.current}
           className="border-x border-border px-2 py-1 text-[10px] uppercase tracking-wide text-muted hover:text-foreground transition-colors"
         >
           This cycle
@@ -207,18 +215,11 @@ function CycleLinks({ board }: { board: GrokBotBoard }) {
           history="push"
           className={linkClass}
           ariaLabel="Next cycle"
+          title={board.cycleLinkLabels.next}
         >
           →
         </PendingAnchor>
       </div>
-      <span className="text-xs text-muted">{board.cycle.label}</span>
-      {board.windowMode.kind === 'range' ? (
-        <span className="text-xs text-muted">
-          {eventTime(board.window.startMs)}
-          {' to '}
-          {eventTime(board.window.endMs)}
-        </span>
-      ) : null}
       <PeriodStrip board={board} />
     </div>
   );
@@ -304,6 +305,10 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
     mode: mode === 'by-type' ? 'ins-outs' : 'by-type',
     page: undefined,
   });
+  const focusTargets = board.charts.periods.map((period) => ({
+    startMs: period.startMs,
+    href: focusHref(board, period.startMs),
+  }));
   const chartProps = {
     charts: board.charts,
     windowStartMs: board.window.startMs,
@@ -312,6 +317,7 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
     usageParam: board.usageParam,
     bucketMs: board.window.bucketMs,
     focusStartMs: board.focusStartMs,
+    focusTargets,
     compareStarts: grokBotCompareStarts(board.charts.periods),
     cycleOffset: board.windowMode.kind === 'cycle' ? board.windowMode.offset : undefined,
   };
@@ -352,25 +358,33 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
             <div className="flex flex-wrap items-center gap-2">
               <div className="text-xs text-muted uppercase tracking-wider">Events</div>
               {board.charts.periods.length > 1
-                ? board.charts.periods.map((period) => {
-                    const caption = grokBotPeriodCaption(period, board.charts.periods);
+                ? board.charts.periods.map((period, index) => {
+                    const title = grokBotPeriodTitle(index, board.charts.periods);
                     const focused = period.startMs === board.focusStartMs;
+                    const className = focused
+                      ? 'rounded-md border border-foreground px-2 py-1 text-xs text-foreground'
+                      : 'rounded-md border border-border px-2 py-1 text-xs text-muted hover:text-foreground';
+                    if (focused) {
+                      return (
+                        <span
+                          key={period.startMs}
+                          title={period.label}
+                          aria-current="page"
+                          className={className}
+                        >
+                          {title}
+                        </span>
+                      );
+                    }
                     return (
                       <PendingAnchor
                         key={period.startMs}
-                        href={hrefFor(board, {
-                          focusStartMs: period.startMs,
-                          page: undefined,
-                        })}
+                        href={focusHref(board, period.startMs)}
                         history="push"
-                        ariaCurrent={focused ? 'page' : undefined}
-                        className={
-                          focused
-                            ? 'rounded-md border border-foreground px-2 py-1 text-xs text-foreground'
-                            : 'rounded-md border border-border px-2 py-1 text-xs text-muted hover:text-foreground'
-                        }
+                        title={period.label}
+                        className={className}
                       >
-                        {caption}
+                        {title}
                       </PendingAnchor>
                     );
                   })

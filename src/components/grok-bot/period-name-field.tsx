@@ -29,6 +29,7 @@ export function grokBotPeriodNameError(
 export function GrokBotPeriodNameField(props: {
   readonly startMs: number;
   readonly name: GrokBotPeriodName | undefined;
+  readonly title: string;
   readonly hrefParams: GrokBotHrefParams;
 }): JSX.Element {
   const [open, setOpen] = useState(false);
@@ -53,13 +54,14 @@ export function GrokBotPeriodNameField(props: {
       <button
         type="button"
         className="rounded-md border border-border px-2 py-1 text-xs text-muted hover:text-foreground"
+        aria-label={`Rename ${props.title}`}
         onClick={() => {
           setDraft(props.name ?? '');
           setSubmitted(null);
           setOpen(true);
         }}
       >
-        {props.name ?? 'Name'}
+        Rename
       </button>
     );
   }

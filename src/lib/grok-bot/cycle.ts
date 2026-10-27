@@ -382,13 +382,6 @@ export function projectGrokBotPeriods(input: {
   return [primary, ...compared];
 }
 
-export function grokBotProgressLabel(offsetMs: number, bucketMs: number): string {
-  if (bucketMs >= HOUR_MS) {
-    return `hour ${Math.floor(offsetMs / HOUR_MS) + 1}`;
-  }
-  return `minute ${Math.floor(offsetMs / MINUTE_MS) + 1}`;
-}
-
 export function focusedBucketWallMs(
   primaryBucketStartMs: number,
   primaryStartMs: number,

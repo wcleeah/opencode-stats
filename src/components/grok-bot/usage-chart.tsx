@@ -16,15 +16,14 @@ import {
 
 import { formatCost, formatTokens } from '@/lib/format';
 import {
+  focusedBucketWallMs,
   formatGrokBotWallTime,
   grokBotBucketTickLabel,
   grokBotDayTickIndexes,
-  grokBotProgressLabel,
   grokBotWallTimeFromUtcMs,
   grokBotWallTimeToUtcMs,
   type GrokBotWallTime,
 } from '@/lib/grok-bot/cycle';
-import { grokBotPeriodCaption } from '@/lib/grok-bot/caption';
 import {
   GROK_BOT_INS_LINE,
   GROK_BOT_OUTS_LINE,
@@ -33,8 +32,8 @@ import {
 import {
   grokBotPeriodNames,
   moveGrokBotPeriodName,
-  type GrokBotPeriodName,
 } from '@/lib/grok-bot/period-name';
+import { grokBotPeriodTitle } from '@/lib/grok-bot/period-title';
 import type { GrokBotAlignedCharts } from '@/lib/grok-bot/window';
 import { useChartColors } from '@/lib/use-chart-colors';
 
@@ -57,7 +56,13 @@ const CHART_HEIGHT = 448;
 
 interface ChartRow {
   label: string;
-  [seriesKey: string]: string | number;
+  when: readonly string[];
+  [seriesKey: string]: string | number | readonly string[];
+}
+
+export interface GrokFocusTarget {
+  readonly startMs: number;
+  readonly href: string;
 }
 
 interface DrawnLine {
@@ -78,6 +83,7 @@ type GrokBotSeriesChartProps = {
   readonly measure: 'tokens' | 'usd';
   readonly bucketMs: number;
   readonly focusStartMs: number;
+  readonly focusTargets: readonly GrokFocusTarget[];
   readonly compareStarts: readonly number[];
   readonly cycleOffset?: number;
 };
@@ -107,19 +113,12 @@ function parseWallInput(
 
 function seriesName(
   usageLabel: string,
-  period: {
-    readonly name?: GrokBotPeriodName;
-    readonly shortLabel: string;
-    readonly label: string;
-  },
-  periods: readonly {
-    readonly name?: GrokBotPeriodName;
-    readonly shortLabel: string;
-    readonly label: string;
-  }[],
+  index: number,
+  periods: GrokBotAlignedCharts['periods'],
 ): string {
-  if (periods.length === 1 && period.name === undefined) return usageLabel;
-  return `${usageLabel} · ${grokBotPeriodCaption(period, periods)}`;
+  const period = periods[index];
+  if (periods.length === 1 && period?.name === undefined) return usageLabel;
+  return `${usageLabel} · ${grokBotPeriodTitle(index, periods)}`;
 }
 
 function projection(
@@ -128,20 +127,28 @@ function projection(
   spanMs: number,
   timeZone: 'Asia/Hong_Kong',
   windowStartMs: number,
-  bucketMs: number,
+  focusStartMs: number,
 ): { rows: ChartRow[]; lines: DrawnLine[] } {
   const several = charts.periods.length > 1;
-  const labelFor = (bucketStartMs: number): string => {
-    if (!several) return grokBotBucketTickLabel(bucketStartMs, spanMs, timeZone);
-    return grokBotProgressLabel(bucketStartMs - windowStartMs, bucketMs);
+  const focusIndex = charts.periods.findIndex((period) => period.startMs === focusStartMs);
+  const rowBase = (bucketStartMs: number): ChartRow => {
+    const when = charts.periods.map((period) => grokBotBucketTickLabel(
+      focusedBucketWallMs(bucketStartMs, windowStartMs, period.startMs),
+      spanMs,
+      timeZone,
+    ));
+    return {
+      label: when[focusIndex] ?? when[0] ?? '',
+      when,
+    };
   };
   if (charts.mode === 'by-type') {
     const lines: DrawnLine[] = [];
     charts.lines.forEach((line, lineIndex) => {
-      charts.periods.forEach((period, periodIndex) => {
+      charts.periods.forEach((_period, periodIndex) => {
         lines.push({
           key: several ? `${lineIndex}:${periodIndex}` : line.id,
-          name: seriesName(line.label, period, charts.periods),
+          name: seriesName(line.label, periodIndex, charts.periods),
           colorIndex: lineIndex,
           periodIndex,
           lineIndex,
@@ -152,9 +159,7 @@ function projection(
     return {
       lines,
       rows: charts.points.map((point) => {
-        const row: ChartRow = {
-          label: labelFor(point.bucketStartMs),
-        };
+        const row = rowBase(point.bucketStartMs);
         for (const line of lines) {
           const cell = point.values[line.lineIndex]?.[line.periodIndex];
           row[line.key] = measure === 'tokens' ? (cell?.tokens ?? 0) : (cell?.usd ?? 0);
@@ -166,11 +171,11 @@ function projection(
 
   const lines: DrawnLine[] = [];
   (['ins', 'outs'] as const).forEach((side, sideIndex) => {
-    charts.periods.forEach((period, periodIndex) => {
+    charts.periods.forEach((_period, periodIndex) => {
       const label = side === 'ins' ? GROK_BOT_INS_LINE : GROK_BOT_OUTS_LINE;
       lines.push({
         key: several ? `${side}:${periodIndex}` : side,
-        name: seriesName(label, period, charts.periods),
+        name: seriesName(label, periodIndex, charts.periods),
         colorIndex: sideIndex,
         periodIndex,
         lineIndex: sideIndex,
@@ -181,9 +186,7 @@ function projection(
   return {
     lines,
     rows: charts.points.map((point) => {
-      const row: ChartRow = {
-        label: labelFor(point.bucketStartMs),
-      };
+      const row = rowBase(point.bucketStartMs);
       for (const line of lines) {
         const side = point.sides[line.periodIndex];
         if (!side) {
@@ -201,6 +204,13 @@ function projection(
   };
 }
 
+function tooltipHeading(label: string, when: readonly string[] | undefined): string {
+  if (when === undefined) return label;
+  const extras = when.filter((tick) => tick !== label);
+  if (extras.length === 0) return label;
+  return [label, ...extras].join(' · ');
+}
+
 function ChartTooltip({
   active,
   payload,
@@ -213,14 +223,16 @@ function ChartTooltip({
     value?: number | string;
     color?: string;
     dataKey?: string | number;
+    payload?: ChartRow;
   }>;
   label?: string;
   formatValue: (value: number, seriesKey: string) => string;
 }) {
   if (!active || !payload?.length) return null;
+  const heading = tooltipHeading(label ?? '', payload[0]?.payload?.when);
   return (
     <div className="rounded-sm border border-border bg-surface px-3 py-2 text-xs">
-      <div className="mb-1 text-muted">{label}</div>
+      <div className="mb-1 text-muted">{heading}</div>
       {payload.map((entry) => (
         <div key={String(entry.dataKey ?? entry.name)} className="flex items-center gap-2">
           <span
@@ -250,10 +262,12 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
     measure,
     bucketMs,
     focusStartMs,
+    focusTargets,
     compareStarts,
     cycleOffset,
   } = props;
   const router = useRouter();
+  const focusAnchors = useRef(new Map<number, HTMLAnchorElement>());
   const colors = useChartColors();
   const spanMs = windowEndMs - windowStartMs + 1;
   const selection = useRef<{ startIndex: number; endIndex: number } | null>(null);
@@ -276,13 +290,11 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
   }
 
   const palette = [colors.chart1, colors.chart2, colors.chart3, colors.chart4, colors.chart5];
-  const drawn = projection(charts, measure, spanMs, timeZone, windowStartMs, bucketMs);
+  const drawn = projection(charts, measure, spanMs, timeZone, windowStartMs, focusStartMs);
   const several = charts.periods.length > 1;
-  const axisTicks = several
-    ? undefined
-    : grokBotDayTickIndexes(drawn.rows.length, bucketMs, spanMs)
-      ?.map((index) => drawn.rows[index]?.label)
-      .filter((label): label is string => label !== undefined);
+  const axisTicks = grokBotDayTickIndexes(drawn.rows.length, bucketMs, spanMs)
+    ?.map((index) => drawn.rows[index]?.label)
+    .filter((label): label is string => label !== undefined);
 
   function navigationHref(next: { startMs?: number; endMs?: number; focusStartMs: number }): string {
     const ranged = next.startMs !== undefined && next.endMs !== undefined;
@@ -323,9 +335,9 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
     router.push(navigationHref({ startMs, endMs, focusStartMs }));
   }
 
-  function highlightPeriod(startMs: number): void {
+  function activateFocus(startMs: number): void {
     if (!several || startMs === focusStartMs) return;
-    router.push(navigationHref({ focusStartMs: startMs }));
+    focusAnchors.current.get(startMs)?.click();
   }
 
   function rangeForIndexes(
@@ -445,7 +457,7 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
                 const line = drawn.lines.find((item) => item.key === key);
                 if (!line) return;
                 const period = charts.periods[line.periodIndex];
-                if (period) highlightPeriod(period.startMs);
+                if (period) activateFocus(period.startMs);
               }}
             />
             {drawn.lines.map((line) => {
@@ -465,7 +477,7 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
                   isAnimationActive={false}
                   style={{ cursor: several ? 'pointer' : undefined }}
                   onClick={() => {
-                    if (period) highlightPeriod(period.startMs);
+                    if (period) activateFocus(period.startMs);
                   }}
                 />
               );
@@ -481,6 +493,11 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
           </LineChart>
         </ResponsiveContainer>
       </div>
+      {several ? (
+        <p className="text-[10px] text-muted">
+          {'The brush changes the first period\'s window. Compares keep their starts.'}
+        </p>
+      ) : null}
       <p className="text-[10px] text-muted">
         {formatGrokBotWallTime(grokBotWallTimeFromUtcMs(windowStartMs, timeZone))}
         {' to '}
@@ -489,21 +506,37 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
         Asia/Hong_Kong
       </p>
       {several
-        ? charts.periods.map((period) => (
-            <p key={period.startMs} className="text-[10px]">
-              {period.startMs === focusStartMs ? (
-                <span className="text-foreground">{period.label}</span>
-              ) : (
-                <PendingAnchor
-                  href={navigationHref({ focusStartMs: period.startMs })}
-                  history="push"
-                  className="text-muted hover:text-foreground"
-                >
-                  {period.label}
-                </PendingAnchor>
-              )}
-            </p>
-          ))
+        ? charts.periods.map((period, index) => {
+            const title = grokBotPeriodTitle(index, charts.periods);
+            const focused = period.startMs === focusStartMs;
+            const target = focusTargets.find((item) => item.startMs === period.startMs);
+            return (
+              <p key={period.startMs} className="text-[10px]">
+                {focused || target === undefined ? (
+                  <span
+                    title={period.label}
+                    aria-current={focused ? 'page' : undefined}
+                    className="text-foreground"
+                  >
+                    {title}
+                  </span>
+                ) : (
+                  <PendingAnchor
+                    href={target.href}
+                    history="push"
+                    title={period.label}
+                    className="text-muted hover:text-foreground"
+                    anchorRef={(node) => {
+                      if (node) focusAnchors.current.set(period.startMs, node);
+                      else focusAnchors.current.delete(period.startMs);
+                    }}
+                  >
+                    {title}
+                  </PendingAnchor>
+                )}
+              </p>
+            );
+          })
         : null}
     </div>
   );

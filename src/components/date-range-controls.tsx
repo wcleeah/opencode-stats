@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useMemo, useState } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 import { cn } from '@/lib/utils';
+
+import { PendingAnchor } from '@/components/pending-anchor';
 
 interface DateRangeControlsProps {
   from?: string;
@@ -14,7 +16,14 @@ interface DateRangeControlsProps {
 export function DateRangeControls({ from, to, className }: DateRangeControlsProps) {
   const [localFrom, setLocalFrom] = useState(from ?? '');
   const [localTo, setLocalTo] = useState(to ?? '');
-  const router = useRouter();
+  const [trackedFrom, setTrackedFrom] = useState(from);
+  const [trackedTo, setTrackedTo] = useState(to);
+  if (from !== trackedFrom || to !== trackedTo) {
+    setTrackedFrom(from);
+    setTrackedTo(to);
+    setLocalFrom(from ?? '');
+    setLocalTo(to ?? '');
+  }
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -61,11 +70,6 @@ export function DateRangeControls({ from, to, className }: DateRangeControlsProp
     return null;
   }, [from, to, presets]);
 
-  useEffect(() => {
-    setLocalFrom(from ?? '');
-    setLocalTo(to ?? '');
-  }, [from, to]);
-
   function buildUrl(nextFrom: string, nextTo: string): string {
     const params = new URLSearchParams(searchParams.toString());
     params.delete('page');
@@ -83,61 +87,49 @@ export function DateRangeControls({ from, to, className }: DateRangeControlsProp
     return query ? `${pathname}?${query}` : pathname;
   }
 
-  function applyRange() {
-    router.replace(buildUrl(localFrom, localTo));
-  }
-
-  function applyPreset(nextFrom: string, nextTo: string) {
-    setLocalFrom(nextFrom);
-    setLocalTo(nextTo);
-    router.replace(buildUrl(nextFrom, nextTo));
-  }
-
-  function clearRange() {
-    setLocalFrom('');
-    setLocalTo('');
-    router.replace(buildUrl('', ''));
-  }
+  const presetClass = (active: boolean): string => cn(
+    'rounded-md border border-border px-2 py-1 text-[10px] uppercase tracking-wide',
+    active
+      ? 'text-foreground border-foreground'
+      : 'text-muted hover:text-foreground transition-colors',
+  );
 
   return (
     <div className={cn('flex flex-wrap items-center gap-2', className)}>
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
-          onClick={() => applyPreset(presets.today.from, presets.today.to)}
-          className={cn(
-            'rounded-md border border-border px-2 py-1 text-[10px] uppercase tracking-wide',
-            activePreset === 'today'
-              ? 'text-foreground border-foreground'
-              : 'text-muted hover:text-foreground transition-colors',
-          )}
+        <PendingAnchor
+          href={buildUrl(presets.today.from, presets.today.to)}
+          history="replace"
+          className={presetClass(activePreset === 'today')}
+          onClick={() => {
+            setLocalFrom(presets.today.from);
+            setLocalTo(presets.today.to);
+          }}
         >
           Today
-        </button>
-        <button
-          type="button"
-          onClick={() => applyPreset(presets.sevenDays.from, presets.sevenDays.to)}
-          className={cn(
-            'rounded-md border border-border px-2 py-1 text-[10px] uppercase tracking-wide',
-            activePreset === 'sevenDays'
-              ? 'text-foreground border-foreground'
-              : 'text-muted hover:text-foreground transition-colors',
-          )}
+        </PendingAnchor>
+        <PendingAnchor
+          href={buildUrl(presets.sevenDays.from, presets.sevenDays.to)}
+          history="replace"
+          className={presetClass(activePreset === 'sevenDays')}
+          onClick={() => {
+            setLocalFrom(presets.sevenDays.from);
+            setLocalTo(presets.sevenDays.to);
+          }}
         >
           7 days
-        </button>
-        <button
-          type="button"
-          onClick={() => applyPreset(presets.month.from, presets.month.to)}
-          className={cn(
-            'rounded-md border border-border px-2 py-1 text-[10px] uppercase tracking-wide',
-            activePreset === 'month'
-              ? 'text-foreground border-foreground'
-              : 'text-muted hover:text-foreground transition-colors',
-          )}
+        </PendingAnchor>
+        <PendingAnchor
+          href={buildUrl(presets.month.from, presets.month.to)}
+          history="replace"
+          className={presetClass(activePreset === 'month')}
+          onClick={() => {
+            setLocalFrom(presets.month.from);
+            setLocalTo(presets.month.to);
+          }}
         >
           Current month
-        </button>
+        </PendingAnchor>
       </div>
       <div className="flex items-center gap-2 rounded-md border border-border bg-card px-2 py-1">
         <label className="text-[10px] uppercase tracking-wide text-muted">From</label>
@@ -157,9 +149,9 @@ export function DateRangeControls({ from, to, className }: DateRangeControlsProp
           className="bg-transparent text-xs text-foreground outline-none"
         />
       </div>
-      <button
-        type="button"
-        onClick={applyRange}
+      <PendingAnchor
+        href={buildUrl(localFrom, localTo)}
+        history="replace"
         disabled={!canApply}
         className={cn(
           'rounded-md border border-border px-3 py-1 text-xs uppercase tracking-wide',
@@ -169,10 +161,10 @@ export function DateRangeControls({ from, to, className }: DateRangeControlsProp
         )}
       >
         Apply
-      </button>
-      <button
-        type="button"
-        onClick={clearRange}
+      </PendingAnchor>
+      <PendingAnchor
+        href={buildUrl('', '')}
+        history="replace"
         disabled={!localFrom && !localTo}
         className={cn(
           'rounded-md border border-border px-3 py-1 text-xs uppercase tracking-wide',
@@ -180,9 +172,13 @@ export function DateRangeControls({ from, to, className }: DateRangeControlsProp
             ? 'text-muted hover:text-foreground transition-colors'
             : 'text-subtle cursor-not-allowed',
         )}
+        onClick={() => {
+          setLocalFrom('');
+          setLocalTo('');
+        }}
       >
         Clear
-      </button>
+      </PendingAnchor>
     </div>
   );
 }

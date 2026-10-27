@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, type JSX } from 'react';
-import { useRouter } from 'next/navigation';
 
 import { grokBotHref, type GrokBotHrefParams } from '@/lib/grok-bot/href';
 import {
@@ -9,6 +8,8 @@ import {
   setGrokBotPeriodName,
   type GrokBotPeriodName,
 } from '@/lib/grok-bot/period-name';
+
+import { PendingAnchor } from '@/components/pending-anchor';
 
 export function grokBotPeriodNameError(
   reason: 'too-long' | 'unsupported',
@@ -30,29 +31,21 @@ export function GrokBotPeriodNameField(props: {
   readonly name: GrokBotPeriodName | undefined;
   readonly hrefParams: GrokBotHrefParams;
 }): JSX.Element {
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState(props.name ?? '');
-  const [error, setError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState<string | null>(null);
+  const edited = setGrokBotPeriodName(props.hrefParams.periodNames, props.startMs, draft);
+  const unchanged = draft.trim() === (props.name ?? '');
+  if (submitted !== null && (props.name ?? '') === submitted) {
+    setOpen(false);
+    setDraft(props.name ?? '');
+    setSubmitted(null);
+  }
 
   function close(): void {
     setOpen(false);
     setDraft(props.name ?? '');
-    setError(null);
-  }
-
-  function confirm(): void {
-    if (draft.trim() === (props.name ?? '')) {
-      close();
-      return;
-    }
-    const edited = setGrokBotPeriodName(props.hrefParams.periodNames, props.startMs, draft);
-    if (!edited.ok) {
-      setError(grokBotPeriodNameError(edited.reason));
-      return;
-    }
-    router.push(grokBotHref({ ...props.hrefParams, periodNames: edited.names }));
-    close();
+    setSubmitted(null);
   }
 
   if (!open) {
@@ -62,7 +55,7 @@ export function GrokBotPeriodNameField(props: {
         className="rounded-md border border-border px-2 py-1 text-xs text-muted hover:text-foreground"
         onClick={() => {
           setDraft(props.name ?? '');
-          setError(null);
+          setSubmitted(null);
           setOpen(true);
         }}
       >
@@ -70,6 +63,8 @@ export function GrokBotPeriodNameField(props: {
       </button>
     );
   }
+
+  const saveClass = 'rounded-md border border-foreground px-2 py-1 text-xs text-foreground';
 
   return (
     <div className="flex flex-wrap items-end gap-2">
@@ -80,20 +75,29 @@ export function GrokBotPeriodNameField(props: {
           value={draft}
           maxLength={GROK_BOT_PERIOD_NAME_MAX}
           aria-label="Line name"
-          onChange={(event) => {
-            setDraft(event.target.value);
-            setError(null);
-          }}
+          onChange={(event) => setDraft(event.target.value)}
           className="rounded-md border border-border bg-background px-2 py-1.5 text-sm"
         />
       </label>
-      <button
-        type="button"
-        className="rounded-md border border-foreground px-2 py-1 text-xs text-foreground"
-        onClick={confirm}
-      >
-        Save
-      </button>
+      {edited.ok && !unchanged ? (
+        <PendingAnchor
+          href={grokBotHref({ ...props.hrefParams, periodNames: edited.names })}
+          history="push"
+          className={saveClass}
+          onClick={() => setSubmitted(draft.trim())}
+        >
+          Save
+        </PendingAnchor>
+      ) : (
+        <button
+          type="button"
+          className={edited.ok ? saveClass : `${saveClass} disabled:border-border disabled:text-muted`}
+          disabled={!edited.ok}
+          onClick={edited.ok ? close : undefined}
+        >
+          Save
+        </button>
+      )}
       <button
         type="button"
         className="rounded-md border border-border px-2 py-1 text-xs text-muted hover:text-foreground"
@@ -101,9 +105,9 @@ export function GrokBotPeriodNameField(props: {
       >
         Cancel
       </button>
-      {error !== null ? (
-        <p className="w-full text-xs text-error">{error}</p>
-      ) : null}
+      {edited.ok ? null : (
+        <p className="w-full text-xs text-error">{grokBotPeriodNameError(edited.reason)}</p>
+      )}
     </div>
   );
 }

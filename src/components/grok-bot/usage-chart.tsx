@@ -38,6 +38,8 @@ import {
 import type { GrokBotAlignedCharts } from '@/lib/grok-bot/window';
 import { useChartColors } from '@/lib/use-chart-colors';
 
+import { PendingAnchor } from '@/components/pending-anchor';
+
 const PERIOD_DASH: readonly (string | undefined)[] = [
   undefined,
   '6 4',
@@ -489,17 +491,17 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
       {several
         ? charts.periods.map((period) => (
             <p key={period.startMs} className="text-[10px]">
-              <button
-                type="button"
-                className={
-                  period.startMs === focusStartMs
-                    ? 'text-foreground'
-                    : 'text-muted hover:text-foreground'
-                }
-                onClick={() => highlightPeriod(period.startMs)}
-              >
-                {period.label}
-              </button>
+              {period.startMs === focusStartMs ? (
+                <span className="text-foreground">{period.label}</span>
+              ) : (
+                <PendingAnchor
+                  href={navigationHref({ focusStartMs: period.startMs })}
+                  history="push"
+                  className="text-muted hover:text-foreground"
+                >
+                  {period.label}
+                </PendingAnchor>
+              )}
             </p>
           ))
         : null}

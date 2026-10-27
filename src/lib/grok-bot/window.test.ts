@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 
 import type { GrokBotProjectedCompare, GrokBotProjectedPrimary } from './cycle';
 import { grokBotBucketMs } from './cycle';
-import { parseGrokBotCompareDeltas } from './href';
 import {
   grokBotOutsUsd,
   grokBotTokenTotal,
@@ -13,7 +12,8 @@ import {
 import {
   alignGrokBotPeriods,
   foldGrokBotWindow,
-  grokBotCompareDeltas,
+  grokBotCompareStarts,
+  grokBotPeriodCaption,
   type GrokBotCharts,
   type GrokBotFoldEvent,
   type GrokBotTypeLine,
@@ -277,10 +277,6 @@ function periodTotals(
 }
 
 test('alignment uses the primary bucket and zeros a missing compared point', () => {
-  const nearer = parseGrokBotCompareDeltas('-1')[0];
-  const later = parseGrokBotCompareDeltas('-8')[0];
-  assert.ok(nearer);
-  assert.ok(later);
   const lines: readonly GrokBotTypeLine[] = [
     { id: 'grok-bot-default', label: 'Default' },
     { id: 'grok-bot-cua', label: 'CUA' },
@@ -293,14 +289,12 @@ test('alignment uses the primary bucket and zeros a missing compared point', () 
   };
   const compareProjected: GrokBotProjectedCompare = {
     role: 'compare',
-    delta: nearer,
     window: { startMs: 10, endMs: 11, bucketMs: 1 },
     label: 'compare label',
     shortLabel: 'Wed 7 Oct 2026',
   };
   const olderProjected: GrokBotProjectedCompare = {
     role: 'compare',
-    delta: later,
     window: { startMs: 20, endMs: 21, bucketMs: 1 },
     label: 'older label',
     shortLabel: 'Wed 19 Aug 2026',
@@ -381,13 +375,14 @@ test('alignment uses the primary bucket and zeros a missing compared point', () 
   assert.equal(JSON.stringify(aligned).includes('999'), false);
   assert.deepEqual(aligned.periods[0].totals, primaryTotals);
   assert.deepEqual(aligned.periods[1].totals, compareTotals);
+  assert.equal(aligned.periods[0].startMs, 0);
+  assert.equal(aligned.periods[1].startMs, 10);
   assert.equal(aligned.periods[1].shortLabel, 'Wed 7 Oct 2026');
-  assert.deepEqual(grokBotCompareDeltas(aligned.periods), [nearer, later]);
+  assert.deepEqual(grokBotCompareStarts(aligned.periods), [10, 20]);
+  assert.equal(grokBotPeriodCaption(aligned.periods[1], aligned.periods), 'Wed 7 Oct 2026');
 });
 
 test('alignment copies outs dollars from the fold', () => {
-  const delta = parseGrokBotCompareDeltas('-1')[0];
-  assert.ok(delta);
   const primaryTotals = periodTotals(
     { ins: 1, outs: 2 },
     { totalUsd: 5.25, insUsd: 1, unpricedCacheWriteTokens: 0, includesCardEstimate: false },
@@ -432,7 +427,6 @@ test('alignment copies outs dollars from the fold', () => {
       {
         projected: {
           role: 'compare',
-          delta,
           window: { startMs: 0, endMs: 1, bucketMs: 1 },
           label: 'compare label',
           shortLabel: 'Wed 7 Oct 2026',
@@ -472,8 +466,6 @@ test('alignment copies outs dollars from the fold', () => {
 });
 
 test('an empty primary fold keeps period totals and draws no points', () => {
-  const delta = parseGrokBotCompareDeltas('-1')[0];
-  assert.ok(delta);
   const primaryTotals = periodTotals(
     { ins: 0, outs: 0 },
     { totalUsd: 0, insUsd: 0, unpricedCacheWriteTokens: 0, includesCardEstimate: false },
@@ -500,7 +492,6 @@ test('an empty primary fold keeps period totals and draws no points', () => {
       {
         projected: {
           role: 'compare',
-          delta,
           window: { startMs: 0, endMs: 1, bucketMs: 1 },
           label: 'compare label',
           shortLabel: 'Wed 7 Oct 2026',

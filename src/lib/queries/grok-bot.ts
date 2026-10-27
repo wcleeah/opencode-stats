@@ -10,7 +10,11 @@ import {
   resolveGrokBotWindow,
   type GrokBotWindowMode,
 } from '@/lib/grok-bot/cycle';
-import { parseGrokBotChartMode, parseGrokBotCompareDeltas } from '@/lib/grok-bot/href';
+import {
+  parseGrokBotChartMode,
+  parseGrokBotCompareStarts,
+  parseGrokBotFocusStart,
+} from '@/lib/grok-bot/href';
 import { grokBotModelSql, isGrokBotModel, normalizeGrokBotModelId } from '@/lib/grok-bot/membership';
 import {
   grokBotUsageCatalog,
@@ -39,6 +43,7 @@ export interface GrokBotBoardQuery {
   page?: string;
   view?: string;
   cmp?: string;
+  focus?: string;
   now?: Date;
 }
 
@@ -70,6 +75,7 @@ export interface GrokBotBoard {
   selectedUsageTypeIds: readonly string[];
   usageParam: string | undefined;
   charts: GrokBotAlignedCharts;
+  focusStartMs: number;
   rows: readonly GrokBotTableRow[];
   page: number;
   pageSize: number;
@@ -193,12 +199,16 @@ export async function getGrokBotBoard(
     start: query.start,
     end: query.end,
   });
+  const compareStarts = parseGrokBotCompareStarts(query.cmp, primary.window.startMs);
   const projected = projectGrokBotPeriods({
     clock,
-    now,
     primary,
-    compareDeltas: parseGrokBotCompareDeltas(query.cmp),
+    compareStarts,
   });
+  const focusStartMs = parseGrokBotFocusStart(
+    query.focus,
+    projected.map((period) => period.window.startMs),
+  );
   const membership = grokBotModelSql('model');
   const cycleArgs = [primary.cycle.startMs, primary.cycle.endMs];
 
@@ -259,13 +269,17 @@ export async function getGrokBotBoard(
       ),
     };
   });
-  const primaryFilter = scans[0].filter;
+  const focusIndex = Math.max(
+    0,
+    projected.findIndex((period) => period.window.startMs === focusStartMs),
+  );
+  const tableFilter = scans[focusIndex].filter;
 
   const [scanResults, countResult] = await Promise.all([
     Promise.all(scans.map((scan) => scan.query)),
     queryOne<{ total: number | bigint }>(
-      `SELECT COUNT(*) AS total FROM cursor_usage_events WHERE ${primaryFilter.clause}`,
-      primaryFilter.args,
+      `SELECT COUNT(*) AS total FROM cursor_usage_events WHERE ${tableFilter.clause}`,
+      tableFilter.args,
     ),
   ]);
   for (const scanResult of scanResults) {
@@ -295,10 +309,10 @@ export async function getGrokBotBoard(
          tokens_output,
          tokens_total
        FROM cursor_usage_events
-       WHERE ${primaryFilter.clause}
+       WHERE ${tableFilter.clause}
        ORDER BY event_at DESC, id DESC
        LIMIT ? OFFSET ?`,
-      [...primaryFilter.args, GROK_BOT_PAGE_SIZE, (page - 1) * GROK_BOT_PAGE_SIZE],
+      [...tableFilter.args, GROK_BOT_PAGE_SIZE, (page - 1) * GROK_BOT_PAGE_SIZE],
     );
     if (rowResult.error || !rowResult.data) {
       return { data: null, error: rowResult.error ?? 'Failed to load Grokbot rows.' };
@@ -352,6 +366,7 @@ export async function getGrokBotBoard(
       selectedUsageTypeIds: selection.ids,
       usageParam: selection.param,
       charts,
+      focusStartMs,
       rows,
       page,
       pageSize: GROK_BOT_PAGE_SIZE,

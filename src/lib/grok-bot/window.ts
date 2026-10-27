@@ -2,7 +2,7 @@ import type {
   GrokBotProjectedCompare,
   GrokBotProjectedPrimary,
 } from '@/lib/grok-bot/cycle';
-import type { GrokBotChartMode, GrokBotNegativeCycleDelta } from '@/lib/grok-bot/href';
+import type { GrokBotChartMode } from '@/lib/grok-bot/href';
 import {
   grokBotOutsUsd,
   grokBotTokenTotal,
@@ -235,6 +235,7 @@ export function foldGrokBotWindow(input: {
 
 export interface GrokBotPrimaryPeriod {
   readonly role: 'primary';
+  readonly startMs: number;
   readonly label: string;
   readonly shortLabel: string;
   readonly totals: GrokBotWindowTotals;
@@ -242,7 +243,7 @@ export interface GrokBotPrimaryPeriod {
 
 export interface GrokBotComparePeriod {
   readonly role: 'compare';
-  readonly delta: GrokBotNegativeCycleDelta;
+  readonly startMs: number;
   readonly label: string;
   readonly shortLabel: string;
   readonly totals: GrokBotWindowTotals;
@@ -255,14 +256,24 @@ export type GrokBotPeriodList = readonly [
   ...GrokBotComparePeriod[],
 ];
 
-export function grokBotCompareDeltas(
+export function grokBotCompareStarts(
   periods: GrokBotPeriodList,
-): readonly GrokBotNegativeCycleDelta[] {
-  const deltas: GrokBotNegativeCycleDelta[] = [];
+): readonly number[] {
+  const starts: number[] = [];
   for (const period of periods) {
-    if (period.role === 'compare') deltas.push(period.delta);
+    if (period.role === 'compare') starts.push(period.startMs);
   }
-  return deltas;
+  return starts;
+}
+
+export function grokBotPeriodCaption(
+  period: { readonly shortLabel: string; readonly label: string },
+  periods: readonly { readonly shortLabel: string }[],
+): string {
+  const shared = periods.filter((item) => item.shortLabel === period.shortLabel).length > 1;
+  if (!shared) return period.shortLabel;
+  const splitAt = period.label.indexOf(' to ');
+  return splitAt === -1 ? period.label : period.label.slice(0, splitAt);
 }
 
 export interface GrokBotMeasureCell {
@@ -324,6 +335,7 @@ function toPeriod(fold: AlignedFold): GrokBotPeriod {
   if (projected.role === 'primary') {
     return {
       role: 'primary',
+      startMs: projected.window.startMs,
       label: projected.label,
       shortLabel: projected.shortLabel,
       totals: fold.folded.totals,
@@ -331,7 +343,7 @@ function toPeriod(fold: AlignedFold): GrokBotPeriod {
   }
   return {
     role: 'compare',
-    delta: projected.delta,
+    startMs: projected.window.startMs,
     label: projected.label,
     shortLabel: projected.shortLabel,
     totals: fold.folded.totals,

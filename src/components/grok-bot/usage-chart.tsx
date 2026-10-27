@@ -17,31 +17,32 @@ import {
 import { formatCost, formatTokens } from '@/lib/format';
 import {
   formatGrokBotWallTime,
+  grokBotProgressLabel,
   grokBotWallTimeFromUtcMs,
   grokBotWallTimeToUtcMs,
   type GrokBotWallTime,
 } from '@/lib/grok-bot/cycle';
 import {
   GROK_BOT_INS_LINE,
-  GROK_BOT_MAX_COMPARE,
   GROK_BOT_OUTS_LINE,
   grokBotHref,
 } from '@/lib/grok-bot/href';
 import {
-  grokBotCompareDeltas,
+  grokBotPeriodCaption,
   type GrokBotAlignedCharts,
 } from '@/lib/grok-bot/window';
 import { useChartColors } from '@/lib/use-chart-colors';
 
-const PERIOD_DASH: readonly [undefined, string, string, string] = [
+const PERIOD_DASH: readonly (string | undefined)[] = [
   undefined,
   '6 4',
   '2 3',
   '8 3 2 3',
 ];
 
-if (PERIOD_DASH.length !== GROK_BOT_MAX_COMPARE + 1) {
-  throw new Error('PERIOD_DASH must cover the primary and every compare slot');
+function periodDash(periodIndex: number, several: boolean): string | undefined {
+  if (!several) return undefined;
+  return PERIOD_DASH[periodIndex % PERIOD_DASH.length];
 }
 
 const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
@@ -70,6 +71,10 @@ type GrokBotSeriesChartProps = {
   readonly timeZone: 'Asia/Hong_Kong';
   readonly usageParam: string | undefined;
   readonly measure: 'tokens' | 'usd';
+  readonly bucketMs: number;
+  readonly focusStartMs: number;
+  readonly compareStarts: readonly number[];
+  readonly cycleOffset?: number;
 };
 
 function pad2(value: number): string {
@@ -110,15 +115,23 @@ function projection(
   measure: 'tokens' | 'usd',
   spanMs: number,
   timeZone: 'Asia/Hong_Kong',
+  windowStartMs: number,
+  bucketMs: number,
 ): { rows: ChartRow[]; lines: DrawnLine[] } {
   const several = charts.periods.length > 1;
+  const labelFor = (bucketStartMs: number): string => {
+    if (!several) return tickLabel(bucketStartMs, spanMs, timeZone);
+    return grokBotProgressLabel(bucketStartMs - windowStartMs, bucketMs);
+  };
   if (charts.mode === 'by-type') {
     const lines: DrawnLine[] = [];
     charts.lines.forEach((line, lineIndex) => {
       charts.periods.forEach((period, periodIndex) => {
         lines.push({
           key: several ? `${lineIndex}:${periodIndex}` : line.id,
-          name: several ? `${line.label} · ${period.shortLabel}` : line.label,
+          name: several
+            ? `${line.label} · ${grokBotPeriodCaption(period, charts.periods)}`
+            : line.label,
           colorIndex: lineIndex,
           periodIndex,
           lineIndex,
@@ -130,7 +143,7 @@ function projection(
       lines,
       rows: charts.points.map((point) => {
         const row: ChartRow = {
-          label: tickLabel(point.bucketStartMs, spanMs, timeZone),
+          label: labelFor(point.bucketStartMs),
         };
         for (const line of lines) {
           const cell = point.values[line.lineIndex]?.[line.periodIndex];
@@ -147,7 +160,9 @@ function projection(
       const label = side === 'ins' ? GROK_BOT_INS_LINE : GROK_BOT_OUTS_LINE;
       lines.push({
         key: several ? `${side}:${periodIndex}` : side,
-        name: several ? `${label} · ${period.shortLabel}` : label,
+        name: several
+          ? `${label} · ${grokBotPeriodCaption(period, charts.periods)}`
+          : label,
         colorIndex: sideIndex,
         periodIndex,
         lineIndex: sideIndex,
@@ -159,7 +174,7 @@ function projection(
     lines,
     rows: charts.points.map((point) => {
       const row: ChartRow = {
-        label: tickLabel(point.bucketStartMs, spanMs, timeZone),
+        label: labelFor(point.bucketStartMs),
       };
       for (const line of lines) {
         const side = point.sides[line.periodIndex];
@@ -225,6 +240,10 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
     timeZone,
     usageParam,
     measure,
+    bucketMs,
+    focusStartMs,
+    compareStarts,
+    cycleOffset,
   } = props;
   const router = useRouter();
   const colors = useChartColors();
@@ -249,7 +268,26 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
   }
 
   const palette = [colors.chart1, colors.chart2, colors.chart3, colors.chart4, colors.chart5];
-  const drawn = projection(charts, measure, spanMs, timeZone);
+  const drawn = projection(charts, measure, spanMs, timeZone, windowStartMs, bucketMs);
+  const several = charts.periods.length > 1;
+
+  function navigationHref(next: { startMs?: number; endMs?: number; focusStartMs: number }): string {
+    const ranged = next.startMs !== undefined && next.endMs !== undefined;
+    const windowPart = ranged
+      ? { startMs: next.startMs, endMs: next.endMs }
+      : cycleOffset !== undefined
+        ? { cycle: cycleOffset }
+        : { startMs: windowStartMs, endMs: windowEndMs };
+    const primaryStart = ranged ? next.startMs : windowStartMs;
+    return grokBotHref({
+      ...windowPart,
+      usage: usageParam,
+      mode: charts.mode,
+      compareStarts,
+      focusStartMs: next.focusStartMs,
+      primaryStartMs: primaryStart,
+    });
+  }
   const formatTooltip = (value: number, seriesKey: string): string => {
     if (measure !== 'usd') return formatTokens(value);
     const periodIndex = drawn.lines.find((line) => line.key === seriesKey)?.periodIndex ?? 0;
@@ -257,19 +295,18 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
     return formatCost(value, period.totals.spend.includesCardEstimate);
   };
   const points = charts.points;
-  const bucketMs = points.length > 1
+  const pointGapMs = points.length > 1
     ? points[1].bucketStartMs - points[0].bucketStartMs
     : spanMs;
 
   function openRange(startMs: number, endMs: number): void {
     if (startMs === windowStartMs && endMs === windowEndMs) return;
-    router.push(grokBotHref({
-      startMs,
-      endMs,
-      usage: usageParam,
-      mode: charts.mode,
-      compareDeltas: grokBotCompareDeltas(charts.periods),
-    }));
+    router.push(navigationHref({ startMs, endMs, focusStartMs }));
+  }
+
+  function highlightPeriod(startMs: number): void {
+    if (!several || startMs === focusStartMs) return;
+    router.push(navigationHref({ focusStartMs: startMs }));
   }
 
   function rangeForIndexes(
@@ -281,7 +318,7 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
     const end = Math.max(start, Math.min(endIndex, last));
     if (start === 0 && end === last) return null;
     const startMs = points[start].bucketStartMs;
-    const endMs = Math.min(windowEndMs, points[end].bucketStartMs + bucketMs - 1);
+    const endMs = Math.min(windowEndMs, points[end].bucketStartMs + pointGapMs - 1);
     if (startMs === windowStartMs && endMs === windowEndMs) return null;
     return { startMs, endMs };
   }
@@ -376,21 +413,37 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
             <Tooltip content={<ChartTooltip formatValue={formatTooltip} />} />
             <Legend
               itemSorter={null}
-              wrapperStyle={{ fontSize: '11px', color: colors.legend }}
+              wrapperStyle={{ fontSize: '11px', color: colors.legend, cursor: several ? 'pointer' : undefined }}
+              onClick={(entry) => {
+                const key = String(entry.dataKey ?? '');
+                const line = drawn.lines.find((item) => item.key === key);
+                if (!line) return;
+                const period = charts.periods[line.periodIndex];
+                if (period) highlightPeriod(period.startMs);
+              }}
             />
-            {drawn.lines.map((line) => (
-              <Line
-                key={line.key}
-                type="monotone"
-                dataKey={line.key}
-                name={line.name}
-                stroke={palette[line.colorIndex % palette.length]}
-                strokeWidth={line.periodIndex === 0 ? 1.75 : 1.25}
-                strokeDasharray={PERIOD_DASH[line.periodIndex]}
-                dot={false}
-                isAnimationActive={false}
-              />
-            ))}
+            {drawn.lines.map((line) => {
+              const period = charts.periods[line.periodIndex];
+              const focused = !several || period?.startMs === focusStartMs;
+              return (
+                <Line
+                  key={line.key}
+                  type="monotone"
+                  dataKey={line.key}
+                  name={line.name}
+                  stroke={palette[line.colorIndex % palette.length]}
+                  strokeWidth={several ? (focused ? 2.25 : 1.25) : 1.75}
+                  strokeOpacity={focused ? 1 : 0.35}
+                  strokeDasharray={periodDash(line.periodIndex, several)}
+                  dot={false}
+                  isAnimationActive={false}
+                  style={{ cursor: several ? 'pointer' : undefined }}
+                  onClick={() => {
+                    if (period) highlightPeriod(period.startMs);
+                  }}
+                />
+              );
+            })}
             <Brush
               dataKey="label"
               height={28}
@@ -409,15 +462,21 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
         {' · '}
         Asia/Hong_Kong
       </p>
-      {charts.periods.length > 1
-        ? charts.periods.slice(1).map((period) => (
-            period.role === 'compare'
-              ? (
-                  <p key={period.delta} className="text-[10px] text-muted">
-                    {period.label}
-                  </p>
-                )
-              : null
+      {several
+        ? charts.periods.map((period) => (
+            <p key={period.startMs} className="text-[10px]">
+              <button
+                type="button"
+                className={
+                  period.startMs === focusStartMs
+                    ? 'text-foreground'
+                    : 'text-muted hover:text-foreground'
+                }
+                onClick={() => highlightPeriod(period.startMs)}
+              >
+                {period.label}
+              </button>
+            </p>
           ))
         : null}
     </div>

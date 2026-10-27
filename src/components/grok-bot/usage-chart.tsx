@@ -393,11 +393,17 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
             <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
             <XAxis
               dataKey="label"
-              ticks={axisTicks}
               tick={{ fontSize: 10, fill: colors.axis }}
               tickLine={false}
               axisLine={{ stroke: colors.grid }}
               minTickGap={24}
+              {...(axisTicks
+                ? {
+                    ticks: axisTicks,
+                    interval: 'preserveStartEnd' as const,
+                    padding: { left: 36, right: 44 },
+                  }
+                : {})}
             />
             <YAxis
               tickFormatter={formatAxis}

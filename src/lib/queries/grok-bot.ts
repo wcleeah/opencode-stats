@@ -5,7 +5,8 @@ import { ensureCursorSchema } from '@/lib/cursor/schema';
 import {
   GROK_BOT_CYCLE_TIME_ZONE,
   grokBotBucketStartSql,
-  grokBotCycleLinkLabels,
+  grokBotNeighborCycleLabels,
+  grokBotPresentCycleLabel,
   parseGrokBotCycleClock,
   projectGrokBotPeriods,
   resolveGrokBotWindow,
@@ -371,7 +372,10 @@ export async function getGrokBotBoard(
         endMs: primary.cycle.endMs,
         label: primary.cycle.label,
       },
-      cycleLinkLabels: grokBotCycleLinkLabels(clock, now, primary.cycle.offset),
+      cycleLinkLabels: {
+        ...grokBotNeighborCycleLabels(clock, now, primary.cycle.offset),
+        current: grokBotPresentCycleLabel(clock, now),
+      },
       windowMode: primary.mode,
       window: primary.window,
       timeZone: GROK_BOT_CYCLE_TIME_ZONE,

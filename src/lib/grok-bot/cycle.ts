@@ -204,7 +204,6 @@ function pad2(value: number): string {
   return String(value).padStart(2, '0');
 }
 
-/** `YYYY-MM-DDTHH:mm` in Asia/Hong_Kong. */
 export function formatGrokBotWallInput(utcMs: number): string {
   const wall = grokBotWallTimeFromUtcMs(utcMs, GROK_BOT_CYCLE_TIME_ZONE);
   return `${wall.year}-${pad2(wall.month)}-${pad2(wall.day)}T${pad2(wall.hour)}:${pad2(wall.minute)}`;
@@ -305,15 +304,20 @@ export function grokBotCycleBounds(
   };
 }
 
-export function grokBotCycleLinkLabels(
+export function grokBotPresentCycleLabel(
+  clock: GrokBotCycleClock,
+  now: Date,
+): string {
+  return grokBotCycleBounds(clock, now, 0).label;
+}
+
+export function grokBotNeighborCycleLabels(
   clock: GrokBotCycleClock,
   now: Date,
   viewedOffset: number,
-): { readonly previous: string; readonly current: string; readonly next: string } {
+): { readonly previous: string; readonly next: string } {
   return {
     previous: grokBotCycleBounds(clock, now, viewedOffset - 1).label,
-    // This cycle always opens offset 0, including on a custom range.
-    current: grokBotCycleBounds(clock, now, 0).label,
     next: grokBotCycleBounds(clock, now, viewedOffset + 1).label,
   };
 }
@@ -500,6 +504,10 @@ export function resolveGrokBotWindow(input: {
   };
 }
 
+function inclusiveMinuteEndMs(minuteStartMs: number): number {
+  return minuteStartMs + MINUTE_MS - 1;
+}
+
 export function clipGrokBotWindow(
   startMs: number,
   endMs: number,
@@ -540,8 +548,9 @@ export function parseGrokDraftRange(
   const endWall = parseGrokBotWallInput(endValue);
   if (startWall === null || endWall === null) return { ok: false, reason: 'invalid' };
   let startMs = grokBotWallTimeToUtcMs(startWall, GROK_BOT_CYCLE_TIME_ZONE);
-  // The typed end minute includes its last millisecond.
-  let endMs = grokBotWallTimeToUtcMs(endWall, GROK_BOT_CYCLE_TIME_ZONE) + MINUTE_MS - 1;
+  let endMs = inclusiveMinuteEndMs(
+    grokBotWallTimeToUtcMs(endWall, GROK_BOT_CYCLE_TIME_ZONE),
+  );
   const reasons: GrokDraftClipReason[] = [];
   if (endMs < startMs) {
     reasons.push('swapped');

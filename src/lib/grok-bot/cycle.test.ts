@@ -17,7 +17,8 @@ import {
   focusedBucketWallMs,
   formatGrokBotWallInput,
   grokBotBucketTickLabel,
-  grokBotCycleLinkLabels,
+  grokBotNeighborCycleLabels,
+  grokBotPresentCycleLabel,
   grokBotDayTickIndexes,
   grokBotDraftHint,
   parseGrokBotWallInput,
@@ -337,19 +338,20 @@ test('wall input is a Hong Kong minute and the draft end includes that minute', 
   assert.equal(grokBotDraftHint({ ok: false, reason: 'invalid' }), null);
 });
 
-test('cycle link labels keep This cycle on offset 0', () => {
+test('the present cycle label stays on offset 0', () => {
   const now = new Date(DEFAULT_START);
-  const labels = grokBotCycleLinkLabels(DEFAULT_GROK_BOT_CYCLE, now, -3);
-  assert.equal(labels.current, 'Wed 14 Oct 2026 11:30 to Wed 21 Oct 2026 11:29');
+  const neighbors = grokBotNeighborCycleLabels(DEFAULT_GROK_BOT_CYCLE, now, -3);
+  const current = grokBotPresentCycleLabel(DEFAULT_GROK_BOT_CYCLE, now);
+  assert.equal(current, 'Wed 14 Oct 2026 11:30 to Wed 21 Oct 2026 11:29');
   assert.equal(
-    labels.previous,
+    neighbors.previous,
     grokBotCycleBounds(DEFAULT_GROK_BOT_CYCLE, now, -4).label,
   );
   assert.equal(
-    labels.next,
+    neighbors.next,
     grokBotCycleBounds(DEFAULT_GROK_BOT_CYCLE, now, -2).label,
   );
-  assert.notEqual(labels.current, grokBotCycleBounds(DEFAULT_GROK_BOT_CYCLE, now, -3).label);
+  assert.notEqual(current, grokBotCycleBounds(DEFAULT_GROK_BOT_CYCLE, now, -3).label);
 });
 
 test('focused bucket wall time shifts by the focus start', () => {

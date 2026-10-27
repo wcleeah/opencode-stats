@@ -1,10 +1,23 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 
-import type { McpLink } from '@/types/mcp';
+import {
+  MCP_LINK_FLIGHT_HOLD_MS,
+  mcpLinkFlightBusy,
+  mcpLinkFlightFail,
+  mcpLinkFlightMatches,
+  mcpLinkFlightOnPending,
+  mcpLinkFlightRefresh,
+  mcpLinkFlightStart,
+  mcpLinkFlightTimeout,
+  type McpLinkFlight,
+  type McpLinkFlightPhase,
+} from '@/lib/mcp/link-flight';
 import { cn } from '@/lib/utils';
+
+import type { McpLink } from '@/types/mcp';
 
 interface McpLinksProps {
   links: McpLink[];
@@ -27,7 +40,9 @@ export function McpLinks({ links }: McpLinksProps) {
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<number | 'new' | null>(null);
+  const [phase, setPhase] = useState<McpLinkFlightPhase>({ status: 'idle' });
+  const shown = mcpLinkFlightOnPending(phase, pending);
+  if (shown !== phase) setPhase(shown);
   const [drafts, setDrafts] = useState<Record<number, { name: string; url: string }>>(
     {},
   );
@@ -38,15 +53,37 @@ export function McpLinks({ links }: McpLinksProps) {
     return drafts[link.id] ?? { name: link.name, url: link.url };
   }
 
+  useEffect(() => {
+    if (shown.status !== 'refresh') return;
+    const timer = window.setTimeout(() => {
+      setPhase((current) => mcpLinkFlightTimeout(current));
+    }, MCP_LINK_FLIGHT_HOLD_MS);
+    return () => window.clearTimeout(timer);
+  }, [shown]);
+
   function refresh(): void {
     startTransition(() => {
       router.refresh();
     });
   }
 
-  async function createLink(): Promise<void> {
+  function begin(flight: McpLinkFlight): void {
     setError(null);
-    setBusyId('new');
+    setPhase(mcpLinkFlightStart(flight));
+  }
+
+  function fail(current: McpLinkFlightPhase): void {
+    setPhase(mcpLinkFlightFail(current));
+  }
+
+  function succeed(flight: McpLinkFlight): void {
+    setPhase(mcpLinkFlightRefresh(mcpLinkFlightStart(flight)));
+    refresh();
+  }
+
+  async function createLink(): Promise<void> {
+    const flight: McpLinkFlight = { kind: 'add' };
+    begin(flight);
     try {
       const response = await fetch('/api/mcp/links', {
         method: 'POST',
@@ -56,22 +93,22 @@ export function McpLinks({ links }: McpLinksProps) {
       const payload: unknown = await response.json();
       if (!response.ok) {
         setError(readError(payload, 'Failed to add link'));
+        fail(mcpLinkFlightStart(flight));
         return;
       }
       setNewName('');
       setNewUrl('');
-      refresh();
+      succeed(flight);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Network error');
-    } finally {
-      setBusyId(null);
+      fail(mcpLinkFlightStart(flight));
     }
   }
 
   async function saveLink(link: McpLink): Promise<void> {
     const draft = draftFor(link);
-    setError(null);
-    setBusyId(link.id);
+    const flight: McpLinkFlight = { kind: 'save', id: link.id };
+    begin(flight);
     try {
       const response = await fetch(`/api/mcp/links/${link.id}`, {
         method: 'PUT',
@@ -85,6 +122,7 @@ export function McpLinks({ links }: McpLinksProps) {
       const payload: unknown = await response.json();
       if (!response.ok) {
         setError(readError(payload, 'Failed to save link'));
+        fail(mcpLinkFlightStart(flight));
         return;
       }
       setDrafts((current) => {
@@ -92,18 +130,17 @@ export function McpLinks({ links }: McpLinksProps) {
         delete next[link.id];
         return next;
       });
-      refresh();
+      succeed(flight);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Network error');
-    } finally {
-      setBusyId(null);
+      fail(mcpLinkFlightStart(flight));
     }
   }
 
   async function removeLink(link: McpLink): Promise<void> {
     if (!window.confirm(`Remove “${link.name}”?`)) return;
-    setError(null);
-    setBusyId(link.id);
+    const flight: McpLinkFlight = { kind: 'delete', id: link.id };
+    begin(flight);
     try {
       const response = await fetch(`/api/mcp/links/${link.id}`, {
         method: 'DELETE',
@@ -111,13 +148,13 @@ export function McpLinks({ links }: McpLinksProps) {
       const payload: unknown = await response.json();
       if (!response.ok) {
         setError(readError(payload, 'Failed to delete link'));
+        fail(mcpLinkFlightStart(flight));
         return;
       }
-      refresh();
+      succeed(flight);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Network error');
-    } finally {
-      setBusyId(null);
+      fail(mcpLinkFlightStart(flight));
     }
   }
 
@@ -126,8 +163,11 @@ export function McpLinks({ links }: McpLinksProps) {
     const swapWith = links[index + direction];
     if (!swapWith) return;
 
-    setError(null);
-    setBusyId(link.id);
+    const flight: McpLinkFlight = {
+      kind: direction < 0 ? 'up' : 'down',
+      id: link.id,
+    };
+    begin(flight);
     try {
       const first = await fetch(`/api/mcp/links/${link.id}`, {
         method: 'PUT',
@@ -140,6 +180,7 @@ export function McpLinks({ links }: McpLinksProps) {
       });
       if (!first.ok) {
         setError(readError(await first.json(), 'Failed to reorder link'));
+        fail(mcpLinkFlightStart(flight));
         return;
       }
       const second = await fetch(`/api/mcp/links/${swapWith.id}`, {
@@ -153,17 +194,21 @@ export function McpLinks({ links }: McpLinksProps) {
       });
       if (!second.ok) {
         setError(readError(await second.json(), 'Failed to reorder link'));
+        fail(mcpLinkFlightStart(flight));
         return;
       }
-      refresh();
+      succeed(flight);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Network error');
-    } finally {
-      setBusyId(null);
+      fail(mcpLinkFlightStart(flight));
     }
   }
 
-  const busy = pending || busyId !== null;
+  const busy = mcpLinkFlightBusy(shown, pending);
+
+  function actionLabel(idle: string, working: string, flight: McpLinkFlight): string {
+    return mcpLinkFlightMatches(shown, flight) ? working : idle;
+  }
 
   return (
     <div className="space-y-3">
@@ -171,11 +216,12 @@ export function McpLinks({ links }: McpLinksProps) {
         <div className="text-xs uppercase tracking-wider text-muted">Quick links</div>
         <button
           type="button"
+          disabled={busy}
           onClick={() => {
             setEditing((value) => !value);
             setError(null);
           }}
-          className="rounded-md border border-border px-2 py-1 text-[10px] uppercase tracking-wide text-foreground hover:bg-surface-alt"
+          className="rounded-md border border-border px-2 py-1 text-[10px] uppercase tracking-wide text-foreground hover:bg-surface-alt disabled:opacity-50"
         >
           {editing ? 'Done' : 'Edit'}
         </button>
@@ -252,7 +298,7 @@ export function McpLinks({ links }: McpLinksProps) {
                     onClick={() => void saveLink(link)}
                     className="rounded-md border border-border px-2 py-1 text-[10px] uppercase tracking-wide hover:bg-surface-alt disabled:opacity-50"
                   >
-                    {busyId === link.id ? 'Saving…' : 'Save'}
+                    {actionLabel('Save', 'Saving…', { kind: 'save', id: link.id })}
                   </button>
                   <button
                     type="button"
@@ -260,7 +306,7 @@ export function McpLinks({ links }: McpLinksProps) {
                     onClick={() => void moveLink(link, -1)}
                     className="rounded-md border border-border px-2 py-1 text-[10px] uppercase tracking-wide hover:bg-surface-alt disabled:opacity-50"
                   >
-                    Up
+                    {actionLabel('Up', 'Up…', { kind: 'up', id: link.id })}
                   </button>
                   <button
                     type="button"
@@ -268,7 +314,7 @@ export function McpLinks({ links }: McpLinksProps) {
                     onClick={() => void moveLink(link, 1)}
                     className="rounded-md border border-border px-2 py-1 text-[10px] uppercase tracking-wide hover:bg-surface-alt disabled:opacity-50"
                   >
-                    Down
+                    {actionLabel('Down', 'Down…', { kind: 'down', id: link.id })}
                   </button>
                   <button
                     type="button"
@@ -276,7 +322,7 @@ export function McpLinks({ links }: McpLinksProps) {
                     onClick={() => void removeLink(link)}
                     className="rounded-md border border-error/30 px-2 py-1 text-[10px] uppercase tracking-wide text-error hover:bg-error/10 disabled:opacity-50"
                   >
-                    Delete
+                    {actionLabel('Delete', 'Delete…', { kind: 'delete', id: link.id })}
                   </button>
                 </div>
               </div>
@@ -312,7 +358,7 @@ export function McpLinks({ links }: McpLinksProps) {
               disabled={busy || !newName.trim() || !newUrl.trim()}
               className="rounded-md border border-border px-3 py-1.5 text-xs uppercase tracking-wide hover:bg-surface-alt disabled:opacity-50"
             >
-              {busyId === 'new' ? 'Adding…' : 'Add button'}
+              {actionLabel('Add button', 'Adding…', { kind: 'add' })}
             </button>
           </form>
         </div>

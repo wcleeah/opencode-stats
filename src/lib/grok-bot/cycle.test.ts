@@ -13,6 +13,8 @@ import {
   grokBotWallTimeFromUtcMs,
   grokBotWallTimeToUtcMs,
   parseGrokBotCycleClock,
+  grokBotBucketTickLabel,
+  grokBotDayTickIndexes,
   grokBotProgressLabel,
   projectGrokBotPeriods,
   resolveGrokBotWindow,
@@ -202,6 +204,37 @@ test('a compared window copies the primary span and bucket width', () => {
   assert.equal(compared[1].window.bucketMs, 60 * 60 * 1000);
   assert.equal(compared[1].shortLabel, 'Tue 13 Oct 2026');
   assert.equal(compared[1].label, 'Tue 13 Oct 2026 11:30 to Tue 20 Oct 2026 11:29');
+});
+
+test('a solo week axis names the selected calendar day and minute', () => {
+  const weekMs = 7 * 24 * 60 * 60 * 1000;
+  const currentStart = Date.parse('2026-10-21T03:30:00.000Z');
+  const previousStart = Date.parse('2026-10-14T03:30:00.000Z');
+  assert.equal(
+    grokBotBucketTickLabel(currentStart, weekMs, 'Asia/Hong_Kong'),
+    'Wed 21 11:30',
+  );
+  assert.equal(
+    grokBotBucketTickLabel(previousStart, weekMs, 'Asia/Hong_Kong'),
+    'Wed 14 11:30',
+  );
+  assert.equal(
+    grokBotBucketTickLabel(currentStart, 30 * 60 * 1000, 'Asia/Hong_Kong'),
+    '11:30',
+  );
+  assert.equal(
+    grokBotBucketTickLabel(currentStart, 24 * 60 * 60 * 1000, 'Asia/Hong_Kong'),
+    '21 11:30',
+  );
+  const hourMs = 60 * 60 * 1000;
+  assert.equal(
+    grokBotBucketTickLabel(currentStart + 167 * hourMs, weekMs, 'Asia/Hong_Kong'),
+    'Wed 28 10:30',
+  );
+  assert.deepEqual(grokBotDayTickIndexes(168, hourMs, weekMs), [
+    0, 24, 48, 72, 96, 120, 144, 167,
+  ]);
+  assert.equal(grokBotDayTickIndexes(96, 15 * 60 * 1000, 24 * 60 * 60 * 1000), null);
 });
 
 test('progress labels count hours on hourly buckets and minutes otherwise', () => {

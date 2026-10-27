@@ -17,6 +17,8 @@ import {
 import { formatCost, formatTokens } from '@/lib/format';
 import {
   formatGrokBotWallTime,
+  grokBotBucketTickLabel,
+  grokBotDayTickIndexes,
   grokBotProgressLabel,
   grokBotWallTimeFromUtcMs,
   grokBotWallTimeToUtcMs,
@@ -45,8 +47,6 @@ function periodDash(periodIndex: number, several: boolean): string | undefined {
   return PERIOD_DASH[periodIndex % PERIOD_DASH.length];
 }
 
-const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
-const FORTY_EIGHT_HOURS_MS = 48 * 60 * 60 * 1000;
 const MINUTE_MS = 60 * 1000;
 const CHART_HEIGHT = 448;
 
@@ -81,16 +81,6 @@ function pad2(value: number): string {
   return String(value).padStart(2, '0');
 }
 
-function tickLabel(utcMs: number, spanMs: number, timeZone: 'Asia/Hong_Kong'): string {
-  const wall = grokBotWallTimeFromUtcMs(utcMs, timeZone);
-  const hh = pad2(wall.hour);
-  const mm = pad2(wall.minute);
-  if (spanMs <= SIX_HOURS_MS) return `${hh}:${mm}`;
-  if (spanMs <= FORTY_EIGHT_HOURS_MS) return `${wall.day} ${hh}:${mm}`;
-  const weekday = wall.weekday.charAt(0).toUpperCase() + wall.weekday.slice(1, 3);
-  return `${weekday} ${hh}`;
-}
-
 function wallInputValue(utcMs: number, timeZone: 'Asia/Hong_Kong'): string {
   const wall = grokBotWallTimeFromUtcMs(utcMs, timeZone);
   return `${wall.year}-${pad2(wall.month)}-${pad2(wall.day)}T${pad2(wall.hour)}:${pad2(wall.minute)}`;
@@ -120,7 +110,7 @@ function projection(
 ): { rows: ChartRow[]; lines: DrawnLine[] } {
   const several = charts.periods.length > 1;
   const labelFor = (bucketStartMs: number): string => {
-    if (!several) return tickLabel(bucketStartMs, spanMs, timeZone);
+    if (!several) return grokBotBucketTickLabel(bucketStartMs, spanMs, timeZone);
     return grokBotProgressLabel(bucketStartMs - windowStartMs, bucketMs);
   };
   if (charts.mode === 'by-type') {
@@ -270,6 +260,11 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
   const palette = [colors.chart1, colors.chart2, colors.chart3, colors.chart4, colors.chart5];
   const drawn = projection(charts, measure, spanMs, timeZone, windowStartMs, bucketMs);
   const several = charts.periods.length > 1;
+  const axisTicks = several
+    ? undefined
+    : grokBotDayTickIndexes(drawn.rows.length, bucketMs, spanMs)
+      ?.map((index) => drawn.rows[index]?.label)
+      .filter((label): label is string => label !== undefined);
 
   function navigationHref(next: { startMs?: number; endMs?: number; focusStartMs: number }): string {
     const ranged = next.startMs !== undefined && next.endMs !== undefined;
@@ -402,6 +397,13 @@ export function GrokBotSeriesChart(props: GrokBotSeriesChartProps): JSX.Element 
               tickLine={false}
               axisLine={{ stroke: colors.grid }}
               minTickGap={24}
+              {...(axisTicks
+                ? {
+                    ticks: axisTicks,
+                    interval: 'preserveStartEnd' as const,
+                    padding: { left: 36, right: 44 },
+                  }
+                : {})}
             />
             <YAxis
               tickFormatter={formatAxis}

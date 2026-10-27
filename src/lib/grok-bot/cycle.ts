@@ -351,6 +351,33 @@ export function grokBotProgressLabel(offsetMs: number, bucketMs: number): string
   return `minute ${Math.floor(offsetMs / MINUTE_MS) + 1}`;
 }
 
+export function grokBotBucketTickLabel(
+  utcMs: number,
+  spanMs: number,
+  timeZone: typeof GROK_BOT_CYCLE_TIME_ZONE,
+): string {
+  const wall = grokBotWallTimeFromUtcMs(utcMs, timeZone);
+  const hh = pad2(wall.hour);
+  const mm = pad2(wall.minute);
+  if (spanMs <= SIX_HOURS_MS) return `${hh}:${mm}`;
+  if (spanMs <= FORTY_EIGHT_HOURS_MS) return `${wall.day} ${hh}:${mm}`;
+  return `${weekdayAbbrev(wall.weekday)} ${wall.day} ${hh}:${mm}`;
+}
+
+export function grokBotDayTickIndexes(
+  pointCount: number,
+  bucketMs: number,
+  spanMs: number,
+): readonly number[] | null {
+  if (spanMs <= FORTY_EIGHT_HOURS_MS || pointCount <= 0 || bucketMs <= 0) return null;
+  const step = Math.max(1, Math.round(DAY_MS / bucketMs));
+  const indexes: number[] = [];
+  for (let index = 0; index < pointCount; index += step) indexes.push(index);
+  const last = pointCount - 1;
+  if (indexes[indexes.length - 1] !== last) indexes.push(last);
+  return indexes;
+}
+
 export type GrokBotWindowMode =
   | { kind: 'cycle'; offset: number }
   | { kind: 'range'; startMs: number; endMs: number };

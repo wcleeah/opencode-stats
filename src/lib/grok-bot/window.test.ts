@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 
 import type { GrokBotProjectedCompare, GrokBotProjectedPrimary } from './cycle';
 import { grokBotBucketMs } from './cycle';
+import { setGrokBotPeriodName } from './period-name';
+import { grokBotPeriodTitle } from './period-title';
 import {
   grokBotOutsUsd,
   grokBotTokenTotal,
@@ -13,7 +15,6 @@ import {
   alignGrokBotPeriods,
   foldGrokBotWindow,
   grokBotCompareStarts,
-  grokBotPeriodCaption,
   type GrokBotCharts,
   type GrokBotFoldEvent,
   type GrokBotTypeLine,
@@ -309,6 +310,7 @@ test('alignment uses the primary bucket and zeros a missing compared point', () 
   );
   const aligned = alignGrokBotPeriods({
     seriesTypes: lines,
+    names: [],
     folds: [
       {
         projected: primaryProjected,
@@ -379,7 +381,9 @@ test('alignment uses the primary bucket and zeros a missing compared point', () 
   assert.equal(aligned.periods[1].startMs, 10);
   assert.equal(aligned.periods[1].shortLabel, 'Wed 7 Oct 2026');
   assert.deepEqual(grokBotCompareStarts(aligned.periods), [10, 20]);
-  assert.equal(grokBotPeriodCaption(aligned.periods[1], aligned.periods), 'Wed 7 Oct 2026');
+  assert.equal(grokBotPeriodTitle(1, aligned.periods), 'Period 2');
+  assert.equal(Object.hasOwn(aligned.periods[0], 'name'), false);
+  assert.equal(Object.hasOwn(aligned.periods[1], 'name'), false);
 });
 
 test('alignment copies outs dollars from the fold', () => {
@@ -393,6 +397,7 @@ test('alignment copies outs dollars from the fold', () => {
   );
   const aligned = alignGrokBotPeriods({
     seriesTypes: [],
+    names: [],
     folds: [
       {
         projected: {
@@ -476,6 +481,7 @@ test('an empty primary fold keeps period totals and draws no points', () => {
   );
   const aligned = alignGrokBotPeriods({
     seriesTypes: [{ id: 'grok-bot-default', label: 'Default' }],
+    names: [],
     folds: [
       {
         projected: {
@@ -538,4 +544,57 @@ test('an empty series list keeps the requested mode and drops events', () => {
   assert.equal(grokBotTokenTotal(split.totals.tokens), 0);
   assert.equal(typed.totals.spend.totalUsd, 0);
   assert.equal(typed.totals.spend.includesCardEstimate, false);
+});
+
+test('align copies a shared name onto each matching start', () => {
+  const first = setGrokBotPeriodName([], 0, 'Launch');
+  assert.equal(first.ok, true);
+  if (!first.ok) return;
+  const shared = setGrokBotPeriodName(first.names, 10, 'Launch');
+  assert.equal(shared.ok, true);
+  if (!shared.ok) return;
+  const withHidden = setGrokBotPeriodName(shared.names, 99, 'Hidden');
+  assert.equal(withHidden.ok, true);
+  if (!withHidden.ok) return;
+  const totals = periodTotals(
+    { ins: 0, outs: 0 },
+    { totalUsd: 0, insUsd: 0, unpricedCacheWriteTokens: 0, includesCardEstimate: false },
+  );
+  const aligned = alignGrokBotPeriods({
+    seriesTypes: [],
+    names: withHidden.names,
+    folds: [
+      {
+        projected: {
+          role: 'primary',
+          window: { startMs: 0, endMs: 1, bucketMs: 1 },
+          label: 'Wed 14 Oct 2026 11:30 to Wed 21 Oct 2026 11:29',
+          shortLabel: 'Wed 14 Oct 2026',
+        },
+        folded: {
+          totals,
+          charts: { mode: 'by-type', lines: [], points: [] },
+        },
+      },
+      {
+        projected: {
+          role: 'compare',
+          window: { startMs: 10, endMs: 11, bucketMs: 1 },
+          label: 'Wed 21 Oct 2026 11:30 to Wed 28 Oct 2026 11:29',
+          shortLabel: 'Wed 21 Oct 2026',
+        },
+        folded: {
+          totals,
+          charts: { mode: 'by-type', lines: [], points: [] },
+        },
+      },
+    ],
+  });
+  assert.equal(aligned.periods[0].name, 'Launch');
+  assert.equal(aligned.periods[1].name, 'Launch');
+  assert.equal(grokBotPeriodTitle(0, [aligned.periods[0]]), 'Launch');
+  assert.equal(grokBotPeriodTitle(0, aligned.periods), 'Launch · 1');
+  assert.equal(grokBotPeriodTitle(1, aligned.periods), 'Launch · 2');
+  assert.equal(aligned.periods[0].name, 'Launch');
+  assert.equal(aligned.periods.some((period) => period.name === 'Hidden'), false);
 });

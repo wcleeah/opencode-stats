@@ -1,12 +1,11 @@
 export const dynamic = 'force-dynamic';
 
-import Link from 'next/link';
-
 import { formatDateTime } from '@/lib/format';
 import { listCursorImports } from '@/lib/queries/cursor';
 
-import { Card } from '@/components/ui/card';
 import { CursorUploadForm } from '@/components/cursor/upload-form';
+import { PendingAnchor } from '@/components/pending-anchor';
+import { Card } from '@/components/ui/card';
 
 export default async function CursorUploadPage() {
   const importsResult = await listCursorImports(20);
@@ -22,12 +21,13 @@ export default async function CursorUploadPage() {
             and skip duplicates.
           </p>
         </div>
-        <Link
+        <PendingAnchor
           href="/cursor"
+          history="push"
           className="rounded-md border border-border px-3 py-1.5 text-xs uppercase tracking-wide hover:bg-surface-alt"
         >
           Dashboard
-        </Link>
+        </PendingAnchor>
       </div>
 
       <Card>

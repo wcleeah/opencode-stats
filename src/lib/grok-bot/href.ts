@@ -1,3 +1,9 @@
+import {
+  moveGrokBotPeriodName,
+  serializeGrokBotPeriodNames,
+  type GrokBotPeriodNames,
+} from '@/lib/grok-bot/period-name';
+
 export const GROK_BOT_PATH = '/cursor/grok';
 
 export type GrokBotChartMode = 'by-type' | 'ins-outs';
@@ -17,6 +23,7 @@ export interface GrokBotHrefParams {
   compareStarts?: readonly number[];
   focusStartMs?: number;
   primaryStartMs?: number;
+  periodNames: GrokBotPeriodNames;
 }
 
 export function parseGrokBotChartMode(raw: string | undefined): GrokBotChartMode {
@@ -88,12 +95,37 @@ export function grokBotHref(params: GrokBotHrefParams): string {
   ) {
     search.set('focus', String(params.focusStartMs));
   }
+  const namesParam = serializeGrokBotPeriodNames(params.periodNames);
+  if (namesParam !== undefined) search.set('names', namesParam);
   let query = search.toString();
   if (params.compareStarts !== undefined && params.compareStarts.length > 0) {
     const cmp = `cmp=${params.compareStarts.join(',')}`;
     query = query.length > 0 ? `${query}&${cmp}` : cmp;
   }
   return query.length > 0 ? `${GROK_BOT_PATH}?${query}` : GROK_BOT_PATH;
+}
+
+export function grokBotRangeHref(
+  current: GrokBotHrefParams,
+  startMs: number,
+  endMs: number,
+): string {
+  const oldPrimary = current.primaryStartMs;
+  const periodNames = oldPrimary === undefined
+    ? current.periodNames
+    : moveGrokBotPeriodName(current.periodNames, oldPrimary, startMs);
+  const focusWasPrimary = current.focusStartMs === undefined
+    || current.focusStartMs === oldPrimary;
+  return grokBotHref({
+    ...current,
+    cycle: undefined,
+    page: undefined,
+    startMs,
+    endMs,
+    focusStartMs: focusWasPrimary ? startMs : current.focusStartMs,
+    primaryStartMs: startMs,
+    periodNames,
+  });
 }
 
 function explicitSelection(

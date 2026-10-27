@@ -1,12 +1,12 @@
 import type { JSX } from 'react';
 
 import { formatCost, formatTokens } from '@/lib/format';
+import { grokBotPeriodTitle } from '@/lib/grok-bot/period-title';
 import { grokBotOutsUsd, grokBotTokenTotal } from '@/lib/grok-bot/rates';
-import {
-  grokBotPeriodCaption,
-  type GrokBotPeriod,
-  type GrokBotPeriodList,
-  type GrokBotWindowTotals,
+import type {
+  GrokBotPeriod,
+  GrokBotPeriodList,
+  GrokBotWindowTotals,
 } from '@/lib/grok-bot/window';
 
 import { StatCard } from '@/components/ui/card';
@@ -62,15 +62,17 @@ function PeriodLabel(props: {
   readonly focusStartMs?: number;
 }): JSX.Element {
   const focused = props.focusStartMs === props.period.startMs;
+  const index = props.periods.findIndex((item) => item.startMs === props.period.startMs);
   return (
     <div
+      title={props.period.label}
       className={
         focused
           ? 'text-xs font-medium normal-case tracking-normal text-foreground'
           : 'text-xs font-normal normal-case tracking-normal text-muted'
       }
     >
-      {grokBotPeriodCaption(props.period, props.periods)}
+      {grokBotPeriodTitle(index, props.periods)}
     </div>
   );
 }

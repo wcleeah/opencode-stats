@@ -1,8 +1,8 @@
 'use client';
 
-import Link from 'next/link';
-
 import { cn } from '@/lib/utils';
+
+import { PendingAnchor } from '@/components/pending-anchor';
 
 interface PaginationProps {
   page: number;
@@ -23,36 +23,32 @@ export function Pagination({ page, totalPages, baseUrl, className }: PaginationP
   const start = Math.max(1, page - 2);
   const end = Math.min(totalPages, start + 4);
   const pages = Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  const linkClass = 'px-2 py-1 text-muted hover:text-foreground transition-colors';
 
   return (
     <nav className={cn('flex items-center gap-1 text-sm', className)}>
       {page > 1 ? (
-        <Link
-          href={pageUrl(page - 1)}
-          className="px-2 py-1 text-muted hover:text-foreground transition-colors"
-        >
+        <PendingAnchor href={pageUrl(page - 1)} history="push" className={linkClass}>
           &lt; prev
-        </Link>
+        </PendingAnchor>
       ) : (
         <span className="px-2 py-1 text-subtle">&lt; prev</span>
       )}
 
       {start > 1 && (
         <>
-          <Link
-            href={pageUrl(1)}
-            className="px-2 py-1 text-muted hover:text-foreground transition-colors"
-          >
+          <PendingAnchor href={pageUrl(1)} history="push" className={linkClass}>
             1
-          </Link>
+          </PendingAnchor>
           {start > 2 && <span className="px-1 text-subtle">...</span>}
         </>
       )}
 
       {pages.map((p) => (
-        <Link
+        <PendingAnchor
           key={p}
           href={pageUrl(p)}
+          history="push"
           className={cn(
             'px-2 py-1 transition-colors',
             p === page
@@ -61,28 +57,22 @@ export function Pagination({ page, totalPages, baseUrl, className }: PaginationP
           )}
         >
           {p}
-        </Link>
+        </PendingAnchor>
       ))}
 
       {end < totalPages && (
         <>
           {end < totalPages - 1 && <span className="px-1 text-subtle">...</span>}
-          <Link
-            href={pageUrl(totalPages)}
-            className="px-2 py-1 text-muted hover:text-foreground transition-colors"
-          >
+          <PendingAnchor href={pageUrl(totalPages)} history="push" className={linkClass}>
             {totalPages}
-          </Link>
+          </PendingAnchor>
         </>
       )}
 
       {page < totalPages ? (
-        <Link
-          href={pageUrl(page + 1)}
-          className="px-2 py-1 text-muted hover:text-foreground transition-colors"
-        >
+        <PendingAnchor href={pageUrl(page + 1)} history="push" className={linkClass}>
           next &gt;
-        </Link>
+        </PendingAnchor>
       ) : (
         <span className="px-2 py-1 text-subtle">next &gt;</span>
       )}

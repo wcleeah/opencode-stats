@@ -15,9 +15,12 @@ interface UploadResponse {
   details?: string;
 }
 
+type UploadLabel = 'Upload & merge' | 'Uploading…' | 'Importing…';
+
 export function CursorUploadForm() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const [uploading, setUploading] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<UploadResponse['data'] | null>(null);
@@ -34,22 +37,34 @@ export function CursorUploadForm() {
 
     const body = new FormData();
     body.set('file', file);
+    setUploading(true);
+    try {
+      const response = await fetch('/api/cursor/upload', {
+        method: 'POST',
+        body,
+      });
+      const payload = (await response.json()) as UploadResponse;
+      if (!response.ok || !payload.data) {
+        setError(payload.details ? `${payload.error}: ${payload.details}` : (payload.error ?? 'Upload failed'));
+        return;
+      }
 
-    const response = await fetch('/api/cursor/upload', {
-      method: 'POST',
-      body,
-    });
-    const payload = (await response.json()) as UploadResponse;
-    if (!response.ok || !payload.data) {
-      setError(payload.details ? `${payload.error}: ${payload.details}` : (payload.error ?? 'Upload failed'));
-      return;
+      setResult(payload.data);
+      startTransition(() => {
+        router.refresh();
+      });
+    } catch {
+      setError('Upload failed');
+    } finally {
+      setUploading(false);
     }
-
-    setResult(payload.data);
-    startTransition(() => {
-      router.refresh();
-    });
   }
+
+  const label: UploadLabel = uploading
+    ? 'Uploading…'
+    : pending
+      ? 'Importing…'
+      : 'Upload & merge';
 
   return (
     <form onSubmit={onSubmit} className="space-y-4">
@@ -67,10 +82,10 @@ export function CursorUploadForm() {
 
       <button
         type="submit"
-        disabled={pending || !file}
+        disabled={uploading || pending || !file}
         className="w-full rounded-md border border-border px-3 py-2 text-xs uppercase tracking-wide text-foreground hover:bg-surface-alt disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
       >
-        {pending ? 'Importing…' : 'Upload & merge'}
+        {label}
       </button>
 
       {error && (

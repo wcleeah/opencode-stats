@@ -1,7 +1,5 @@
 export const dynamic = 'force-dynamic';
 
-import Link from 'next/link';
-
 import { formatCost, formatTokens } from '@/lib/format';
 import {
   formatGrokBotWallTime,
@@ -16,14 +14,19 @@ import {
   type GrokBotChartMode,
   type GrokBotHrefParams,
 } from '@/lib/grok-bot/href';
+import { grokBotPeriodNames } from '@/lib/grok-bot/period-name';
+import { grokBotPeriodTitle } from '@/lib/grok-bot/period-title';
 import type { GrokBotCharge } from '@/lib/grok-bot/rates';
-import { grokBotCompareStarts, grokBotPeriodCaption } from '@/lib/grok-bot/window';
+import { grokBotCompareStarts } from '@/lib/grok-bot/window';
 import { getCursorSettings } from '@/lib/queries/cursor';
 import { getGrokBotBoard, type GrokBotBoard } from '@/lib/queries/grok-bot';
 
 import { GrokBotAddPeriod } from '@/components/grok-bot/add-period';
+import { GrokBotPeriodNameField } from '@/components/grok-bot/period-name-field';
 import { GrokBotSeriesChart } from '@/components/grok-bot/usage-chart';
+import { GrokWindowEditor } from '@/components/grok-bot/window-editor';
 import { GrokBotWindowStats } from '@/components/grok-bot/window-stats';
+import { PendingAnchor } from '@/components/pending-anchor';
 import { Card } from '@/components/ui/card';
 import { Pagination } from '@/components/ui/pagination';
 import {
@@ -44,37 +47,52 @@ interface GrokPageProps {
     view?: string;
     cmp?: string;
     focus?: string;
+    names?: string;
   }>;
 }
 
-function hrefFor(
-  board: GrokBotBoard,
-  overrides: Partial<GrokBotHrefParams> = {},
-): string {
+function linkParams(board: GrokBotBoard): GrokBotHrefParams {
   const windowHref = board.windowMode.kind === 'cycle'
     ? { cycle: board.windowMode.offset }
     : { startMs: board.windowMode.startMs, endMs: board.windowMode.endMs };
-  return grokBotHref({
+  return {
     ...windowHref,
     usage: board.usageParam,
     mode: board.charts.mode,
     compareStarts: grokBotCompareStarts(board.charts.periods),
     focusStartMs: board.focusStartMs,
     primaryStartMs: board.window.startMs,
+    periodNames: grokBotPeriodNames(board.charts.periods),
+  };
+}
+
+function hrefFor(
+  board: GrokBotBoard,
+  overrides: Partial<GrokBotHrefParams> = {},
+): string {
+  const base = linkParams(board);
+  return grokBotHref({
+    ...base,
     ...overrides,
+    periodNames: overrides.periodNames ?? base.periodNames,
   });
+}
+
+function focusHref(board: GrokBotBoard, startMs: number): string {
+  return hrefFor(board, { focusStartMs: startMs, page: undefined });
 }
 
 function GrokHeader() {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="text-lg font-bold">Grokbot Usage</h1>
-      <Link
+      <PendingAnchor
         href="/cursor/upload"
+        history="push"
         className="rounded-md border border-border px-3 py-1.5 text-xs uppercase tracking-wide hover:bg-surface-alt"
       >
         Upload CSV
-      </Link>
+      </PendingAnchor>
     </div>
   );
 }
@@ -103,68 +121,62 @@ function eventTime(utcMs: number): string {
 function PeriodStrip({ board }: { board: GrokBotBoard }) {
   const periods = board.charts.periods;
   const starts = grokBotCompareStarts(periods);
+  const hrefParams = linkParams(board);
   const chipOn = 'inline-flex items-center gap-1 rounded-md border border-foreground px-2 py-1 text-xs text-foreground';
   const chipOff = 'inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs text-muted hover:text-foreground';
-  const windowPart = board.windowMode.kind === 'cycle'
-    ? { cycle: board.windowMode.offset }
-    : { startMs: board.windowMode.startMs, endMs: board.windowMode.endMs };
+  const showChips = periods.length > 1;
 
   return (
     <>
-      {periods.length > 1
-        ? periods.map((period) => {
-            const caption = grokBotPeriodCaption(period, periods);
-            const focused = period.startMs === board.focusStartMs;
-            const removeHref = period.role === 'compare'
-              ? grokBotHref({
-                  ...windowPart,
-                  usage: board.usageParam,
-                  mode: board.charts.mode,
-                  compareStarts: removeGrokBotCompareStart(starts, period.startMs),
-                  focusStartMs: period.startMs === board.focusStartMs
-                    ? board.window.startMs
-                    : board.focusStartMs,
-                  primaryStartMs: board.window.startMs,
-                })
-              : undefined;
-            return (
-              <span
-                key={period.startMs}
-                title={period.label}
-                className={focused ? chipOn : chipOff}
-              >
-                <Link
-                  href={hrefFor(board, {
-                    focusStartMs: period.startMs,
-                    page: undefined,
-                  })}
-                  aria-current={focused ? 'page' : undefined}
-                >
-                  {caption}
-                </Link>
+      {periods.map((period, index) => {
+        const title = grokBotPeriodTitle(index, periods);
+        const focused = period.startMs === board.focusStartMs;
+        const removeHref = showChips && period.role === 'compare'
+          ? hrefFor(board, {
+              compareStarts: removeGrokBotCompareStart(starts, period.startMs),
+              focusStartMs: period.startMs === board.focusStartMs
+                ? board.window.startMs
+                : board.focusStartMs,
+            })
+          : undefined;
+        return (
+          <span key={period.startMs} className="inline-flex items-center gap-1">
+            {showChips ? (
+              <span title={period.label} className={focused ? chipOn : chipOff}>
+                {focused ? (
+                  <span aria-current="page">{title}</span>
+                ) : (
+                  <PendingAnchor
+                    href={focusHref(board, period.startMs)}
+                    history="push"
+                  >
+                    {title}
+                  </PendingAnchor>
+                )}
                 {removeHref === undefined ? null : (
-                  <Link
+                  <PendingAnchor
                     href={removeHref}
-                    aria-label={`Remove ${caption}`}
+                    history="push"
+                    ariaLabel={`Remove ${title}`}
                     className="text-muted hover:text-foreground"
                   >
                     ×
-                  </Link>
+                  </PendingAnchor>
                 )}
               </span>
-            );
-          })
-        : null}
+            ) : null}
+            <GrokBotPeriodNameField
+              startMs={period.startMs}
+              name={period.name}
+              title={title}
+              hrefParams={hrefParams}
+            />
+          </span>
+        );
+      })}
       <GrokBotAddPeriod
-        primaryStartMs={board.window.startMs}
-        primaryEndMs={board.window.endMs}
-        compareStarts={starts}
-        cycle={board.windowMode.kind === 'cycle' ? board.windowMode.offset : undefined}
-        startMs={board.windowMode.kind === 'range' ? board.window.startMs : undefined}
-        endMs={board.windowMode.kind === 'range' ? board.window.endMs : undefined}
-        usage={board.usageParam}
-        mode={board.charts.mode}
-        focusStartMs={board.focusStartMs}
+        hrefParams={hrefParams}
+        primaryDurationMs={board.window.endMs - board.window.startMs}
       />
     </>
   );
@@ -182,27 +194,33 @@ function CycleLinks({ board }: { board: GrokBotBoard }) {
         Grok cycle · Asia/Hong_Kong
       </span>
       <div className="inline-flex items-center rounded-md border border-border">
-        <Link href={previousHref} className={linkClass} aria-label="Previous cycle">
+        <PendingAnchor
+          href={previousHref}
+          history="push"
+          className={linkClass}
+          ariaLabel="Previous cycle"
+          title={board.cycleLinkLabels.previous}
+        >
           ←
-        </Link>
-        <Link
+        </PendingAnchor>
+        <PendingAnchor
           href={thisHref}
+          history="push"
+          title={board.cycleLinkLabels.current}
           className="border-x border-border px-2 py-1 text-[10px] uppercase tracking-wide text-muted hover:text-foreground transition-colors"
         >
           This cycle
-        </Link>
-        <Link href={nextHref} className={linkClass} aria-label="Next cycle">
+        </PendingAnchor>
+        <PendingAnchor
+          href={nextHref}
+          history="push"
+          className={linkClass}
+          ariaLabel="Next cycle"
+          title={board.cycleLinkLabels.next}
+        >
           →
-        </Link>
+        </PendingAnchor>
       </div>
-      <span className="text-xs text-muted">{board.cycle.label}</span>
-      {board.windowMode.kind === 'range' ? (
-        <span className="text-xs text-muted">
-          {eventTime(board.window.startMs)}
-          {' to '}
-          {eventTime(board.window.endMs)}
-        </span>
-      ) : null}
       <PeriodStrip board={board} />
     </div>
   );
@@ -222,10 +240,11 @@ function UsageLinks({ board }: { board: GrokBotBoard }) {
         });
         const on = selected.has(type.id);
         return (
-          <Link
+          <PendingAnchor
             key={type.id}
             href={href}
-            aria-current={on ? 'true' : undefined}
+            history="push"
+            ariaCurrent={on ? 'true' : undefined}
             className={
               on
                 ? 'rounded-md border border-foreground px-2 py-1 text-xs text-foreground'
@@ -233,7 +252,7 @@ function UsageLinks({ board }: { board: GrokBotBoard }) {
             }
           >
             {type.label}
-          </Link>
+          </PendingAnchor>
         );
       })}
     </div>
@@ -267,6 +286,7 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
     view: params.view,
     cmp: params.cmp,
     focus: params.focus,
+    names: params.names,
   });
   if (boardResult.error || !boardResult.data) {
     return (
@@ -286,16 +306,18 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
     mode: mode === 'by-type' ? 'ins-outs' : 'by-type',
     page: undefined,
   });
+  const focusTargets = board.charts.periods.map((period) => ({
+    startMs: period.startMs,
+    href: focusHref(board, period.startMs),
+  }));
   const chartProps = {
     charts: board.charts,
     windowStartMs: board.window.startMs,
     windowEndMs: board.window.endMs,
     timeZone: board.timeZone,
-    usageParam: board.usageParam,
     bucketMs: board.window.bucketMs,
     focusStartMs: board.focusStartMs,
-    compareStarts: grokBotCompareStarts(board.charts.periods),
-    cycleOffset: board.windowMode.kind === 'cycle' ? board.windowMode.offset : undefined,
+    focusTargets,
   };
   const totalPages = Math.ceil(board.totalRows / board.pageSize);
 
@@ -310,9 +332,10 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
             periods={board.charts.periods}
             focusStartMs={board.focusStartMs}
           />
-          <Link
+          <PendingAnchor
             href={toggleHref}
-            aria-pressed={mode === 'ins-outs'}
+            history="push"
+            ariaPressed={mode === 'ins-outs'}
             className={
               mode === 'ins-outs'
                 ? 'rounded-md border border-foreground px-2 py-1 text-xs text-foreground'
@@ -320,38 +343,54 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
             }
           >
             {GROK_BOT_INS_LINE} / {GROK_BOT_OUTS_LINE}
-          </Link>
-          <Card>
-            <div className="mb-3 text-xs text-muted uppercase tracking-wider">Tokens</div>
-            <GrokBotSeriesChart {...chartProps} measure="tokens" />
-          </Card>
-          <Card>
-            <div className="mb-3 text-xs text-muted uppercase tracking-wider">Spending</div>
-            <GrokBotSeriesChart {...chartProps} measure="usd" />
-          </Card>
+          </PendingAnchor>
+          <GrokWindowEditor
+            windowStartMs={board.window.startMs}
+            windowEndMs={board.window.endMs}
+            timeZone={board.timeZone}
+            hrefParams={linkParams(board)}
+          >
+            <Card>
+              <div className="mb-3 text-xs text-muted uppercase tracking-wider">Tokens</div>
+              <GrokBotSeriesChart {...chartProps} measure="tokens" />
+            </Card>
+            <Card>
+              <div className="mb-3 text-xs text-muted uppercase tracking-wider">Spending</div>
+              <GrokBotSeriesChart {...chartProps} measure="usd" />
+            </Card>
+          </GrokWindowEditor>
           <div className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">
               <div className="text-xs text-muted uppercase tracking-wider">Events</div>
               {board.charts.periods.length > 1
-                ? board.charts.periods.map((period) => {
-                    const caption = grokBotPeriodCaption(period, board.charts.periods);
+                ? board.charts.periods.map((period, index) => {
+                    const title = grokBotPeriodTitle(index, board.charts.periods);
                     const focused = period.startMs === board.focusStartMs;
+                    const className = focused
+                      ? 'rounded-md border border-foreground px-2 py-1 text-xs text-foreground'
+                      : 'rounded-md border border-border px-2 py-1 text-xs text-muted hover:text-foreground';
+                    if (focused) {
+                      return (
+                        <span
+                          key={period.startMs}
+                          title={period.label}
+                          aria-current="page"
+                          className={className}
+                        >
+                          {title}
+                        </span>
+                      );
+                    }
                     return (
-                      <Link
+                      <PendingAnchor
                         key={period.startMs}
-                        href={hrefFor(board, {
-                          focusStartMs: period.startMs,
-                          page: undefined,
-                        })}
-                        aria-current={focused ? 'page' : undefined}
-                        className={
-                          focused
-                            ? 'rounded-md border border-foreground px-2 py-1 text-xs text-foreground'
-                            : 'rounded-md border border-border px-2 py-1 text-xs text-muted hover:text-foreground'
-                        }
+                        href={focusHref(board, period.startMs)}
+                        history="push"
+                        title={period.label}
+                        className={className}
                       >
-                        {caption}
-                      </Link>
+                        {title}
+                      </PendingAnchor>
                     );
                   })
                 : null}
@@ -400,12 +439,13 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
       ) : (
         <Card className="space-y-3">
           <p className="text-sm text-foreground">No grok bot usage in this cycle.</p>
-          <Link
+          <PendingAnchor
             href="/cursor/upload"
+            history="push"
             className="inline-block text-xs text-muted hover:text-foreground"
           >
             Upload CSV
-          </Link>
+          </PendingAnchor>
         </Card>
       )}
     </div>

@@ -14,6 +14,7 @@ import {
   grokBotWallTimeToUtcMs,
   parseGrokBotCycleClock,
   grokBotBucketTickLabel,
+  grokBotDayTickIndexes,
   grokBotProgressLabel,
   projectGrokBotPeriods,
   resolveGrokBotWindow,
@@ -225,6 +226,15 @@ test('a solo week axis names the selected calendar day and minute', () => {
     grokBotBucketTickLabel(currentStart, 24 * 60 * 60 * 1000, 'Asia/Hong_Kong'),
     '21 11:30',
   );
+  const hourMs = 60 * 60 * 1000;
+  assert.equal(
+    grokBotBucketTickLabel(currentStart + 167 * hourMs, weekMs, 'Asia/Hong_Kong'),
+    'Wed 28 10:30',
+  );
+  assert.deepEqual(grokBotDayTickIndexes(168, hourMs, weekMs), [
+    0, 24, 48, 72, 96, 120, 144, 167,
+  ]);
+  assert.equal(grokBotDayTickIndexes(96, 15 * 60 * 1000, 24 * 60 * 60 * 1000), null);
 });
 
 test('progress labels count hours on hourly buckets and minutes otherwise', () => {

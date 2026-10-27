@@ -44,7 +44,7 @@ interface ChartPoint {
 
 interface PeriodSummary {
   role: string;
-  delta: number | null;
+  startMs: number;
   shortLabel: string;
 }
 
@@ -66,6 +66,7 @@ interface BoardSummary {
   bucketMs: number;
   cycleStartMs: number;
   offset: number;
+  focusStartMs: number;
   totals: TotalsSummary;
   charts: ChartSummary;
   rows: SummaryRow[];
@@ -82,6 +83,7 @@ interface Payload {
   empty: { data: BoardSummary | null; error: string | null };
   future: { data: BoardSummary | null; error: string | null };
   compare: { data: BoardSummary | null; error: string | null };
+  focused: { data: BoardSummary | null; error: string | null };
   junk: { data: BoardSummary | null; error: string | null };
 }
 
@@ -302,11 +304,14 @@ test('grok bot board prices member rows and leaves cursor models out', () => {
   assert.equal(future.charts.points.length, 0);
 
   const compare = requireBoard(payload.compare, 'compare');
+  const compareStart = BASE_MS - 7 * DAY_MS;
   assert.equal(compare.charts.periods.length, 2);
   assert.equal(compare.charts.periods[0].role, 'primary');
+  assert.equal(compare.charts.periods[0].startMs, BASE_MS);
   assert.equal(compare.charts.periods[0].shortLabel, 'Wed 14 Oct 2026');
+  assert.equal(compare.focusStartMs, BASE_MS);
   assert.equal(compare.charts.periods[1].role, 'compare');
-  assert.equal(compare.charts.periods[1].delta, -1);
+  assert.equal(compare.charts.periods[1].startMs, compareStart);
   assert.equal(compare.charts.periods[1].shortLabel, 'Wed 7 Oct 2026');
   assert.deepEqual(compare.totals, short.totals);
   assert.deepEqual(compare.rows, short.rows);
@@ -325,6 +330,14 @@ test('grok bot board prices member rows and leaves cursor models out', () => {
     byTypeValue(compare, BASE_MS + 60_000, 'grok-bot-default', 1).usd,
     77 * 2 / 1_000_000,
   );
+
+  const focused = requireBoard(payload.focused, 'focused');
+  assert.equal(focused.focusStartMs, compareStart);
+  assert.equal(focused.charts.periods.length, 2);
+  assert.equal(focused.totalRows, 1);
+  assert.equal(focused.rows[0].tokensTotal, 77);
+  assert.equal(focused.rows[0].usageType, 'grok-bot-default');
+  assert.notDeepEqual(focused.rows, short.rows);
 
   const junk = requireBoard(payload.junk, 'junk');
   assert.deepEqual(junk, short);

@@ -1,5 +1,3 @@
-import type { GrokBotNegativeCycleDelta } from '@/lib/grok-bot/href';
-
 export const GROK_BOT_WEEKDAYS = [
   'sunday',
   'monday',
@@ -308,7 +306,6 @@ export interface GrokBotProjectedPrimary {
 
 export interface GrokBotProjectedCompare {
   readonly role: 'compare';
-  readonly delta: GrokBotNegativeCycleDelta;
   readonly window: { readonly startMs: number; readonly endMs: number; readonly bucketMs: number };
   readonly label: string;
   readonly shortLabel: string;
@@ -321,12 +318,10 @@ export type GrokBotProjectedList = readonly [
 
 export function projectGrokBotPeriods(input: {
   readonly clock: GrokBotCycleClock;
-  readonly now: Date;
   readonly primary: GrokBotResolvedWindow;
-  readonly compareDeltas: readonly GrokBotNegativeCycleDelta[];
+  readonly compareStarts: readonly number[];
 }): GrokBotProjectedList {
   const span = input.primary.window.endMs - input.primary.window.startMs;
-  const shift = input.primary.window.startMs - input.primary.cycle.startMs;
   const bucketMs = input.primary.window.bucketMs;
   const primaryLabel = input.primary.mode.kind === 'cycle'
     ? input.primary.cycle.label
@@ -337,23 +332,23 @@ export function projectGrokBotPeriods(input: {
     label: primaryLabel,
     shortLabel: shortLabelFor(input.primary.window.startMs, input.clock.timeZone),
   };
-  const compared = input.compareDeltas.map((delta): GrokBotProjectedCompare => {
-    const bounds = grokBotCycleBounds(
-      input.clock,
-      input.now,
-      input.primary.cycle.offset + delta,
-    );
-    const startMs = bounds.startMs + shift;
+  const compared = input.compareStarts.map((startMs): GrokBotProjectedCompare => {
     const endMs = startMs + span;
     return {
       role: 'compare',
-      delta,
       window: { startMs, endMs, bucketMs },
       label: rangeLabel(startMs, endMs, input.clock.timeZone),
       shortLabel: shortLabelFor(startMs, input.clock.timeZone),
     };
   });
   return [primary, ...compared];
+}
+
+export function grokBotProgressLabel(offsetMs: number, bucketMs: number): string {
+  if (bucketMs >= HOUR_MS) {
+    return `hour ${Math.floor(offsetMs / HOUR_MS) + 1}`;
+  }
+  return `minute ${Math.floor(offsetMs / MINUTE_MS) + 1}`;
 }
 
 export type GrokBotWindowMode =

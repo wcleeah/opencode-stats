@@ -5,16 +5,6 @@ export type GrokBotChartMode = 'by-type' | 'ins-outs';
 export const GROK_BOT_INS_LINE = 'Ins';
 export const GROK_BOT_OUTS_LINE = 'Outs';
 
-export const GROK_BOT_MAX_COMPARE = 3;
-export const GROK_BOT_MAX_COMPARE_WEEKS = 52;
-
-declare const grokBotNegativeCycleDeltaBrand: unique symbol;
-
-/** Integer cycle delta from -52 through -1. The primary is not a member. */
-export type GrokBotNegativeCycleDelta = number & {
-  readonly [grokBotNegativeCycleDeltaBrand]: true;
-};
-
 export interface GrokBotHrefParams {
   /** Whole-cycle link. Omit `startMs` and `endMs` when this is set. */
   cycle?: number;
@@ -24,67 +14,55 @@ export interface GrokBotHrefParams {
   usage?: string;
   page?: number;
   mode: GrokBotChartMode;
-  compareDeltas?: readonly GrokBotNegativeCycleDelta[];
+  compareStarts?: readonly number[];
+  focusStartMs?: number;
+  primaryStartMs?: number;
 }
 
 export function parseGrokBotChartMode(raw: string | undefined): GrokBotChartMode {
   return raw === 'ins-outs' ? 'ins-outs' : 'by-type';
 }
 
-function brandGrokBotCompareDelta(value: number): GrokBotNegativeCycleDelta {
-  return value as GrokBotNegativeCycleDelta;
+function parseSafeInteger(raw: string): number | null {
+  const trimmed = raw.trim();
+  if (!/^-?\d+$/.test(trimmed)) return null;
+  const parsed = Number(trimmed);
+  if (!Number.isSafeInteger(parsed)) return null;
+  return parsed;
 }
 
-function normalizeGrokBotCompareDeltas(
-  values: readonly number[],
-): readonly GrokBotNegativeCycleDelta[] {
+export function parseGrokBotCompareStarts(
+  raw: string | undefined,
+  primaryStartMs: number,
+): readonly number[] {
+  if (raw === undefined) return [];
   const seen = new Set<number>();
   const kept: number[] = [];
-  for (const value of values) {
-    if (value > -1 || value < -GROK_BOT_MAX_COMPARE_WEEKS || seen.has(value)) continue;
-    seen.add(value);
-    kept.push(value);
-  }
-  kept.sort((left, right) => right - left);
-  return kept.slice(0, GROK_BOT_MAX_COMPARE).map(brandGrokBotCompareDelta);
-}
-
-export function parseGrokBotCompareDeltas(
-  raw: string | undefined,
-): readonly GrokBotNegativeCycleDelta[] {
-  if (raw === undefined) return [];
-  const values: number[] = [];
   for (const part of raw.split(',')) {
-    const trimmed = part.trim();
-    if (!/^-?\d+$/.test(trimmed)) continue;
-    const parsed = Number(trimmed);
-    if (!Number.isSafeInteger(parsed)) continue;
-    values.push(parsed);
+    const parsed = parseSafeInteger(part);
+    if (parsed === null || parsed < 0 || parsed === primaryStartMs || seen.has(parsed)) continue;
+    seen.add(parsed);
+    kept.push(parsed);
   }
-  return normalizeGrokBotCompareDeltas(values);
+  return kept;
 }
 
-export function addGrokBotCompareDelta(
-  deltas: readonly GrokBotNegativeCycleDelta[],
-): readonly GrokBotNegativeCycleDelta[] | undefined {
-  if (deltas.length >= GROK_BOT_MAX_COMPARE) return undefined;
-  const present = new Set<number>(deltas);
-  let hole = 0;
-  for (let magnitude = 1; magnitude <= GROK_BOT_MAX_COMPARE_WEEKS; magnitude += 1) {
-    if (!present.has(-magnitude)) {
-      hole = magnitude;
-      break;
-    }
-  }
-  if (hole === 0) return undefined;
-  return normalizeGrokBotCompareDeltas([...deltas, -hole]);
+export function parseGrokBotFocusStart(
+  raw: string | undefined,
+  periodStarts: readonly number[],
+): number {
+  const fallback = periodStarts[0] ?? 0;
+  if (raw === undefined) return fallback;
+  const parsed = parseSafeInteger(raw);
+  if (parsed === null) return fallback;
+  return periodStarts.includes(parsed) ? parsed : fallback;
 }
 
-export function removeGrokBotCompareDelta(
-  deltas: readonly GrokBotNegativeCycleDelta[],
-  delta: GrokBotNegativeCycleDelta,
-): readonly GrokBotNegativeCycleDelta[] {
-  return deltas.filter((item) => item !== delta);
+export function removeGrokBotCompareStart(
+  starts: readonly number[],
+  startMs: number,
+): readonly number[] {
+  return starts.filter((item) => item !== startMs);
 }
 
 export function grokBotHref(params: GrokBotHrefParams): string {
@@ -104,9 +82,15 @@ export function grokBotHref(params: GrokBotHrefParams): string {
   if (params.mode === 'ins-outs') {
     search.set('view', 'ins-outs');
   }
+  if (
+    params.focusStartMs !== undefined
+    && params.focusStartMs !== params.primaryStartMs
+  ) {
+    search.set('focus', String(params.focusStartMs));
+  }
   let query = search.toString();
-  if (params.compareDeltas !== undefined && params.compareDeltas.length > 0) {
-    const cmp = `cmp=${params.compareDeltas.join(',')}`;
+  if (params.compareStarts !== undefined && params.compareStarts.length > 0) {
+    const cmp = `cmp=${params.compareStarts.join(',')}`;
     query = query.length > 0 ? `${query}&${cmp}` : cmp;
   }
   return query.length > 0 ? `${GROK_BOT_PATH}?${query}` : GROK_BOT_PATH;

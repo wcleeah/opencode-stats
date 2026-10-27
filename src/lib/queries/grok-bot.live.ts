@@ -69,7 +69,7 @@ function summarizeRow(row: GrokBotTableRow): {
 function summarizeCharts(charts: GrokBotAlignedCharts): {
   mode: GrokBotAlignedCharts['mode'];
   lines: Array<{ id: string; label: string }>;
-  periods: Array<{ role: 'primary' | 'compare'; delta: number | null; shortLabel: string }>;
+  periods: Array<{ role: 'primary' | 'compare'; startMs: number; shortLabel: string }>;
   points: Array<{
     bucketStartMs: number;
     values?: Array<Array<{ tokens: number; usd: number }>>;
@@ -83,7 +83,7 @@ function summarizeCharts(charts: GrokBotAlignedCharts): {
 } {
   const periods = charts.periods.map((period) => ({
     role: period.role,
-    delta: period.role === 'compare' ? period.delta : null,
+    startMs: period.startMs,
     shortLabel: period.shortLabel,
   }));
   if (charts.mode === 'by-type') {
@@ -145,6 +145,7 @@ function summarizeBoard(board: GrokBotBoard): {
   bucketMs: number;
   cycleStartMs: number;
   offset: number;
+  focusStartMs: number;
   totals: ReturnType<typeof summarizeTotals>;
   charts: ReturnType<typeof summarizeCharts>;
   rows: ReturnType<typeof summarizeRow>[];
@@ -160,6 +161,7 @@ function summarizeBoard(board: GrokBotBoard): {
     bucketMs: board.window.bucketMs,
     cycleStartMs: board.cycle.startMs,
     offset: board.cycle.offset,
+    focusStartMs: board.focusStartMs,
     totals: summarizeTotals(board.charts.periods[0].totals),
     charts: summarizeCharts(board.charts),
     rows: board.rows.map(summarizeRow),
@@ -174,6 +176,7 @@ async function load(query: {
   page?: string;
   view?: string;
   cmp?: string;
+  focus?: string;
   weekday?: string;
 }): Promise<{ data: ReturnType<typeof summarizeBoard> | null; error: string | null }> {
   const result = await getGrokBotBoard({
@@ -187,6 +190,7 @@ async function load(query: {
     page: query.page,
     view: query.view,
     cmp: query.cmp,
+    focus: query.focus,
     now: NOW,
   });
   if (result.error || !result.data) return { data: null, error: result.error };
@@ -310,7 +314,8 @@ async function main(): Promise<void> {
 
   const shortEnd = BASE_MS + 180_000 - 1;
   const emptyStart = BASE_MS + 3 * DAY_MS;
-  const [bad, short, shortSplit, cycle, page2, page99, cua, empty, future, compare, junk] = (
+  const compareStart = BASE_MS - 7 * DAY_MS;
+  const [bad, short, shortSplit, cycle, page2, page99, cua, empty, future, compare, focused, junk] = (
     await Promise.all([
       load({ weekday: 'funday' }),
       load({ start: String(BASE_MS), end: String(shortEnd) }),
@@ -321,8 +326,18 @@ async function main(): Promise<void> {
       load({ usage: 'grok-bot-cua' }),
       load({ start: String(emptyStart), end: String(emptyStart + 60_000 - 1) }),
       load({ cycle: '1' }),
-      load({ start: String(BASE_MS), end: String(shortEnd), cmp: '-1' }),
-      load({ start: String(BASE_MS), end: String(shortEnd), cmp: '0,nope,1' }),
+      load({ start: String(BASE_MS), end: String(shortEnd), cmp: String(compareStart) }),
+      load({
+        start: String(BASE_MS),
+        end: String(shortEnd),
+        cmp: String(compareStart),
+        focus: String(compareStart),
+      }),
+      load({
+        start: String(BASE_MS),
+        end: String(shortEnd),
+        cmp: `nope,-1,${BASE_MS}`,
+      }),
     ])
   );
 
@@ -337,6 +352,7 @@ async function main(): Promise<void> {
     empty,
     future,
     compare,
+    focused,
     junk,
   }));
 }

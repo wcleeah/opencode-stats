@@ -92,12 +92,6 @@ function parseTokenCount(value: string): number {
   return Math.round(n);
 }
 
-export function isUnbilledCursorEvent(kind: string, costRaw: string): boolean {
-  const k = kind.trim().toLowerCase();
-  const c = costRaw.trim().toLowerCase();
-  return k.includes('error') || k === 'free' || c === 'free';
-}
-
 function parseReportedCost(costRaw: string): number | null {
   const trimmed = costRaw.trim();
   if (!trimmed) return null;

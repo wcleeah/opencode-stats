@@ -37,10 +37,16 @@ Use this order. Stop when a row is unambiguous.
    - https://cursor.com/docs/models/grok-4-6
    - https://cursor.com/docs/models/grok-4-7
    - https://cursor.com/docs/models/cursor-composer-2-5
+   - https://cursor.com/docs/models/claude-opus-4-8
    - https://cursor.com/docs/models/claude-opus-5-5
    - https://cursor.com/docs/models/claude-fable-5-1
+   - https://cursor.com/docs/models/claude-sonnet-5-5
+   - https://cursor.com/docs/models/claude-haiku-5-5
    - https://cursor.com/docs/models/gemini-3-8-flash
+   - https://cursor.com/docs/models/gemini-4-argon
    - https://cursor.com/docs/models/muse-spark-1-3
+   - https://cursor.com/docs/models/muse-wonder
+   - https://cursor.com/docs/models/deepseek-v4-1-flash-1017
    - https://cursor.com/blog (e.g. “Introducing Grok 4.5”)
 3. **Cursor changelog / forum** for first-party pool rules and launch-week promos
    https://cursor.com/changelog
@@ -158,7 +164,7 @@ uses `Date.now()` (current card).
 - [ ] `SAMPLE_CSV_MODELS` updated if the CSV grew.
 - [ ] `pnpm test` and `pnpm run typecheck`.
 
-## Known dated cards (as of 2026-09-23)
+## Known dated cards (as of 2026-10-28)
 
 | Model | Card | When |
 | --- | --- | --- |
@@ -168,8 +174,20 @@ uses `Date.now()` (current card).
 | Grok 4.7 | $2 in / $6 out; Fast $4 / $12 | Launch **2026-09-21**; 500k is 2x / Fast-500k 3x of standard |
 | Claude Fable 5.1 | $10 in / $50 out; cache read $0.25 | Launch **2026-09-01** (same I/O as Fable 5) |
 | Claude Opus 5.5 | $4 in / $20 out; Fast $8 / $40 | Launch **2026-09-22** |
-| Gemini 3.8 Flash | $0.75 in / $3.50 out | Cursor list from **2026-09-02**; Google API intro $3.75 out expires 2026-12-31 — do not assume Cursor moves then |
+| Claude Opus 4.8 Fast | $10 in / $50 out; cache read $1 | Pricing note since at least **2026-09-22** (3× lower than Opus 4.7 fast). Standard stays $5 / $25 |
+| Claude Sonnet 5.5 | $2 in / $10 out; cache read $0.20 | Cursor doc **2026-09-29** until **2026-10-07** |
+| Claude Sonnet 5.5 | cache read $0.10 | From **2026-10-07** (Anthropic cache-read cut; I/O and cache write unchanged) |
+| Claude Haiku 5.5 | $0.10 in / $0.50 out; cache read $0.01 | Anthropic **2026-10-07**; Cursor doc by **2026-10-08**. Above 100k input is 5× and is not a separate slug |
+| Gemini 3.7 / 3.8 Flash | $0.75 in / $3.50 out | Until **2026-10-14** 00:00 UTC |
+| Gemini 3.7 / 3.8 Flash | $0.75 in / $3.75 out | From **2026-10-14**. Google's 3.8 intro becomes $1.50 / $7.50 on **2027-01-01** — do not assume Cursor moves then |
+| Gemini 4 Argon | $2 in / $10 out; cache read $0.10 | Cursor **2026-10-13**. Google intro through **2026-11-30**, then API $4 / $20 — do not assume Cursor moves on **2026-12-01** |
+| Gemini 3.5 Flash Lite | $0.30 in / $2.50 out | On the Cursor table by **2026-10-14** (absent **2026-10-08**) |
+| GLM 5.3 / 5.3 Flash | $1.40 / $4.40 and $0.15 / $0.50 | Release notes week of **2026-09-28**; model doc captured **2026-10-02** |
 | Muse Spark 1.3 | $1.25 in / $4.25 out; cache read $0.15 | Meta **2026-09-02**; Cursor **2026-09-09** |
+| Muse Wonder | $4 in / $20 out; cache read $0.20 | Cursor **2026-10-15** (`muse-wonder-1.0`) |
+| DeepSeek V4.1 Flash 1017 | $0.30 in / $1.20 out; cache read $0.006 | Cursor **2026-10-26** |
 
 After 2026-11-21, re-check OpenAI + Cursor docs before assuming Sol stays
-at $4/$20.
+at $4/$20. After 2026-11-30, re-check Cursor before assuming Argon leaves
+$2/$10. After 2026-12-31, re-check Cursor before assuming Gemini 3.8 leaves
+$0.75/$3.75.

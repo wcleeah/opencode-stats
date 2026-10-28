@@ -1,17 +1,23 @@
 /**
  * Cursor published model pricing (USD per token).
  *
- * Sources (synced Sep 2026):
+ * Sources (synced 2026-10-28):
  * - https://cursor.com/docs/models-and-pricing
  * - https://cursor.com/docs/account/teams/pricing
  * - https://cursor.com/docs/models/grok-4-5
  * - https://cursor.com/docs/models/grok-4-6
  * - https://cursor.com/docs/models/grok-4-7
  * - https://cursor.com/docs/models/cursor-composer-2-5
+ * - https://cursor.com/docs/models/claude-opus-4-8
  * - https://cursor.com/docs/models/claude-opus-5-5
  * - https://cursor.com/docs/models/claude-fable-5-1
+ * - https://cursor.com/docs/models/claude-sonnet-5-5
+ * - https://cursor.com/docs/models/claude-haiku-5-5
  * - https://cursor.com/docs/models/gemini-3-8-flash
+ * - https://cursor.com/docs/models/gemini-4-argon
  * - https://cursor.com/docs/models/muse-spark-1-3
+ * - https://cursor.com/docs/models/muse-wonder
+ * - https://cursor.com/docs/models/deepseek-v4-1-flash-1017
  *
  * When docs omit cache-write (`-`), cache-write is billed at the input rate.
  * Effort / thinking suffixes in CSV model IDs resolve to the base model rate.
@@ -23,6 +29,13 @@
  * - Grok 4.7: $2/$6 (Fast $4/$12) from launch 2026-09-21; 500k long-context
  *   rows are 2x standard / 3x standard-in-Fast. Same list as Grok 4.6 Fast,
  *   not Grok 4.5 Fast ($18 output).
+ * - Claude Sonnet 5.5: cache read $0.20 until 2026-10-07, then $0.10.
+ *   Input $2, output $10, and cache write $2.50 are unchanged.
+ * - Gemini 3.7 Flash and Gemini 3.8 Flash: output $3.50 until 2026-10-14,
+ *   then $3.75. Input $0.75 and cache read $0.075 are unchanged.
+ * - Claude Opus 4.8 Fast is $10/$50 (not the standard $5/$25 row). The
+ *   pricing note has said "3x lower than Opus 4.7 fast" since at least
+ *   2026-09-22, so there is no earlier fast card to keep.
  *
  * How to update rates and cutoffs: `CURSOR-PRICING.md`.
  */
@@ -99,7 +112,11 @@ const CURSOR_MODEL_PRICING: Record<string, CursorModelPricing> = {
   'claude-opus-4-7-fast': rate(30, 150, 3, 37.5),
   'claude-opus-4.8': rate(5, 25, 0.5, 6.25),
   'claude-opus-4-8': rate(5, 25, 0.5, 6.25),
-  'claude-opus-4-8-fast': rate(5, 25, 0.5, 6.25),
+  // Fast is $10/$50, 3x lower per-token than Opus 4.7 fast ($30/$150),
+  // not the standard $5/$25 row. Cache write $12.5 and cache read $1 are
+  // one-third of the Opus 4.7 fast row. Pricing note since at least 2026-09-22.
+  'claude-opus-4-8-fast': rate(10, 50, 1, 12.5),
+  'claude-opus-4.8-fast': rate(10, 50, 1, 12.5),
   'claude-opus-5': rate(5, 25, 0.5, 6.25),
   'claude-opus-5-fast': rate(5, 25, 0.5, 6.25),
   // Opus 5.5 launch 2026-09-22: $4/$20, cache read $0.20 (0.05x). Fast is 2x.
@@ -109,6 +126,16 @@ const CURSOR_MODEL_PRICING: Record<string, CursorModelPricing> = {
   'claude-opus-5-5-fast': rate(8, 40, 0.4, 10),
   // Claude Sonnet 5 — list $2/$10 (cache write $2.5, cache read $0.2)
   'claude-sonnet-5': rate(2, 10, 0.2, 2.5),
+  // Sonnet 5.5 current card: same I/O and cache write as Sonnet 5, cache
+  // read $0.10 from 2026-10-07. Launch cache read $0.20 via pricingForKeyAt.
+  // Cursor model doc captured 2026-09-29 (release notes, week of Sep 28).
+  'claude-sonnet-5.5': rate(2, 10, 0.1, 2.5),
+  'claude-sonnet-5-5': rate(2, 10, 0.1, 2.5),
+  // Haiku 5.5: Anthropic launch 2026-10-07 (`claude-haiku-5-5`); Cursor
+  // model doc by 2026-10-08. Above 100k input tokens the API bills 5x
+  // ($0.50 / $0.625 / $0.05 / $2.50). That tier is not its own model row.
+  'claude-haiku-5.5': rate(0.1, 0.5, 0.01, 0.125),
+  'claude-haiku-5-5': rate(0.1, 0.5, 0.01, 0.125),
   'claude-sonnet-4.5': rate(3, 15, 0.3, 3.75),
   'claude-opus-4.5': rate(5, 25, 0.5, 6.25),
   'claude-opus-4.6': rate(5, 25, 0.5, 6.25),
@@ -121,13 +148,25 @@ const CURSOR_MODEL_PRICING: Record<string, CursorModelPricing> = {
   'gemini-3.1-pro': rate(2, 12, 0.2),
   'gemini-3.5-flash': rate(1.5, 9, 0.15),
   'gemini-3.6-flash': rate(1.5, 7.5, 0.15),
-  'gemini-3.7-flash': rate(0.75, 3.5, 0.075),
-  // Gemini 3.8 Flash launch 2026-09-02. Cursor list output is $3.50 (not
-  // Google's $3.75 API intro price). Cache write omitted → input rate.
-  'gemini-3.8-flash': rate(0.75, 3.5, 0.075),
+  // Output was $3.50 until 2026-10-14. Current card matches the Cursor table
+  // ($3.75). Google's 3.8 intro ($0.75/$3.75) becomes $1.50/$7.50 on
+  // 2027-01-01 — do not switch Cursor rates until the table moves.
+  'gemini-3.7-flash': rate(0.75, 3.75, 0.075),
+  'gemini-3.8-flash': rate(0.75, 3.75, 0.075),
+  // Auto-review classifier only. On the Cursor table by 2026-10-14
+  // (absent on the 2026-10-08 capture). Cache write omitted → input.
+  'gemini-3.5-flash-lite': rate(0.3, 2.5, 0.03),
+  // Cursor availability 2026-10-13 at Google's intro card. Cache read is
+  // $0.10 (95% off input), not 0.1x input. Intro on the Google API runs
+  // through 2026-11-30, then $4/$20 — keep $2/$10 until Cursor republishes.
+  'gemini-4-argon': rate(2, 10, 0.1),
 
   // —— Z.ai ——
   'glm-5.2': rate(1.4, 4.4, 0.26),
+  // GLM 5.3 matches GLM 5.2. Flash is the cheaper card. Cursor release
+  // notes, week of 2026-09-28; model doc captured 2026-10-02.
+  'glm-5.3': rate(1.4, 4.4, 0.26),
+  'glm-5.3-flash': rate(0.15, 0.5, 0.029),
 
   // —— OpenAI ——
   'gpt-5': rate(1.25, 10, 0.125),
@@ -156,10 +195,20 @@ const CURSOR_MODEL_PRICING: Record<string, CursorModelPricing> = {
   'kimi-k2.7-code': rate(0.95, 4, 0.19),
   'kimi-k3': rate(3, 15, 0.3),
 
+  // —— DeepSeek ——
+  // V4.1 Flash 1017: Cursor availability 2026-10-26. Cache write omitted
+  // (`-`) → input rate. No long-context surcharge.
+  'deepseek-v4-1-flash-1017': rate(0.3, 1.2, 0.006),
+  'deepseek-v4.1-flash-1017': rate(0.3, 1.2, 0.006),
+
   // —— Meta ——
   // Muse Spark 1.3: Meta launch 2026-09-02; Cursor availability 2026-09-09.
   // Cache write omitted (`-`) → input rate. Cached input is $0.15/M.
   'muse-spark-1.3': rate(1.25, 4.25, 0.15),
+  // Muse Wonder: Cursor post 2026-10-15, $4/$20, cache read $0.20.
+  // `muse-wonder-1.0` is the product slug; `muse-wonder` is the docs name.
+  'muse-wonder': rate(4, 20, 0.2),
+  'muse-wonder-1.0': rate(4, 20, 0.2),
 };
 
 /** Explicit CSV / product slugs that differ from the docs table name. */
@@ -311,9 +360,51 @@ export const GPT_56_SOL_PROMO_START_MS = Date.UTC(2026, 7, 21);
  */
 export const GPT_56_SOL_PROMO_END_MS = Date.UTC(2026, 10, 22);
 
+/**
+ * Sonnet 5.5 launch cache read ($0.20) before Anthropic's 7 Oct 2026 cut.
+ * Input $2, output $10, and cache write $2.50 did not change.
+ * Source: Claude Platform release notes, 2026-10-07. Cursor Other Models
+ * tracks API list rates; the Cursor table already showed $0.10 on 2026-10-08.
+ */
+const SONNET_55_LAUNCH = rate(2, 10, 0.2, 2.5);
+
+/** UTC midnight when Sonnet 5.5 cache reads become $0.10/M. */
+export const SONNET_55_CACHE_READ_CUT_START_MS = Date.UTC(2026, 9, 7);
+
+/**
+ * Gemini 3.7 Flash and 3.8 Flash output was $3.50 before Cursor's table
+ * moved to $3.75. Input $0.75 and cache read $0.075 unchanged.
+ * Wayback of the Cursor pricing table: $3.50 at 2026-10-08 10:31 UTC,
+ * $3.75 at 2026-10-14 10:32 UTC. LLMRates records the 3.8 output change
+ * on 2026-10-14.
+ */
+const GEMINI_37_38_FLASH_BEFORE = rate(0.75, 3.5, 0.075);
+
+/** UTC midnight when Gemini 3.7/3.8 Flash output becomes $3.75/M. */
+export const GEMINI_FLASH_OUTPUT_375_START_MS = Date.UTC(2026, 9, 14);
+
+/**
+ * Exclusive end of Google's Gemini 4 Argon intro ($2/$10 through 30 Nov 2026).
+ * After this instant we still use the intro card until Cursor republishes.
+ * Source: Google launch post, 2026-10-13. Cursor matched $2/$10 on that day.
+ */
+export const GEMINI_4_ARGON_INTRO_END_MS = Date.UTC(2026, 11, 1);
+
 function pricingForKeyAt(key: string, eventAtMs: number): CursorModelPricing | null {
   if (key === 'gpt-5.6-sol' && eventAtMs < GPT_56_SOL_PROMO_START_MS) {
     return GPT_56_SOL_LAUNCH;
+  }
+  if (
+    (key === 'claude-sonnet-5.5' || key === 'claude-sonnet-5-5') &&
+    eventAtMs < SONNET_55_CACHE_READ_CUT_START_MS
+  ) {
+    return SONNET_55_LAUNCH;
+  }
+  if (
+    (key === 'gemini-3.7-flash' || key === 'gemini-3.8-flash') &&
+    eventAtMs < GEMINI_FLASH_OUTPUT_375_START_MS
+  ) {
+    return GEMINI_37_38_FLASH_BEFORE;
   }
   return CURSOR_MODEL_PRICING[key] ?? null;
 }
@@ -455,4 +546,15 @@ export const SAMPLE_CSV_MODELS = [
   'gemini-3.8-flash',
   'muse-spark-1.3-max',
   'gpt-5.6-sol-high-fast',
+  'claude-sonnet-5-5-thinking-high',
+  'claude-haiku-5-5-thinking-high',
+  'claude-haiku-5.5',
+  'gemini-4-argon-medium',
+  'gemini-3.5-flash-lite',
+  'glm-5.3',
+  'glm-5.3-flash',
+  'muse-wonder-1.0-high',
+  'muse-wonder',
+  'deepseek-v4-1-flash-1017-max',
+  'claude-opus-4-8-fast',
 ] as const;

@@ -40,6 +40,16 @@ test('resolvePricingKey maps CSV effort variants to base families', () => {
   assert.equal(resolvePricingKey('muse-spark-1.3-minimal'), 'muse-spark-1.3');
   assert.equal(resolvePricingKey('gemini-3.8-flash-high'), 'gemini-3.8-flash');
   assert.equal(resolvePricingKey('gpt-5.1-codex-max'), 'gpt-5.1-codex-max');
+  assert.equal(resolvePricingKey('claude-sonnet-5-5-thinking-high'), 'claude-sonnet-5-5');
+  assert.equal(resolvePricingKey('claude-haiku-5-5-thinking-high'), 'claude-haiku-5-5');
+  assert.equal(resolvePricingKey('claude-haiku-5.5'), 'claude-haiku-5.5');
+  assert.equal(resolvePricingKey('gemini-4-argon-minimal'), 'gemini-4-argon');
+  assert.equal(resolvePricingKey('gemini-3.5-flash-lite'), 'gemini-3.5-flash-lite');
+  assert.equal(resolvePricingKey('glm-5.3-flash'), 'glm-5.3-flash');
+  assert.equal(resolvePricingKey('muse-wonder-1.0-max'), 'muse-wonder-1.0');
+  assert.equal(resolvePricingKey('deepseek-v4-1-flash-1017-none'), 'deepseek-v4-1-flash-1017');
+  assert.equal(resolvePricingKey('deepseek-v4.1-flash-1017-high'), 'deepseek-v4.1-flash-1017');
+  assert.equal(resolvePricingKey('claude-opus-4.8-high-fast'), 'claude-opus-4.8-fast');
 });
 
 test('getCursorUsagePool classifies first-party vs third-party', () => {
@@ -54,6 +64,13 @@ test('getCursorUsagePool classifies first-party vs third-party', () => {
   assert.equal(getCursorUsagePool('claude-opus-5-5-thinking-high'), 'other');
   assert.equal(getCursorUsagePool('muse-spark-1.3-max'), 'other');
   assert.equal(getCursorUsagePool('gemini-3.8-flash'), 'other');
+  assert.equal(getCursorUsagePool('claude-sonnet-5-5-thinking-high'), 'other');
+  assert.equal(getCursorUsagePool('claude-haiku-5-5-thinking-high'), 'other');
+  assert.equal(getCursorUsagePool('gemini-4-argon-medium'), 'other');
+  assert.equal(getCursorUsagePool('gemini-3.5-flash-lite'), 'other');
+  assert.equal(getCursorUsagePool('glm-5.3-flash'), 'other');
+  assert.equal(getCursorUsagePool('muse-wonder-1.0-high'), 'other');
+  assert.equal(getCursorUsagePool('deepseek-v4-1-flash-1017-max'), 'other');
 });
 
 test('estimateCursorCost uses published grok fast rates', () => {
@@ -265,8 +282,9 @@ test('estimateCursorCost uses gemini 3.8 flash and muse spark list rates', () =>
       tokensInputCacheWrite: 0,
       tokensCacheRead: 0,
       tokensOutput: 1_000_000,
+      eventAt: Date.UTC(2026, 9, 14),
     }).cost,
-    0.75 + 3.5,
+    0.75 + 3.75,
   );
   assert.equal(
     estimateCursorCost({
@@ -278,6 +296,177 @@ test('estimateCursorCost uses gemini 3.8 flash and muse spark list rates', () =>
       tokensOutput: 1_000_000,
     }).cost,
     1.25 + 0.15 + 4.25,
+  );
+});
+
+test('estimateCursorCost keeps gemini 3.7 and 3.8 output at $3.50 before 14 Oct 2026', () => {
+  const before = {
+    reportedCost: null,
+    tokensInput: 1_000_000,
+    tokensInputCacheWrite: 0,
+    tokensCacheRead: 0,
+    tokensOutput: 1_000_000,
+    eventAt: Date.UTC(2026, 9, 13, 23, 59, 59, 999),
+  };
+  assert.equal(
+    estimateCursorCost({ ...before, modelId: 'gemini-3.8-flash' }).cost,
+    0.75 + 3.5,
+  );
+  assert.equal(
+    estimateCursorCost({ ...before, modelId: 'gemini-3.7-flash' }).cost,
+    0.75 + 3.5,
+  );
+
+  const onCutoff = {
+    ...before,
+    eventAt: Date.UTC(2026, 9, 14),
+  };
+  assert.equal(
+    estimateCursorCost({ ...onCutoff, modelId: 'gemini-3.7-flash' }).cost,
+    0.75 + 3.75,
+  );
+});
+
+test('estimateCursorCost uses sonnet 5.5 cache-read cut on 7 Oct 2026', () => {
+  const cacheRead = {
+    reportedCost: null,
+    modelId: 'claude-sonnet-5-5-thinking-high',
+    tokensInput: 0,
+    tokensInputCacheWrite: 0,
+    tokensCacheRead: 1_000_000,
+    tokensOutput: 0,
+  };
+  assert.equal(
+    estimateCursorCost({
+      ...cacheRead,
+      eventAt: Date.UTC(2026, 9, 6, 23, 59, 59, 999),
+    }).cost,
+    0.2,
+  );
+  assert.equal(
+    estimateCursorCost({
+      ...cacheRead,
+      eventAt: Date.UTC(2026, 9, 7),
+    }).cost,
+    0.1,
+  );
+  assert.equal(
+    estimateCursorCost({
+      reportedCost: null,
+      modelId: 'claude-sonnet-5.5',
+      tokensInput: 1_000_000,
+      tokensInputCacheWrite: 1_000_000,
+      tokensCacheRead: 0,
+      tokensOutput: 1_000_000,
+      eventAt: Date.UTC(2026, 8, 29),
+    }).cost,
+    2 + 2.5 + 10,
+  );
+});
+
+test('estimateCursorCost uses opus 4.8 fast rates not the standard row', () => {
+  assert.equal(
+    estimateCursorCost({
+      reportedCost: null,
+      modelId: 'claude-opus-4-8-fast',
+      tokensInput: 1_000_000,
+      tokensInputCacheWrite: 0,
+      tokensCacheRead: 0,
+      tokensOutput: 1_000_000,
+    }).cost,
+    10 + 50,
+  );
+  assert.equal(
+    estimateCursorCost({
+      reportedCost: null,
+      modelId: 'claude-opus-4.8-high-fast',
+      tokensInput: 0,
+      tokensInputCacheWrite: 0,
+      tokensCacheRead: 1_000_000,
+      tokensOutput: 0,
+    }).cost,
+    1,
+  );
+  assert.equal(
+    estimateCursorCost({
+      reportedCost: null,
+      modelId: 'claude-opus-4-8-thinking-high',
+      tokensInput: 1_000_000,
+      tokensInputCacheWrite: 0,
+      tokensCacheRead: 0,
+      tokensOutput: 1_000_000,
+    }).cost,
+    5 + 25,
+  );
+});
+
+test('estimateCursorCost uses october 2026 third-party list rates', () => {
+  assert.equal(
+    estimateCursorCost({
+      reportedCost: null,
+      modelId: 'claude-haiku-5-5-thinking-high',
+      tokensInput: 1_000_000,
+      tokensInputCacheWrite: 1_000_000,
+      tokensCacheRead: 1_000_000,
+      tokensOutput: 1_000_000,
+    }).cost,
+    0.1 + 0.125 + 0.01 + 0.5,
+  );
+  assert.equal(
+    estimateCursorCost({
+      reportedCost: null,
+      modelId: 'gemini-4-argon-medium',
+      tokensInput: 1_000_000,
+      tokensInputCacheWrite: 0,
+      tokensCacheRead: 1_000_000,
+      tokensOutput: 1_000_000,
+      eventAt: Date.UTC(2026, 11, 1),
+    }).cost,
+    2 + 0.1 + 10,
+  );
+  assert.equal(
+    estimateCursorCost({
+      reportedCost: null,
+      modelId: 'muse-wonder-1.0-high',
+      tokensInput: 1_000_000,
+      tokensInputCacheWrite: 0,
+      tokensCacheRead: 1_000_000,
+      tokensOutput: 1_000_000,
+    }).cost,
+    4 + 0.2 + 20,
+  );
+  assert.equal(
+    estimateCursorCost({
+      reportedCost: null,
+      modelId: 'deepseek-v4-1-flash-1017-max',
+      tokensInput: 1_000_000,
+      tokensInputCacheWrite: 0,
+      tokensCacheRead: 1_000_000,
+      tokensOutput: 1_000_000,
+    }).cost,
+    0.3 + 0.006 + 1.2,
+  );
+  assert.equal(
+    estimateCursorCost({
+      reportedCost: null,
+      modelId: 'glm-5.3-flash',
+      tokensInput: 1_000_000,
+      tokensInputCacheWrite: 0,
+      tokensCacheRead: 0,
+      tokensOutput: 1_000_000,
+    }).cost,
+    0.15 + 0.5,
+  );
+  assert.equal(
+    estimateCursorCost({
+      reportedCost: null,
+      modelId: 'gemini-3.5-flash-lite',
+      tokensInput: 1_000_000,
+      tokensInputCacheWrite: 0,
+      tokensCacheRead: 0,
+      tokensOutput: 1_000_000,
+    }).cost,
+    0.3 + 2.5,
   );
 });
 

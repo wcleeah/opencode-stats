@@ -16,15 +16,21 @@ import {
 } from '@/lib/grok-bot/href';
 import { grokBotPeriodNames } from '@/lib/grok-bot/period-name';
 import { grokBotPeriodTitle } from '@/lib/grok-bot/period-title';
+import { grokBotPlanCaptureHref } from '@/lib/grok-bot/plan-usage';
 import type { GrokBotCharge } from '@/lib/grok-bot/rates';
 import { grokBotCompareStarts } from '@/lib/grok-bot/window';
 import { getCursorSettings } from '@/lib/queries/cursor';
 import { getGrokBotBoard, type GrokBotBoard } from '@/lib/queries/grok-bot';
+import {
+  getGrokBotPlanView,
+  type GrokBotPlanQueryResult,
+} from '@/lib/queries/grok-bot-plan';
 
 import { GrokBotAddPeriod } from '@/components/grok-bot/add-period';
 import { GrokBotPeriodNameField } from '@/components/grok-bot/period-name-field';
 import { GrokBotSeriesChart } from '@/components/grok-bot/usage-chart';
 import { GrokWindowEditor } from '@/components/grok-bot/window-editor';
+import { GrokBotPlanUsageSection } from '@/components/grok-bot/plan-usage';
 import { GrokBotWindowStats } from '@/components/grok-bot/window-stats';
 import { PendingAnchor } from '@/components/pending-anchor';
 import { Card } from '@/components/ui/card';
@@ -48,6 +54,7 @@ interface GrokPageProps {
     cmp?: string;
     focus?: string;
     names?: string;
+    capture?: string;
   }>;
 }
 
@@ -226,6 +233,29 @@ function CycleLinks({ board }: { board: GrokBotBoard }) {
   );
 }
 
+function planCaptureHref(board: GrokBotBoard | null, id: number): string {
+  return grokBotPlanCaptureHref(board ? hrefFor(board) : '/cursor/grok', id);
+}
+
+function PlanUsageBlock(props: {
+  result: GrokBotPlanQueryResult;
+  board: GrokBotBoard | null;
+}) {
+  if (props.result.error || !props.result.data) {
+    return (
+      <p className="text-sm text-error">
+        {props.result.error ?? 'Failed to load plan usage.'}
+      </p>
+    );
+  }
+  return (
+    <GrokBotPlanUsageSection
+      view={props.result.data}
+      captureHref={(id) => planCaptureHref(props.board, id)}
+    />
+  );
+}
+
 function UsageLinks({ board }: { board: GrokBotBoard }) {
   const catalogIds = board.usageTypes.map((entry) => entry.id);
   const selected = new Set(board.selectedUsageTypeIds);
@@ -261,11 +291,15 @@ function UsageLinks({ board }: { board: GrokBotBoard }) {
 
 export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) {
   const params = await searchParams;
-  const settingsResult = await getCursorSettings();
+  const [settingsResult, planResult] = await Promise.all([
+    getCursorSettings(),
+    getGrokBotPlanView({ capture: params.capture }),
+  ]);
   if (settingsResult.error || !settingsResult.data) {
     return (
       <div className="space-y-6">
         <GrokHeader />
+        <PlanUsageBlock result={planResult} board={null} />
         <p className="text-sm text-error">
           {settingsResult.error ?? 'Failed to load Grokbot usage.'}
         </p>
@@ -292,6 +326,7 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
     return (
       <div className="space-y-6">
         <GrokHeader />
+        <PlanUsageBlock result={planResult} board={null} />
         <p className="text-sm text-error">
           {boardResult.error ?? 'Failed to load Grokbot usage.'}
         </p>
@@ -324,6 +359,7 @@ export default async function GrokbotUsagePage({ searchParams }: GrokPageProps) 
   return (
     <div className="space-y-6">
       <GrokHeader />
+      <PlanUsageBlock result={planResult} board={board} />
       <CycleLinks board={board} />
       <UsageLinks board={board} />
       {board.cycleHasRows ? (

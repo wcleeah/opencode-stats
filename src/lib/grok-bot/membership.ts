@@ -2,7 +2,6 @@ import type { CursorProduct } from '@/lib/cursor/usage-event';
 
 export const GROK_BOT_HYPHEN_PREFIX = 'grok-bot-';
 
-/** Only synthetic slug allowed for Product=grok-bot + empty Model. */
 export const GROK_BOT_DEFAULT_MODEL = 'grok-bot-default';
 
 const SQL_COLUMN = /^[A-Za-z_]+$/;
@@ -23,10 +22,6 @@ export function grokBotModelSql(column: string = 'model'): string {
   return `lower(${column}) LIKE '${GROK_BOT_HYPHEN_PREFIX}%'`;
 }
 
-/**
- * Dashboard family. product='grok-bot' wins; product='cursor' never grok;
- * product=null falls back to isGrokBotModel(model).
- */
 export function isGrokBotDashboardEvent(
   product: CursorProduct | null,
   model: string,
@@ -36,9 +31,8 @@ export function isGrokBotDashboardEvent(
   return isGrokBotModel(model);
 }
 
-/**
- * SQL twin of isGrokBotDashboardEvent. Queries must use this, not a local LIKE.
- */
 export function grokBotDashboardSql(): string {
+  // COALESCE keeps NULL product from making `product = 'grok-bot'` UNKNOWN,
+  // which would drop legacy cursor rows from `NOT (grokBotDashboardSql())`.
   return `(COALESCE(product, '') = 'grok-bot' OR (product IS NULL AND lower(model) LIKE '${GROK_BOT_HYPHEN_PREFIX}%'))`;
 }

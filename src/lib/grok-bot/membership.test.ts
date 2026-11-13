@@ -85,15 +85,29 @@ test('grokBotDashboardSql agrees with isGrokBotDashboardEvent on representative 
     });
   }
 
-  const result = await client.execute(
-    `SELECT product, model FROM cursor_usage_events WHERE ${grokBotDashboardSql()} ORDER BY model`,
+  const grok = await client.execute(
+    `SELECT product, model FROM cursor_usage_events
+     WHERE ${grokBotDashboardSql()}
+     ORDER BY model, COALESCE(product, '')`,
   );
-  const grokRows = result.rows.map((r) => ({
-    product: r.product ?? null,
-    model: r.model,
-  }));
-  assert.equal(grokRows.length, 2);
-  for (const row of grokRows) {
-    assert.equal(isGrokBotDashboardEvent(row.product as typeof DASHBOARD_CASES[number]['product'], String(row.model)), true);
-  }
+  assert.deepEqual(
+    grok.rows.map((row) => ({ product: row.product ?? null, model: row.model })),
+    [
+      { product: null, model: GROK_BOT_DEFAULT_MODEL },
+      { product: 'grok-bot', model: GROK_BOT_DEFAULT_MODEL },
+    ],
+  );
+
+  const cursor = await client.execute(
+    `SELECT product, model FROM cursor_usage_events
+     WHERE NOT (${grokBotDashboardSql()})
+     ORDER BY model`,
+  );
+  assert.deepEqual(
+    cursor.rows.map((row) => ({ product: row.product ?? null, model: row.model })),
+    [
+      { product: null, model: 'cursor-grok-4.6-xhigh' },
+      { product: 'cursor', model: GROK_BOT_DEFAULT_MODEL },
+    ],
+  );
 });

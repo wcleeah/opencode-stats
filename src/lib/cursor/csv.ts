@@ -3,7 +3,6 @@ import { createHash } from 'node:crypto';
 import { GROK_BOT_DEFAULT_MODEL } from '@/lib/grok-bot/membership';
 import type { CursorProduct, CursorUsageEvent } from '@/lib/cursor/usage-event';
 
-/** @deprecated Prefer CursorUsageEvent from usage-event.ts */
 export type CursorCsvEvent = CursorUsageEvent;
 
 export interface CursorCsvParseResult {

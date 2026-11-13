@@ -6,7 +6,6 @@ export interface CursorUsageEvent {
   automationId: string | null;
   kind: string;
   model: string;
-  /** Parsed Product. null = legacy usage-events file; never infer 'cursor'. */
   product: CursorProduct | null;
   maxMode: boolean;
   tokensInputCacheWrite: number;

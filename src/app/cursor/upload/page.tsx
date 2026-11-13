@@ -17,8 +17,8 @@ export default async function CursorUploadPage() {
         <div>
           <h1 className="text-lg font-bold">Upload Cursor usage</h1>
           <p className="mt-1 text-xs text-muted max-w-md">
-            Export a CSV from Cursor&apos;s usage page, then upload it here. Re-uploads merge
-            and skip duplicates.
+            Export a unified usage CSV or the older usage-events CSV from Cursor, then upload it
+            here. Re-uploads merge and skip duplicates.
           </p>
         </div>
         <PendingAnchor

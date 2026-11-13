@@ -70,7 +70,7 @@ export function CursorUploadForm() {
     <form onSubmit={onSubmit} className="space-y-4">
       <label className="block space-y-2">
         <span className="text-xs uppercase tracking-wide text-muted">
-          Cursor usage CSV
+          Cursor usage export (unified or legacy CSV)
         </span>
         <input
           type="file"

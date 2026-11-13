@@ -1,4 +1,4 @@
-import { grokBotModelSql } from '@/lib/grok-bot/membership';
+import { grokBotDashboardSql } from '@/lib/grok-bot/membership';
 
 export const UNBILLED_PREDICATE =
   `(lower(kind) LIKE '%error%' OR lower(ifnull(cost_raw, '')) = 'free' OR lower(kind) = 'free')`;
@@ -55,7 +55,7 @@ export function cursorEventWhere(
 ): { clause: string; args: number[] } {
   return andWhere(
     rangeWhere('event_at', startMs, endMs),
-    `NOT (${grokBotModelSql('model')})`,
+    `NOT (${grokBotDashboardSql()})`,
   );
 }
 

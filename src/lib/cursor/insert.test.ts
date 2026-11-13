@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import type { CursorCsvEvent } from './csv';
+import type { CursorUsageEvent } from '@/lib/cursor/usage-event';
 
 import {
   CURSOR_EVENT_PARAM_COUNT,
@@ -13,13 +13,14 @@ import {
   cursorImportHttpCallCount,
 } from './insert';
 
-function event(index: number): CursorCsvEvent {
+function event(index: number): CursorUsageEvent {
   return {
     eventAt: 1_700_000_000_000 + index,
     cloudAgentId: index % 2 === 0 ? `agent-${index}` : null,
     automationId: null,
     kind: 'Included',
     model: 'cursor-grok-4.5-high',
+    product: index % 3 === 0 ? 'cursor' : null,
     maxMode: false,
     tokensInputCacheWrite: index,
     tokensInput: index + 1,
@@ -32,27 +33,30 @@ function event(index: number): CursorCsvEvent {
   };
 }
 
-test('cursorEventArgs emits 16 bindings in column order', () => {
+test('cursorEventArgs emits 17 bindings in column order', () => {
   const args = cursorEventArgs(event(3), 9, 42);
   assert.equal(args.length, CURSOR_EVENT_PARAM_COUNT);
+  assert.equal(CURSOR_EVENT_PARAM_COUNT, 17);
   assert.equal(args[0], 'hash-3');
   assert.equal(args[1], 1_700_000_000_003);
   assert.equal(args[2], null);
-  assert.equal(args[14], 9);
-  assert.equal(args[15], 42);
+  assert.equal(args[6], 'cursor');
+  assert.equal(args[15], 9);
+  assert.equal(args[16], 42);
 });
 
 test('buildCursorEventInsertStatement uses one VALUES tuple per row', () => {
   const stmt = buildCursorEventInsertStatement([event(0), event(1)], 1, 2);
   assert.equal(typeof stmt.sql, 'string');
+  const seventeen = Array.from({ length: 17 }, () => '\\?').join(', ');
   assert.match(
     stmt.sql,
-    /VALUES \(\?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?\), \(\?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?, \?\)$/,
+    new RegExp(`VALUES \\(${seventeen}\\), \\(${seventeen}\\)$`),
   );
   assert.ok(Array.isArray(stmt.args));
-  assert.equal(stmt.args.length, 32);
+  assert.equal(stmt.args.length, 34);
   assert.equal(stmt.args[0], 'hash-0');
-  assert.equal(stmt.args[16], 'hash-1');
+  assert.equal(stmt.args[17], 'hash-1');
 });
 
 test('buildCursorEventInsertBatches packs 2000 rows into one HTTP batch', () => {

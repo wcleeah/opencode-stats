@@ -18,7 +18,11 @@ import {
   parseGrokBotFocusStart,
 } from '@/lib/grok-bot/href';
 import { parseGrokBotPeriodNames } from '@/lib/grok-bot/period-name';
-import { grokBotModelSql, isGrokBotModel, normalizeGrokBotModelId } from '@/lib/grok-bot/membership';
+import {
+  grokBotDashboardSql,
+  isGrokBotModel,
+  normalizeGrokBotModelId,
+} from '@/lib/grok-bot/membership';
 import {
   grokBotUsageCatalog,
   priceGrokBotRow,
@@ -179,7 +183,7 @@ function eventFilter(
   explicitIds: readonly string[] | undefined,
 ): { clause: string; args: Array<number | string> } {
   const args: Array<number | string> = [startMs, endMs];
-  let clause = `event_at >= ? AND event_at <= ? AND ${grokBotModelSql('model')}`;
+  let clause = `event_at >= ? AND event_at <= ? AND ${grokBotDashboardSql()}`;
   if (explicitIds && explicitIds.length > 0) {
     clause += ` AND lower(model) IN (${explicitIds.map(() => '?').join(', ')})`;
     args.push(...explicitIds);
@@ -218,7 +222,7 @@ export async function getGrokBotBoard(
     query.focus,
     projected.map((period) => period.window.startMs),
   );
-  const membership = grokBotModelSql('model');
+  const membership = grokBotDashboardSql();
   const cycleArgs = [primary.cycle.startMs, primary.cycle.endMs];
 
   const [modelsResult, cycleProbe] = await Promise.all([

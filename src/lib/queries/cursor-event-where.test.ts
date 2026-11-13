@@ -6,7 +6,7 @@ import { resolve } from 'node:path';
 import { createClient } from '@libsql/client';
 
 import { getCursorPricing, getCursorUsagePool } from '@/lib/cursor/pricing';
-import { grokBotModelSql } from '@/lib/grok-bot/membership';
+import { grokBotDashboardSql } from '@/lib/grok-bot/membership';
 
 import {
   CURSOR_EVENT_AGGREGATES,
@@ -30,9 +30,9 @@ test('cursor pricing does not list grok bot models', () => {
   assert.equal(getCursorUsagePool('grok-bot-default'), 'cursor');
 });
 
-test('each cursor aggregate where clause uses grokBotModelSql', () => {
+test('each cursor aggregate where clause uses grokBotDashboardSql', () => {
   const source = readFileSync(resolve('src/lib/queries/cursor.ts'), 'utf8');
-  const fragment = grokBotModelSql('model');
+  const fragment = grokBotDashboardSql();
   assert.equal(CURSOR_EVENT_AGGREGATES.length, AGGREGATE_FUNCTIONS.length);
 
   for (const name of AGGREGATE_FUNCTIONS) {
@@ -64,34 +64,40 @@ test('cursor aggregate sql returns only the cursor model', async () => {
       cloud_agent_id TEXT,
       kind TEXT NOT NULL,
       model TEXT NOT NULL,
+      product TEXT,
       tokens_total INTEGER NOT NULL,
       cost_raw TEXT NOT NULL
     )
   `);
   await client.execute(`
     INSERT INTO cursor_usage_events
-      (event_at, cloud_agent_id, kind, model, tokens_total, cost_raw)
+      (event_at, cloud_agent_id, kind, model, product, tokens_total, cost_raw)
     VALUES
-      (1000, 'agent-1', 'Included', 'grok-bot-default', 10, 'Included'),
-      (2000, 'agent-1', 'Included', 'cursor-grok-4.7', 7, 'Included')
+      (1000, 'agent-1', 'Included', 'grok-bot-default', NULL, 10, 'Included'),
+      (1500, 'agent-1', 'included', 'grok-bot-default', 'cursor', 5, 'Included'),
+      (2000, 'agent-1', 'Included', 'cursor-grok-4.7', NULL, 7, 'Included')
   `);
 
   for (const aggregate of CURSOR_EVENT_AGGREGATES) {
     const where = cursorAggregateWhere(aggregate, 0, 5_000);
     const result = await client.execute({
-      sql: `SELECT model, COALESCE(SUM(tokens_total), 0) AS tokens_total
+      sql: `SELECT model, product, COALESCE(SUM(tokens_total), 0) AS tokens_total
             FROM cursor_usage_events
             ${where.clause}
-            GROUP BY model
+            GROUP BY model, product
             ORDER BY model`,
       args: where.args,
     });
     assert.deepEqual(
       result.rows.map((row) => ({
         model: row.model,
+        product: row.product ?? null,
         tokens_total: Number(row.tokens_total),
       })),
-      [{ model: 'cursor-grok-4.7', tokens_total: 7 }],
+      [
+        { model: 'cursor-grok-4.7', product: null, tokens_total: 7 },
+        { model: 'grok-bot-default', product: 'cursor', tokens_total: 5 },
+      ],
       aggregate,
     );
   }

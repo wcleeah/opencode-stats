@@ -3,7 +3,10 @@ import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 
 const BASE_MS = Date.parse('2026-10-14T03:30:00.000Z');
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -131,7 +134,7 @@ test('grok bot board prices member rows and leaves cursor models out', () => {
     '--import', 'tsx',
     'src/lib/queries/grok-bot.live.ts',
   ], {
-    cwd: '/workspace',
+    cwd: REPO_ROOT,
     env: {
       ...process.env,
       TURSO_DATABASE_URL: `file:${dbPath}`,

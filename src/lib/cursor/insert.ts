@@ -1,33 +1,40 @@
-import type { CursorCsvEvent } from '@/lib/cursor/csv';
+import type { CursorUsageEvent } from '@/lib/cursor/usage-event';
 
 export interface CursorInsertStatement {
   sql: string;
   args: Array<string | number | null>;
 }
 
+export const CURSOR_EVENT_COLUMNS = [
+  'event_hash',
+  'event_at',
+  'cloud_agent_id',
+  'automation_id',
+  'kind',
+  'model',
+  'product',
+  'max_mode',
+  'tokens_input_cache_write',
+  'tokens_input',
+  'tokens_cache_read',
+  'tokens_output',
+  'tokens_total',
+  'cost_raw',
+  'reported_cost',
+  'import_id',
+  'created_at',
+] as const;
+
+const INSERT_COLUMN_LIST = CURSOR_EVENT_COLUMNS.join(',\n        ');
+
 const INSERT_SQL = `INSERT OR IGNORE INTO cursor_usage_events (
-        event_hash,
-        event_at,
-        cloud_agent_id,
-        automation_id,
-        kind,
-        model,
-        max_mode,
-        tokens_input_cache_write,
-        tokens_input,
-        tokens_cache_read,
-        tokens_output,
-        tokens_total,
-        cost_raw,
-        reported_cost,
-        import_id,
-        created_at
+        ${INSERT_COLUMN_LIST}
       ) VALUES `;
 
 /** Bindings per event row. Keep under SQLite's common 999 variable cap. */
-export const CURSOR_EVENT_PARAM_COUNT = 16;
+export const CURSOR_EVENT_PARAM_COUNT = CURSOR_EVENT_COLUMNS.length;
 
-/** Rows per INSERT … VALUES (…), (…). 50 * 16 = 800 placeholders. */
+/** Rows per INSERT … VALUES (…), (…). 50 * 17 = 850 placeholders. */
 export const CURSOR_IMPORT_ROWS_PER_STATEMENT = 50;
 
 /**
@@ -40,7 +47,7 @@ export const CURSOR_IMPORT_STATEMENTS_PER_BATCH = 40;
 const ROW_PLACEHOLDER = `(${Array.from({ length: CURSOR_EVENT_PARAM_COUNT }, () => '?').join(', ')})`;
 
 export function cursorEventArgs(
-  event: CursorCsvEvent,
+  event: CursorUsageEvent,
   importId: number,
   importedAt: number,
 ): Array<string | number | null> {
@@ -51,6 +58,7 @@ export function cursorEventArgs(
     event.automationId,
     event.kind,
     event.model,
+    event.product,
     event.maxMode ? 1 : 0,
     event.tokensInputCacheWrite,
     event.tokensInput,
@@ -65,7 +73,7 @@ export function cursorEventArgs(
 }
 
 export function buildCursorEventInsertStatement(
-  events: CursorCsvEvent[],
+  events: CursorUsageEvent[],
   importId: number,
   importedAt: number,
 ): CursorInsertStatement {
@@ -88,7 +96,7 @@ export function buildCursorEventInsertStatement(
 }
 
 export function buildCursorEventInsertBatches(
-  events: CursorCsvEvent[],
+  events: CursorUsageEvent[],
   importId: number,
   importedAt: number,
 ): CursorInsertStatement[][] {

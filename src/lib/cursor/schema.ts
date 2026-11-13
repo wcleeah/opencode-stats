@@ -19,6 +19,7 @@ const SCHEMA_STATEMENTS = [
     automation_id TEXT,
     kind TEXT NOT NULL,
     model TEXT NOT NULL,
+    product TEXT,
     max_mode INTEGER NOT NULL DEFAULT 0,
     tokens_input_cache_write INTEGER NOT NULL DEFAULT 0,
     tokens_input INTEGER NOT NULL DEFAULT 0,
@@ -97,6 +98,17 @@ export async function ensureCursorSchema(): Promise<{ error: string | null }> {
           schemaReady = null;
           throw new Error(grokColumn.error);
         }
+      }
+
+      const productColumn = await execute(
+        `ALTER TABLE cursor_usage_events ADD COLUMN product TEXT`,
+      );
+      if (
+        productColumn.error &&
+        !productColumn.error.toLowerCase().includes('duplicate column')
+      ) {
+        schemaReady = null;
+        throw new Error(productColumn.error);
       }
 
       const seed = await execute(

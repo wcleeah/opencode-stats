@@ -1,0 +1,299 @@
+{
+  "schema_version": 1,
+  "captured_at": "2026-10-30T00:50:00+08:00",
+  "source": "grok_bot_check_subscription_usage",
+  "plan": "Cursor Ultra",
+  "weekly_usage_percent_used": 21.6,
+  "reset_at": {
+    "timezone": "Asia/Hong_Kong",
+    "label": "Wednesday, Nov 4 at 11:01",
+    "iso_approx": "2026-11-04T11:01:00+08:00"
+  },
+  "on_demand": {
+    "monthly_limit": null,
+    "amount": null
+  },
+  "reports": [
+    {
+      "period": "this_week",
+      "period_label": "Oct 28 \u2013 Oct 29, UTC",
+      "breakdown": [
+        "bot",
+        "routine"
+      ],
+      "rows": [
+        {
+          "bot": "Meovv \u00b7 cool girl",
+          "share_pct": 39,
+          "children": [
+            {
+              "routine": "Deleted routines",
+              "share_pct": 18
+            },
+            {
+              "routine": "meovv-search",
+              "share_pct": 2,
+              "paused": true
+            },
+            {
+              "routine": "meovv-edition-rerun-2026-10-12-search",
+              "share_pct": 2,
+              "paused": true
+            },
+            {
+              "routine": "meovv-context",
+              "share_pct": 0.5,
+              "paused": true,
+              "note": "<1%"
+            },
+            {
+              "routine": "Not from a routine",
+              "share_pct": 17
+            }
+          ]
+        },
+        {
+          "bot": "dr eggbot",
+          "share_pct": 22,
+          "children": [
+            {
+              "routine": "transcript-healthcheck",
+              "share_pct": 0.5,
+              "runs_per_week_approx": 7,
+              "note": "<1%"
+            },
+            {
+              "routine": "Not from a routine",
+              "share_pct": 22
+            }
+          ]
+        },
+        {
+          "bot": "GG Comebacks",
+          "share_pct": 12,
+          "children": [
+            {
+              "routine": "Deleted routines",
+              "share_pct": 6
+            },
+            {
+              "routine": "gg-finder",
+              "share_pct": 1,
+              "runs_per_week_approx": 7
+            },
+            {
+              "routine": "Not from a routine",
+              "share_pct": 5
+            }
+          ]
+        },
+        {
+          "bot": "Bus",
+          "share_pct": 6,
+          "children": [
+            {
+              "routine": "to-work-morning",
+              "share_pct": 0.5,
+              "runs_per_week_approx": 3,
+              "note": "<1%"
+            },
+            {
+              "routine": "Not from a routine",
+              "share_pct": 6
+            }
+          ]
+        },
+        {
+          "bot": "Secretary",
+          "share_pct": 4,
+          "children": [
+            {
+              "routine": "new-email-watch",
+              "share_pct": 2,
+              "paused": true
+            },
+            {
+              "routine": "afternoon-brief",
+              "share_pct": 0.5,
+              "runs_per_week_approx": 7,
+              "note": "<1%"
+            },
+            {
+              "routine": "morning-brief",
+              "share_pct": 0.5,
+              "runs_per_week_approx": 7,
+              "note": "<1%"
+            },
+            {
+              "routine": "Deleted routines",
+              "share_pct": 0.5,
+              "note": "<1%"
+            },
+            {
+              "routine": "Not from a routine",
+              "share_pct": 2
+            }
+          ]
+        },
+        {
+          "bot": "Political Junkie",
+          "share_pct": 3
+        },
+        {
+          "bot": "Water",
+          "share_pct": 3
+        },
+        {
+          "bot": "Deleted bots, group chats and other people's bots",
+          "share_pct": 3
+        },
+        {
+          "bot": "AvTalk",
+          "share_pct": 2
+        },
+        {
+          "bot": "Twitter AI News",
+          "share_pct": 1
+        },
+        {
+          "bot": "Fansite",
+          "share_pct": 1
+        },
+        {
+          "bot": "Sec Desk",
+          "share_pct": 1
+        },
+        {
+          "bot": "Fim \u00b7 Fearnot",
+          "share_pct": 1
+        },
+        {
+          "bot": "DevOps",
+          "share_pct": 1
+        },
+        {
+          "bot": "IT Guy",
+          "share_pct": 1
+        },
+        {
+          "bot": "Music Recs",
+          "share_pct": 0.5,
+          "note": "<1%"
+        },
+        {
+          "bot": "Chief of Staff",
+          "share_pct": 0.5,
+          "note": "<1%"
+        }
+      ]
+    },
+    {
+      "period": "this_week",
+      "period_label": "Oct 28 \u2013 Oct 29, UTC",
+      "breakdown": [
+        "activity",
+        "bot"
+      ],
+      "rows": [
+        {
+          "activity": "chats",
+          "label": "Chats with the user",
+          "share_pct": 47,
+          "children": [
+            {
+              "bot": "dr eggbot",
+              "share_pct": 19
+            },
+            {
+              "bot": "Meovv \u00b7 cool girl",
+              "share_pct": 12
+            },
+            {
+              "bot": "Bus",
+              "share_pct": 5
+            },
+            {
+              "bot": "GG Comebacks",
+              "share_pct": 3
+            }
+          ]
+        },
+        {
+          "activity": "routines",
+          "label": "Routines",
+          "share_pct": 41,
+          "children": [
+            {
+              "bot": "Meovv \u00b7 cool girl",
+              "share_pct": 24
+            },
+            {
+              "bot": "GG Comebacks",
+              "share_pct": 8
+            },
+            {
+              "bot": "Water",
+              "share_pct": 3
+            }
+          ]
+        },
+        {
+          "activity": "bot_to_bot",
+          "label": "Bot-to-Bot",
+          "share_pct": 12
+        }
+      ]
+    },
+    {
+      "period": "last_7_days",
+      "period_label": "Oct 22 \u2013 Oct 29, UTC",
+      "breakdown": [
+        "day",
+        "bot"
+      ],
+      "rows": [
+        {
+          "day": "2026-10-22",
+          "label": "Thu, Oct 22",
+          "share_pct": 6
+        },
+        {
+          "day": "2026-10-23",
+          "label": "Fri, Oct 23",
+          "share_pct": 39
+        },
+        {
+          "day": "2026-10-24",
+          "label": "Sat, Oct 24",
+          "share_pct": 21
+        },
+        {
+          "day": "2026-10-25",
+          "label": "Sun, Oct 25",
+          "share_pct": 9
+        },
+        {
+          "day": "2026-10-26",
+          "label": "Mon, Oct 26",
+          "share_pct": 1
+        },
+        {
+          "day": "2026-10-27",
+          "label": "Tue, Oct 27",
+          "share_pct": 0.5,
+          "note": "<1%"
+        },
+        {
+          "day": "2026-10-28",
+          "label": "Wed, Oct 28",
+          "share_pct": 13
+        },
+        {
+          "day": "2026-10-29",
+          "label": "Thu, Oct 29",
+          "share_pct": 11
+        }
+      ]
+    }
+  ]
+}

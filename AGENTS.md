@@ -160,6 +160,7 @@ These affect how you query and display data:
 | `CURSOR_API_KEY` | Cursor Cloud Agents API key (Dashboard → API Keys). Required for the Cursor page **Update pricing** button. | unset |
 | `CURSOR_AGENT_REPO_URL` | GitHub repo the pricing agent should work in | `https://github.com/wcleeah/opencode-stats` |
 | `CURSOR_AGENT_STARTING_REF` | Branch the pricing agent starts from | `main` |
+| `GROK_BOT_INGEST_SECRET` | Bearer secret for `POST /api/cursor/grok/usage`. Unset rejects ingest. | unset |
 
 ## Dependencies to Use
 

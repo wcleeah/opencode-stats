@@ -34,7 +34,6 @@ const INSERT_SQL = `INSERT OR IGNORE INTO cursor_usage_events (
 /** Bindings per event row. Keep under SQLite's common 999 variable cap. */
 export const CURSOR_EVENT_PARAM_COUNT = CURSOR_EVENT_COLUMNS.length;
 
-/** Rows per INSERT … VALUES (…), (…). 50 * 17 = 850 placeholders. */
 export const CURSOR_IMPORT_ROWS_PER_STATEMENT = 50;
 
 /**
